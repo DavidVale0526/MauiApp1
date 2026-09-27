@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MauiApp1.Presentation.ViewModels;
 using MauiApp1.Presentation.Views;
 using MauiApp1.Application.Storage;
+using MauiApp1.Application.Authentication;
 using MauiApp1.Infrastructure.Persistence;
 
 namespace MauiApp1
@@ -20,8 +21,12 @@ namespace MauiApp1
                 });
 
             builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddTransient<AccessPage>();
+            builder.Services.AddTransient<AccessPageViewModel>();
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<MainPageViewModel>();
+            builder.Services.AddTransient<CashierSetupPage>();
+            builder.Services.AddTransient<CashierSetupViewModel>();
             builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,
                 LocalPersistenceServiceCollectionExtensions.DatabaseFileName));
 

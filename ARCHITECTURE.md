@@ -31,3 +31,12 @@ Android requiere la carga MAUI de Android y un SDK/emulador o dispositivo config
 - Se usa EF Core 10.0.12 y `SQLitePCLRaw.bundle_e_sqlite3` 3.0.5. La versión explícita del bundle evita restaurar la versión 2.1.11 señalada por la auditoría de NuGet.
 
 La base central no se comparte como archivo con las aplicaciones. Se agregará al servicio coordinador Windows cuando se implemente ese módulo; en esta etapa cada app solo accede a su archivo privado local.
+
+El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
+
+## Acceso local (T1.3)
+
+- En la primera apertura, cada instalación solicita crear una sola cuenta Administrador. Un Administrador con sesión iniciada puede agregar cuentas Cajero en ese mismo dispositivo. Windows y Android mantienen sus registros de cuentas separados hasta que el coordinador LAN y la autenticación compartida se implementen en T7.1.
+- Cada cuenta usa nombre de usuario normalizado para no distinguir mayúsculas/minúsculas. El secreto no se persiste: se guarda una sal aleatoria y una derivación PBKDF2-HMAC-SHA256 de 600,000 iteraciones. Las contraseñas deben tener al menos 15 caracteres y pueden contener espacios y cualquier carácter; no hay reglas de composición.
+- La sesión vive solo en memoria, se borra al cerrar sesión y no se restaura al reiniciar la app. La Shell muestra la vista principal solo durante una sesión autenticada. El rol Cajero todavía no tiene restricciones sobre funciones de negocio; la matriz queda pendiente.
+- No hay recuperación de contraseña ni restablecimiento desde la app. Un olvido requiere una futura decisión/proceso de soporte; no se guarda una contraseña de recuperación.

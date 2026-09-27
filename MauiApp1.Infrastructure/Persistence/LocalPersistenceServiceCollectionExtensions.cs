@@ -1,4 +1,6 @@
 using MauiApp1.Application.Storage;
+using MauiApp1.Application.Authentication;
+using MauiApp1.Infrastructure.Authentication;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,8 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddSingleton<ILocalDeviceIdentity>(provider => provider.GetRequiredService<LocalDatabaseInitializer>());
         services.AddScoped<IOperationOutbox, EfOperationOutbox>();
         services.AddScoped<ILocalUnitOfWork>(provider => provider.GetRequiredService<LocalDbContext>());
+        services.AddSingleton<Pbkdf2PasswordHasher>();
+        services.AddSingleton<IAuthenticationService, LocalAuthenticationService>();
         return services;
     }
 }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.AccessPage"
+             x:DataType="viewModels:AccessPageViewModel"
+             Title="Acceso">
+    <ScrollView>
+        <Grid Padding="24" RowDefinitions="*,Auto,*">
+            <VerticalStackLayout Grid.Row="1" Spacing="16" MaximumWidthRequest="440"
+                                 HorizontalOptions="Center" VerticalOptions="Center">
+                <Label Text="Miscelánea Ari" FontSize="30" FontAttributes="Bold"
+                       HorizontalTextAlignment="Center" />
+                <Label Text="{Binding Title}" FontSize="20" HorizontalTextAlignment="Center" />
+
+                <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="8">
+                    <Label Text="Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión."
+                           HorizontalTextAlignment="Center" />
+                    <Label Text="La cuenta se guarda solo en este dispositivo hasta que se implemente la sincronización LAN."
+                           FontSize="12" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <Entry Placeholder="Nombre de usuario" Text="{Binding UserName}" ReturnType="Next" />
+                <Entry Placeholder="Contraseña (mínimo 15 caracteres)" Text="{Binding Password}" IsPassword="True"
+                       ReturnType="Next" />
+                <Entry Placeholder="Confirma la contraseña" Text="{Binding PasswordConfirmation}"
+                       IsPassword="True" IsVisible="{Binding IsSetupMode}"
+                       ReturnType="Go" />
+
+                <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
+
+                <Button Text="Crear cuenta de Administrador" Command="{Binding CreateAdministratorCommand}"
+                        IsVisible="{Binding IsSetupMode}" />
+                <Button Text="Iniciar sesión" Command="{Binding SignInCommand}"
+                        IsVisible="{Binding IsLoginMode}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+</ContentPage>

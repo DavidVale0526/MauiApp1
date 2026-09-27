@@ -6,16 +6,16 @@
              x:DataType="viewModels:MainPageViewModel"
              Title="{Binding Title}">
     <Grid Padding="24">
-        <VerticalStackLayout Spacing="12"
-                             VerticalOptions="Center"
-                             HorizontalOptions="Center">
-            <Label Text="{Binding Title}"
-                   FontSize="28"
-                   FontAttributes="Bold"
+        <VerticalStackLayout Spacing="16" VerticalOptions="Center" HorizontalOptions="Center">
+            <Label Text="{Binding Title}" FontSize="28" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
-            <Label Text="{Binding Description}"
-                   FontSize="16"
+            <Label Text="Sesión iniciada como" FontSize="16" HorizontalTextAlignment="Center" />
+            <Label Text="{Binding CurrentUserName}" FontSize="22" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
+            <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
+            <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
+                    Clicked="OnCreateCashierAccountClicked" />
+            <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

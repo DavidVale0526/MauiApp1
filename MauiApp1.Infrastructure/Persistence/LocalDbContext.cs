@@ -15,6 +15,8 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
 
+    internal DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -54,6 +56,25 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasColumnType("INTEGER");
             entity.HasIndex(item => new { item.Status, item.CreatedAtUtc });
             entity.HasIndex(item => item.DeviceId);
+        });
+
+        modelBuilder.Entity<UserAccountEntity>(entity =>
+        {
+            entity.ToTable("UserAccounts");
+            entity.HasKey(item => item.UserId);
+            entity.Property(item => item.UserId).ValueGeneratedNever();
+            entity.Property(item => item.UserName).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.NormalizedUserName).HasMaxLength(80).IsRequired();
+            entity.HasIndex(item => item.NormalizedUserName).IsUnique();
+            entity.Property(item => item.PasswordSalt).IsRequired();
+            entity.Property(item => item.PasswordHash).IsRequired();
+            entity.Property(item => item.PasswordIterations).IsRequired();
+            entity.Property(item => item.Role).IsRequired();
+            entity.Property(item => item.IsEnabled).IsRequired();
+            entity.Property(item => item.CreatedAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
         });
     }
 }
