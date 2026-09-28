@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.InventoryMovementHistoryPage"
+             x:DataType="viewModels:InventoryMovementHistoryViewModel"
+             Title="Movimientos de inventario">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
+        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+        <Label Grid.Row="1" Text="Movimientos de inventario" FontSize="28" FontAttributes="Bold" />
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <Label Grid.Column="0" Text="Entradas y salidas, de la más reciente a la más antigua." VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked" />
+        </Grid>
+        <Grid Grid.Row="3">
+            <CollectionView ItemsSource="{Binding Movements}">
+                <CollectionView.EmptyView>
+                    <Label Text="Aún no hay movimientos registrados." HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:InventoryMovementHistoryCard">
+                        <Border Padding="16" Margin="0,0,0,12" Stroke="#808080" StrokeThickness="1">
+                            <VerticalStackLayout Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Grid.Column="0" Text="{Binding TypeText}" FontSize="18" FontAttributes="Bold" />
+                                    <Label Grid.Column="1" Text="{Binding DateText}" HorizontalTextAlignment="End" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Grid.Column="0" Text="{Binding ProductText}" FontAttributes="Bold" />
+                                    <Label Grid.Column="1" Text="{Binding QuantityText}" HorizontalTextAlignment="End" />
+                                </Grid>
+                                <Label Text="{Binding ReasonText}" />
+                                <Label Text="{Binding ReferenceText}" FontSize="12" Opacity="0.75" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center" InputTransparent="True" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                               HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
+    </Grid>
+</ContentPage>

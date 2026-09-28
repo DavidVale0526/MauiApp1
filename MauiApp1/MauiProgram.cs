@@ -37,6 +37,8 @@ namespace MauiApp1
             builder.Services.AddTransient<PurchaseRegistrationViewModel>();
             builder.Services.AddTransient<PurchaseHistoryPage>();
             builder.Services.AddTransient<PurchaseHistoryViewModel>();
+            builder.Services.AddTransient<InventoryMovementHistoryPage>();
+            builder.Services.AddTransient<InventoryMovementHistoryViewModel>();
             builder.Services.AddTransient<OtherExitPage>();
             builder.Services.AddTransient<OtherExitViewModel>();
             builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,

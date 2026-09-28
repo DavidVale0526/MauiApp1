@@ -11,6 +11,10 @@ internal sealed class InventoryMovementEntity
 
     public Guid ProductId { get; set; }
 
+    public string ProductNameSnapshot { get; set; } = string.Empty;
+
+    public string UnitSnapshot { get; set; } = string.Empty;
+
     public int Type { get; set; }
 
     public long QuantityMilliUnits { get; set; }

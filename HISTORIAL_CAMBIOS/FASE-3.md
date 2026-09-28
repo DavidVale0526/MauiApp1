@@ -121,3 +121,30 @@ Se persisten solamente fecha/hora UTC, producto y cantidad recibida. No se añad
 - Infrastructure, MAUI Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron correctamente con 0 advertencias y 0 errores.
 - Smoke check SQLite: exceso rechazado con saldo intacto y sin Outbox/movimiento parcial; motivo vacío rechazado; vencimiento y Otro con descripción aceptados; saldo y movimiento guardados una vez; reintento idempotente; mismo identificador con razón distinta rechazado.
 - La revisión visual manual en Windows queda pendiente del usuario; Android físico/emulador también pendiente.
+
+## T3.5 — Consultar movimientos
+
+### Creados
+
+- `MauiApp1.Application/Inventory/InventoryMovementHistoryEntry.cs` — contrato de consulta con tipo, `OperationId`, datos históricos del producto, cantidad, fecha y motivo.
+- `MauiApp1/Presentation/ViewModels/InventoryMovementHistoryViewModel.cs` — carga, estado de espera/error y formato local de movimientos.
+- `MauiApp1/Presentation/Views/InventoryMovementHistoryPage.xaml`, `.xaml.cs` — consulta de solo lectura con actualizar, lista vacía y regreso al menú.
+- `MauiApp1.Infrastructure/Persistence/Migrations/20260928100000_InventoryMovementSnapshots.cs` y `.Designer.cs` — snapshots obligatorios de nombre/unidad y backfill para los movimientos previos.
+
+### Modificados
+
+- `MauiApp1.Infrastructure/Persistence/Entities/InventoryMovementEntity.cs`, `LocalDbContext.cs` y `Migrations/LocalDbContextModelSnapshot.cs` — almacenamiento/mapeo de nombre y unidad al momento del movimiento.
+- `MauiApp1.Infrastructure/Inventory/InventoryMovementWriter.cs` — captura snapshots con el producto utilizado al preparar el movimiento.
+- `MauiApp1.Application/Inventory/IInventoryMovementService.cs` y `InventoryOperationPayload.cs` — contrato de consulta y snapshots opcionales en payloads de sincronización.
+- `MauiApp1.Infrastructure/Products/EfInventoryMovementService.cs` — consulta local autenticada en orden descendente y payload nuevo con nombre/unidad históricos.
+- `MauiApp1/MauiProgram.cs`, `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs` — registro DI y acceso desde «Historial de movimientos».
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — alcance, compatibilidad futura T7.2 y evidencia.
+
+### Comportamiento y verificación
+
+- Cada movimiento conserva el nombre y la unidad que tenía el producto al registrarse. La migración completa estos datos para movimientos previos usando el catálogo vigente al actualizar la base.
+- La pantalla distingue entrada por compra, salida por venta y otra salida; muestra cantidad con signo, producto/unidad, fecha/hora local, motivo cuando existe y referencia corta de la operación. Solo lee el libro existente; no crea una copia ni filtros.
+- El payload de salida nuevo incluye nombre/unidad históricos. T7.2 deberá admitir payloads antiguos donde esos campos falten.
+- Infrastructure, Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores.
+- Smoke check SQLite pasó migración desde versión anterior, backfill de movimiento existente, orden cronológico, tipo/motivo, snapshots tras renombrar producto y consulta autenticada.
+- Queda pendiente la revisión visual manual Windows del usuario; Android físico/emulador sigue pendiente.

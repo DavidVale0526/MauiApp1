@@ -30,13 +30,23 @@ internal sealed class EfInventoryMovementService(
             return InventoryOperationResult.Failure(validationError);
         }
 
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var productIds = lines.Select(line => line.ProductId.Value).Distinct().ToArray();
+        var productSnapshots = await context.Products.AsNoTracking()
+            .Where(product => productIds.Contains(product.ProductId))
+            .ToDictionaryAsync(product => product.ProductId,
+                product => (product.Name, product.Unit), cancellationToken);
         var payloadJson = JsonSerializer.Serialize(new InventoryOperationPayload(
             operation.OperationId,
             operation.OccurredAtUtc,
-            lines.Select(line => new InventoryMovementPayloadLine(
-                line.LineNumber, line.ProductId.Value, line.Type, line.Quantity.MilliUnits, line.Reason)).ToArray()));
+            lines.Select(line =>
+            {
+                productSnapshots.TryGetValue(line.ProductId.Value, out var snapshot);
+                return new InventoryMovementPayloadLine(
+                    line.LineNumber, line.ProductId.Value, line.Type, line.Quantity.MilliUnits, line.Reason,
+                    snapshot.Name, snapshot.Unit);
+            }).ToArray()));
 
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var result = await movementWriter.StageAsync(
             context, operation, actor.Id.Value, OutboxOperationType, payloadJson,
             requireActiveProducts: true, cancellationToken);
@@ -54,5 +64,41 @@ internal sealed class EfInventoryMovementService(
         {
             return InventoryOperationResult.Failure("No se pudo guardar el movimiento completo. Inténtalo de nuevo con el mismo identificador de operación.");
         }
+    }
+
+    public async Task<IReadOnlyList<InventoryMovementHistoryEntry>> GetHistoryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (authenticationService.CurrentUser is null)
+        {
+            return [];
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await context.InventoryMovements.AsNoTracking()
+            .OrderByDescending(movement => movement.OccurredAtUtc)
+            .ThenByDescending(movement => movement.MovementId)
+            .Select(movement => new
+            {
+                movement.MovementId,
+                movement.OperationId,
+                movement.Type,
+                movement.ProductNameSnapshot,
+                movement.UnitSnapshot,
+                movement.QuantityMilliUnits,
+                movement.OccurredAtUtc,
+                movement.Reason
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(row => new InventoryMovementHistoryEntry(
+            row.MovementId,
+            row.OperationId,
+            (InventoryMovementType)row.Type,
+            row.ProductNameSnapshot,
+            row.UnitSnapshot,
+            row.QuantityMilliUnits,
+            row.OccurredAtUtc,
+            row.Reason)).ToArray();
     }
 }

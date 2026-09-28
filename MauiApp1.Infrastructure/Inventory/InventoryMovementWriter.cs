@@ -94,6 +94,8 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
                 OperationId = operation.OperationId,
                 LineNumber = line.LineNumber,
                 ProductId = line.ProductId.Value,
+                ProductNameSnapshot = products[line.ProductId.Value].Name,
+                UnitSnapshot = products[line.ProductId.Value].Unit,
                 Type = (int)line.Type,
                 QuantityMilliUnits = line.Quantity.MilliUnits,
                 Reason = line.Reason,

@@ -80,6 +80,11 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasDefaultValue("")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("QuantityMilliUnits")
                         .HasColumnType("INTEGER");
 
@@ -88,6 +93,11 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Type")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("UnitSnapshot")
+                        .IsRequired()
+                        .HasDefaultValue("")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("MovementId");
 

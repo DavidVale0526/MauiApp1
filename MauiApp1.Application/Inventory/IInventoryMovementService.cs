@@ -6,4 +6,8 @@ public interface IInventoryMovementService
     Task<InventoryOperationResult> ApplyAsync(
         InventoryOperationDraft operation,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the immutable local movement ledger, newest first.</summary>
+    Task<IReadOnlyList<InventoryMovementHistoryEntry>> GetHistoryAsync(
+        CancellationToken cancellationToken = default);
 }

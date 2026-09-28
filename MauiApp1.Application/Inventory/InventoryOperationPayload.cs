@@ -12,4 +12,6 @@ public sealed record InventoryMovementPayloadLine(
     Guid ProductId,
     InventoryMovementType Type,
     long QuantityMilliUnits,
-    string? Reason);
+    string? Reason,
+    string? ProductNameSnapshot = null,
+    string? UnitSnapshot = null);

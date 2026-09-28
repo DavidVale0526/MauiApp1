@@ -63,12 +63,13 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 
 ## Movimientos de inventario (T3.1)
 
-- `InventoryMovements` es el historial de líneas de movimiento. Cada línea conserva identificador, `OperationId`, número de línea, producto, tipo, cantidad en milésimas, motivo opcional, fecha UTC y usuario responsable. La clave única `(OperationId, LineNumber)` y la clave de idempotencia del Outbox impiden volver a aplicar el mismo movimiento.
+- `InventoryMovements` es el historial de líneas de movimiento. Cada línea conserva identificador, `OperationId`, número de línea, producto, snapshot histórico de nombre/unidad, tipo, cantidad en milésimas, motivo opcional, fecha UTC y usuario responsable. La clave única `(OperationId, LineNumber)` y la clave de idempotencia del Outbox impiden volver a aplicar el mismo movimiento. La migración T3.5 completa snapshots anteriores desde el catálogo disponible al migrar.
 - Los tipos de dominio son `PurchaseEntry`, `SaleExit` y `OtherExit`. Una salida distinta de venta exige motivo. Una operación agrupa líneas de un mismo tipo; futuras entidades de compra y venta deberán reutilizar su `OperationId` como vínculo.
 - `Products.StockMilliUnits` conserva el saldo actual consultable. `EfInventoryMovementService` actualiza saldo, añade historial y añade Outbox usando el mismo contexto/`SaveChanges`, que EF Core confirma como una transacción SQLite. El servicio solo agrega movimientos; no ofrece editar ni borrar el historial.
 - El reintento idéntico del mismo usuario y `OperationId` devuelve “ya aplicado”; reutilizar el identificador con otro usuario/tipo/contenido se rechaza. La cantidad debe ser positiva y las fechas deben llegar en UTC.
-- La regla operativa para existencias negativas aún no está aprobada. Por ello, el caso de uso exige que la operación indique explícitamente `NegativeStockPolicy` (`Reject` o `Allow`) y no supone una política predeterminada. T3.4/T4.1 deben resolver esa decisión antes de habilitar salidas correspondientes.
-- Este paso solo crea modelo, persistencia, migración y servicio de aplicación. Los flujos/pantallas de compras, ventas, otras salidas y consulta del historial pertenecen a sus tareas posteriores.
+- Se rechazan salidas locales que dejarían saldo negativo, según la decisión T3.4; T4.1 debe aplicar la misma regla.
+- `EfInventoryMovementService.GetHistoryAsync` ofrece una lectura autenticada, local, de solo lectura, ordenada por fecha descendente. La pantalla muestra tipo, snapshot de producto/cantidad/unidad, fecha local, motivo y referencia corta del `OperationId`. Compras y futuras ventas mantienen el vínculo por `OperationId`.
+- El payload nuevo de movimientos incluye nombre/unidad históricos para replicar el mismo significado en LAN. Los payloads anteriores pueden carecer de esos campos; T7.2 debe conservar compatibilidad al recibirlos. La consulta no agrega filtros ni una tabla paralela y queda disponible como fuente para reportes.
 
 ## Compras y entradas (T3.2)
 

@@ -19,6 +19,7 @@
             <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" />
             <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" />
             <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" />
+            <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" />
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
