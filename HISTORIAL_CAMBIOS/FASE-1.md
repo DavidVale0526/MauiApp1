@@ -91,3 +91,17 @@ La comprobación temporal aplicó la migración y verificó alta única del Admi
 - Android compiló correctamente y generó `MauiApp1/MauiApp1/bin/Debug/net10.0-android/com.companyname.mauiapp1-Signed.apk`. La instalación y apertura en el teléfono físico quedan reservadas para la verificación final del usuario.
 - Un verificador temporal creó una cuenta y una operación pendiente en un primer proceso, terminó ese proceso y recuperó/inició sesión/leyó la operación en un segundo proceso. No utilizó clientes de red; no se apagaron adaptadores del equipo.
 - Los directorios y bases temporales del verificador se eliminaron. T1.4 no se declara terminada hasta recibir la comprobación del teléfono y el escenario offline con conectividad deshabilitada.
+
+### Corrección posterior — visibilidad y diagnóstico de acceso
+
+- `MauiApp1/Presentation/ViewModels/AccessPageViewModel.cs` registra las excepciones y el resultado del acceso con `ILogger` sin incluir la contraseña y conserva mensajes genéricos para errores de credenciales.
+- `MauiApp1.Infrastructure/Authentication/LocalAuthenticationService.cs` registra en modo diagnóstico si encontró cuenta, si la contraseña coincidió y si aceptó el acceso, sin registrar usuario, contraseña ni hash.
+- `MauiApp1/AppShell.xaml.cs` registra el cambio de sesión y reemplaza explícitamente el elemento raíz de Shell al entrar o salir, en vez de cambiar solo el contenido de la página ya montada.
+- `MauiApp1/Presentation/Views/AccessPage.xaml` hace visible el mensaje de error solo cuando existe y agrega el texto «Validando acceso…» mientras se procesa el intento.
+- El registro aportado por el usuario confirmó que la contraseña fue aceptada y aisló el fallo en la transición visual posterior a la autenticación. Verificación del arreglo: compilación de Windows y Android con 0 advertencias y 0 errores. La transición en ejecución todavía debe confirmarse ejecutando esta compilación; las credenciales locales no se restablecieron ni modificaron.
+
+### Ajuste de navegación — volver desde alta de Cajero
+
+- `MauiApp1/Presentation/Views/CashierSetupPage.xaml` agrega el botón visible «← Volver».
+- `MauiApp1/Presentation/Views/CashierSetupPage.xaml.cs` cierra la pantalla modal al pulsarlo.
+- Verificación: compilaciones Windows y Android correctas, con 0 advertencias y 0 errores.

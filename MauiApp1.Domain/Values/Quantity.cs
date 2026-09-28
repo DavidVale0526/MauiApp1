@@ -1,6 +1,6 @@
 namespace MauiApp1.Domain.Values;
 
-/// <summary>Cantidad exacta en milésimas; la unidad del producto se definirá en el módulo de catálogo.</summary>
+/// <summary>Cantidad exacta en milésimas; la unidad se conserva por producto en el catálogo.</summary>
 public readonly record struct Quantity(long MilliUnits)
 {
     public const int DecimalPlaces = 3;

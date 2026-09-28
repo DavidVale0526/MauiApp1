@@ -15,4 +15,9 @@ public partial class CashierSetupPage : ContentPage
     {
         await Navigation.PopModalAsync();
     }
+
+    private async void OnBackClicked(object? sender, EventArgs eventArgs)
+    {
+        await Navigation.PopModalAsync();
+    }
 }

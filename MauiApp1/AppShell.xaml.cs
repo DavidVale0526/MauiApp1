@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Presentation.Views;
 
@@ -8,27 +9,25 @@ namespace MauiApp1
     {
         private readonly IServiceProvider _services;
         private readonly IAuthenticationService _authenticationService;
-        private readonly ShellContent _rootContent;
+        private readonly ILogger<AppShell> _logger;
 
-        public AppShell(IServiceProvider services, IAuthenticationService authenticationService)
+        public AppShell(
+            IServiceProvider services,
+            IAuthenticationService authenticationService,
+            ILogger<AppShell> logger)
         {
             InitializeComponent();
             _services = services;
             _authenticationService = authenticationService;
+            _logger = logger;
             FlyoutBehavior = FlyoutBehavior.Disabled;
-            _rootContent = new ShellContent
-            {
-                Title = "Miscelánea Ari",
-                Route = "app",
-                Content = _services.GetRequiredService<AccessPage>()
-            };
-            Items.Add(_rootContent);
             _authenticationService.AuthenticationStateChanged += OnAuthenticationStateChanged;
             ShowCurrentPage();
         }
 
         private void OnAuthenticationStateChanged(object? sender, EventArgs eventArgs)
         {
+            _logger.LogInformation("Shell recibió un cambio de autenticación; encolando actualización de pantalla.");
             Dispatcher.Dispatch(ShowCurrentPage);
         }
 
@@ -38,7 +37,16 @@ namespace MauiApp1
                 ? _services.GetRequiredService<AccessPage>()
                 : _services.GetRequiredService<MainPage>();
 
-            _rootContent.Content = page;
+            var rootContent = new ShellContent
+            {
+                Title = "Miscelánea Ari",
+                Route = "app",
+                Content = page
+            };
+
+            Items.Clear();
+            Items.Add(rootContent);
+            _logger.LogInformation("Shell reemplazó su página raíz por {PageType}.", page.GetType().Name);
         }
     }
 }

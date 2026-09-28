@@ -13,6 +13,8 @@
             <Label Text="{Binding CurrentUserName}" FontSize="22" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
             <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
+            <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" />
+            <Button Text="Administrar productos" Clicked="OnManageProductsClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
             <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />

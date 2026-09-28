@@ -27,13 +27,16 @@
                        IsPassword="True" IsVisible="{Binding IsSetupMode}"
                        ReturnType="Go" />
 
-                <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
+                <Label Text="{Binding ErrorMessage}" TextColor="Firebrick"
+                       IsVisible="{Binding HasError}" />
 
                 <Button Text="Crear cuenta de Administrador" Command="{Binding CreateAdministratorCommand}"
                         IsVisible="{Binding IsSetupMode}" />
                 <Button Text="Iniciar sesión" Command="{Binding SignInCommand}"
                         IsVisible="{Binding IsLoginMode}" />
                 <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="Validando acceso…" FontSize="12" HorizontalTextAlignment="Center"
+                       IsVisible="{Binding IsBusy}" />
             </VerticalStackLayout>
         </Grid>
     </ScrollView>

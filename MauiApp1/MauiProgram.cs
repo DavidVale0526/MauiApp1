@@ -27,6 +27,10 @@ namespace MauiApp1
             builder.Services.AddTransient<MainPageViewModel>();
             builder.Services.AddTransient<CashierSetupPage>();
             builder.Services.AddTransient<CashierSetupViewModel>();
+            builder.Services.AddTransient<CategoryManagementPage>();
+            builder.Services.AddTransient<CategoryManagementViewModel>();
+            builder.Services.AddTransient<ProductManagementPage>();
+            builder.Services.AddTransient<ProductManagementViewModel>();
             builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,
                 LocalPersistenceServiceCollectionExtensions.DatabaseFileName));
 

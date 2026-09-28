@@ -17,6 +17,10 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
 
+    internal DbSet<CategoryEntity> Categories => Set<CategoryEntity>();
+
+    internal DbSet<ProductEntity> Products => Set<ProductEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -75,6 +79,36 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasConversion(UtcDateTimeConverter)
                 .HasColumnType("INTEGER")
                 .IsRequired();
+        });
+
+        modelBuilder.Entity<CategoryEntity>(entity =>
+        {
+            entity.ToTable("Categories");
+            entity.HasKey(item => item.CategoryId);
+            entity.Property(item => item.CategoryId).ValueGeneratedNever();
+            entity.Property(item => item.Name).IsRequired();
+            entity.Property(item => item.NormalizedName).IsRequired();
+            entity.HasIndex(item => item.NormalizedName).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductEntity>(entity =>
+        {
+            entity.ToTable("Products");
+            entity.HasKey(item => item.ProductId);
+            entity.Property(item => item.ProductId).ValueGeneratedNever();
+            entity.Property(item => item.Name).IsRequired();
+            entity.Property(item => item.SalePriceMinorUnits).IsRequired();
+            entity.Property(item => item.StockMilliUnits).IsRequired();
+            entity.Property(item => item.Unit).IsRequired();
+            entity.Property(item => item.CategoryId).IsRequired();
+            entity.Property(item => item.MinimumStockMilliUnits).IsRequired();
+            entity.Property(item => item.IsActive).IsRequired();
+            entity.HasOne<CategoryEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.CategoryId);
+            entity.HasIndex(item => item.IsActive);
         });
     }
 }

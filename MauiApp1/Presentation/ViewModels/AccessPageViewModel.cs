@@ -2,12 +2,14 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using MauiApp1.Application.Authentication;
+using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Presentation.ViewModels;
 
 public sealed class AccessPageViewModel : INotifyPropertyChanged
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly ILogger<AccessPageViewModel> _logger;
     private string _userName = string.Empty;
     private string _password = string.Empty;
     private string _passwordConfirmation = string.Empty;
@@ -15,9 +17,12 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     private bool _isSetupMode;
     private bool _isBusy;
 
-    public AccessPageViewModel(IAuthenticationService authenticationService)
+    public AccessPageViewModel(
+        IAuthenticationService authenticationService,
+        ILogger<AccessPageViewModel> logger)
     {
         _authenticationService = authenticationService;
+        _logger = logger;
         CreateAdministratorCommand = new Command(async () => await CreateAdministratorAsync(), () => !IsBusy);
         SignInCommand = new Command(async () => await SignInAsync(), () => !IsBusy);
     }
@@ -49,8 +54,16 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     public string ErrorMessage
     {
         get => _errorMessage;
-        private set => SetProperty(ref _errorMessage, value);
+        private set
+        {
+            if (SetProperty(ref _errorMessage, value))
+            {
+                OnPropertyChanged(nameof(HasError));
+            }
+        }
     }
+
+    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool IsSetupMode
     {
@@ -89,8 +102,9 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
             IsSetupMode = !await _authenticationService.HasAdministratorAsync();
             ErrorMessage = string.Empty;
         }
-        catch
+        catch (Exception exception)
         {
+            _logger.LogError(exception, "No se pudo preparar la pantalla de acceso.");
             ErrorMessage = "No fue posible preparar el acceso. Cierra y vuelve a abrir la aplicación.";
         }
     }
@@ -132,13 +146,18 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
             var result = await operation();
             if (!result.Succeeded)
             {
+                _logger.LogInformation("La operación de acceso terminó sin autenticar al usuario.");
                 ErrorMessage = result.ErrorMessage ?? "No fue posible completar la operación.";
                 Password = string.Empty;
                 PasswordConfirmation = string.Empty;
+                return;
             }
+
+            _logger.LogDebug("La operación de acceso fue aceptada por el servicio.");
         }
-        catch
+        catch (Exception exception)
         {
+            _logger.LogError(exception, "Falló la operación de autenticación para el usuario {UserName}.", UserName);
             ErrorMessage = "No fue posible completar la operación. Inténtalo de nuevo.";
             Password = string.Empty;
             PasswordConfirmation = string.Empty;

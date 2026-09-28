@@ -4,12 +4,14 @@ using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Authentication;
 
 internal sealed class LocalAuthenticationService(
     IDbContextFactory<LocalDbContext> contextFactory,
-    Pbkdf2PasswordHasher passwordHasher) : IAuthenticationService
+    Pbkdf2PasswordHasher passwordHasher,
+    ILogger<LocalAuthenticationService> logger) : IAuthenticationService
 {
     private const int MinimumPasswordLength = 15;
     private const int MaximumPasswordLength = 1024;
@@ -39,6 +41,7 @@ internal sealed class LocalAuthenticationService(
         }
 
         var normalizedUserName = NormalizeUserName(userName);
+        logger.LogDebug("Acceso: consultando cuenta local (longitud del usuario: {UserNameLength}).", userName.Length);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (await context.UserAccounts.AnyAsync(
                 account => account.Role == (int)UserRole.Administrator, cancellationToken))
@@ -156,19 +159,23 @@ internal sealed class LocalAuthenticationService(
 
         if (account is null)
         {
+            logger.LogInformation("Acceso rechazado: no se encontró una cuenta local habilitada.");
             return AuthenticationResult.Failure("El nombre de usuario o la contraseña no son correctos.");
         }
 
+        logger.LogDebug("Acceso: cuenta habilitada encontrada; verificando contraseña.");
         var passwordIsValid = await Task.Run(
             () => passwordHasher.Verify(password, account.PasswordSalt, account.PasswordHash, account.PasswordIterations),
             cancellationToken);
         if (!passwordIsValid)
         {
+            logger.LogInformation("Acceso rechazado: la verificación de contraseña no coincidió.");
             return AuthenticationResult.Failure("El nombre de usuario o la contraseña no son correctos.");
         }
 
         var user = ToAuthenticatedUser(account);
         SetCurrentUser(user);
+        logger.LogInformation("Acceso aceptado para el rol {Role}.", user.Role);
         return AuthenticationResult.Success(user);
     }
 

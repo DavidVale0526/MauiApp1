@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             xmlns:categories="clr-namespace:MauiApp1.Application.Categories;assembly=MauiApp1.Application"
+             x:Class="MauiApp1.Presentation.Views.CategoryManagementPage"
+             x:DataType="viewModels:CategoryManagementViewModel"
+             Title="Categorías">
+    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <Button Grid.Column="0" Text="← Volver" Clicked="OnCloseClicked"
+                    Padding="12,6" VerticalOptions="Center" />
+            <Label Grid.Column="1" Text="Categorías" FontSize="26" FontAttributes="Bold"
+                   VerticalOptions="Center" />
+        </Grid>
+        <VerticalStackLayout Grid.Row="1" Spacing="8">
+            <Entry Placeholder="Nombre de la categoría" Text="{Binding CategoryName}"
+                   ReturnType="Go" />
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="{Binding SaveButtonText}" Command="{Binding SaveCommand}"
+                        HorizontalOptions="Fill" />
+                <Button Text="Cancelar" Command="{Binding CancelEditCommand}"
+                        IsVisible="{Binding IsEditing}" />
+            </HorizontalStackLayout>
+            <Label Text="El nombre es obligatorio y único. Se ignoran mayúsculas y espacios al comparar."
+                   FontSize="12" />
+            <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
+        </VerticalStackLayout>
+        <ActivityIndicator Grid.Row="2" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                           HorizontalOptions="Center" />
+        <CollectionView Grid.Row="3" ItemsSource="{Binding Categories}"
+                        SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="Todavía no hay categorías. Escribe un nombre para crear la primera."
+                       HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="categories:CategorySummary">
+                    <Grid Padding="8" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <Label Grid.Column="0" Text="{Binding Name}" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="Editar" Clicked="OnEditClicked"
+                                Padding="12,6" />
+                        <Button Grid.Column="2" Text="Eliminar" Clicked="OnDeleteClicked"
+                                Padding="12,6" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

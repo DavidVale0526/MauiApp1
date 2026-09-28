@@ -21,4 +21,24 @@ public partial class MainPage : ContentPage
 
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
+
+    private async void OnManageCategoriesClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<CategoryManagementPage>() is not { } page)
+        {
+            return;
+        }
+
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async void OnManageProductsClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<ProductManagementPage>() is not { } page)
+        {
+            return;
+        }
+
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
 }

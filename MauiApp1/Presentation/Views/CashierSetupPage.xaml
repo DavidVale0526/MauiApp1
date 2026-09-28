@@ -8,6 +8,8 @@
     <ScrollView>
         <VerticalStackLayout Padding="24" Spacing="16" MaximumWidthRequest="440"
                              HorizontalOptions="Center" VerticalOptions="Center">
+            <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start"
+                    Padding="12,6" />
             <Label Text="Crear cuenta de Cajero" FontSize="24" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
             <Label Text="La cuenta se guardará en este dispositivo. Configúrala también en otros equipos hasta que se habilite la sincronización LAN."
