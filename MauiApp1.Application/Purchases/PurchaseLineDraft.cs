@@ -3,4 +3,8 @@ using MauiApp1.Domain.Values;
 
 namespace MauiApp1.Application.Purchases;
 
-public sealed record PurchaseLineDraft(ProductId ProductId, Quantity Quantity);
+public sealed record PurchaseLineDraft(
+    ProductId ProductId,
+    Quantity Quantity,
+    string ProductNameSnapshot,
+    string UnitSnapshot);

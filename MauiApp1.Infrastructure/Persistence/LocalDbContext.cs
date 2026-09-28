@@ -178,6 +178,8 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.OperationId).IsRequired();
             entity.Property(item => item.LineNumber).IsRequired();
             entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.ProductNameSnapshot).IsRequired();
+            entity.Property(item => item.UnitSnapshot).IsRequired();
             entity.Property(item => item.QuantityMilliUnits).IsRequired();
             entity.HasOne<PurchaseEntity>()
                 .WithMany()

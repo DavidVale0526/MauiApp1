@@ -111,7 +111,11 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
             _pendingPurchase = new PurchaseDraft(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
-                Lines.Select(line => new PurchaseLineDraft(line.ProductId, line.Quantity)).ToArray());
+                Lines.Select(line => new PurchaseLineDraft(
+                    line.ProductId,
+                    line.Quantity,
+                    line.Name,
+                    line.Unit)).ToArray());
             _pendingPurchaseAttempted = false;
             OnPropertyChanged(nameof(CanEditLines));
             ((Command)AddLineCommand).ChangeCanExecute();

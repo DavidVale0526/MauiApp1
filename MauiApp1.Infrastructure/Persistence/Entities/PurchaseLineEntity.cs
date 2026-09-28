@@ -8,5 +8,9 @@ internal sealed class PurchaseLineEntity
 
     public Guid ProductId { get; set; }
 
+    public string ProductNameSnapshot { get; set; } = string.Empty;
+
+    public string UnitSnapshot { get; set; } = string.Empty;
+
     public long QuantityMilliUnits { get; set; }
 }

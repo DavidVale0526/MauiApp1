@@ -220,8 +220,16 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("QuantityMilliUnits")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("UnitSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("OperationId", "LineNumber");
 

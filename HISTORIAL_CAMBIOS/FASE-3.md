@@ -63,7 +63,7 @@ Este archivo registra la primera tarea de la fase. Las tareas siguientes se aña
 
 ### Alcance aprobado
 
-Se persisten solamente fecha/hora UTC, producto y cantidad recibida. No se añadieron proveedor, costo, documento de proveedor, lote ni vencimiento. Solo se pueden agregar productos activos. Si se repite un producto, las cantidades se consolidan en un único renglón. El usuario puede quitar renglones antes de revisar/confirmar. Tras una falla, se conserva el mismo borrador/`OperationId` para reintentar su contenido sin modificarlo.
+Se persisten solamente fecha/hora UTC, producto y cantidad recibida. No se añadieron proveedor, costo, documento de proveedor, lote ni vencimiento. Solo se pueden agregar productos activos. Si se repite un producto, las cantidades se consolidan en un único renglón. Para su historial se conserva también el nombre/unidad tal como se mostraban al confirmar. El usuario puede quitar renglones antes de revisar/confirmar. Tras una falla, se conserva el mismo borrador/`OperationId` para reintentar su contenido sin modificarlo.
 
 ### Verificación
 
@@ -72,3 +72,26 @@ Se persisten solamente fecha/hora UTC, producto y cantidad recibida. No se añad
 - MAUI Android (`net10.0-android`): compilación correcta, 0 advertencias y 0 errores.
 - Smoke check con SQLite temporal: migraciones/FK, alta de Administrador e inicio de sesión, producto activo, cantidades positivas, dos renglones del mismo producto consolidados, exactamente una cabecera/renglón/movimiento/Outbox, saldo aumentado correctamente, reintento idempotente y rechazo de contenido distinto con el mismo identificador.
 - La pantalla compila para Windows y Android. La comprobación visual manual de la pantalla en Windows queda pendiente del usuario; Android físico/emulador también pendiente.
+
+## T3.3 — Consultar historial de compras
+
+### Creados
+
+- `MauiApp1.Application/Purchases/PurchaseHistoryEntry.cs` — resultado de consulta con fecha UTC y renglones históricos.
+- `MauiApp1/Presentation/ViewModels/PurchaseHistoryViewModel.cs` — carga, estado, formato de fecha local y cantidades.
+- `MauiApp1/Presentation/Views/PurchaseHistoryPage.xaml`, `.xaml.cs` — lista de solo lectura, estado vacío, actualización manual y regreso.
+- `MauiApp1.Infrastructure/Persistence/Migrations/20260928064547_PurchaseHistorySnapshots.cs` y `.Designer.cs` — columnas para nombre/unidad históricos y backfill de compras previas desde el catálogo existente.
+
+### Modificados
+
+- `MauiApp1.Application/Purchases/IPurchaseService.cs`, `PurchaseLineDraft.cs`, `PurchaseRecordedPayload.cs` — lectura del historial y persistencia/sincronización de snapshots.
+- `MauiApp1.Infrastructure/Purchases/EfPurchaseService.cs` — consulta ordenada sin filtros, captura/valida snapshots, conserva datos históricos después de editar el catálogo.
+- `MauiApp1.Infrastructure/Persistence/Entities/PurchaseLineEntity.cs`, `LocalDbContext.cs` y `Migrations/LocalDbContextModelSnapshot.cs` — persistencia de nombre y unidad del producto al confirmar.
+- `MauiApp1/MauiProgram.cs`, `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs` — registro y acceso al historial desde Inicio.
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — alcance, decisión y evidencia.
+
+### Verificación
+
+- Infrastructure, Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores.
+- Smoke check SQLite validó migración desde una base anterior de T3.2 y backfill de nombre/unidad; consulta ordenada; producto, cantidad consolidada y unidad histórica; persistencia del nombre/unidad originales tras cambiar el catálogo; e idempotencia después de renombrar el producto sin doble aumento de existencias.
+- No se añadieron filtros ni búsqueda. Falta la comprobación visual manual en Windows por el usuario; la prueba Android físico/emulador sigue pendiente.

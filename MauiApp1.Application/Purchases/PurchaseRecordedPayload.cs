@@ -5,4 +5,9 @@ public sealed record PurchaseRecordedPayload(
     DateTime OccurredAtUtc,
     IReadOnlyList<PurchaseRecordedLinePayload> Lines);
 
-public sealed record PurchaseRecordedLinePayload(int LineNumber, Guid ProductId, long QuantityMilliUnits);
+public sealed record PurchaseRecordedLinePayload(
+    int LineNumber,
+    Guid ProductId,
+    string ProductNameSnapshot,
+    string UnitSnapshot,
+    long QuantityMilliUnits);

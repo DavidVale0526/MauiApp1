@@ -29,19 +29,42 @@ internal sealed class EfPurchaseService(
 
         if (purchase is null || purchase.OperationId == Guid.Empty || purchase.OccurredAtUtc.Kind != DateTimeKind.Utc ||
             purchase.Lines is null || purchase.Lines.Count == 0 ||
-            purchase.Lines.Any(line => line.ProductId.IsEmpty || line.Quantity.MilliUnits <= 0))
+            purchase.Lines.Any(line => line.ProductId.IsEmpty || line.Quantity.MilliUnits <= 0 ||
+                                       string.IsNullOrWhiteSpace(line.ProductNameSnapshot) ||
+                                       string.IsNullOrWhiteSpace(line.UnitSnapshot)))
         {
             return PurchaseResult.Failure("La compra requiere fecha UTC, productos válidos y cantidades mayores que cero.");
         }
 
-        List<(Guid ProductId, long QuantityMilliUnits)> normalizedLines;
+        List<(Guid ProductId, string ProductNameSnapshot, string UnitSnapshot, long QuantityMilliUnits)> normalizedLines;
         try
         {
             normalizedLines = purchase.Lines
+                .Select(line => line with
+                {
+                    ProductNameSnapshot = line.ProductNameSnapshot.Trim(),
+                    UnitSnapshot = line.UnitSnapshot.Trim()
+                })
                 .GroupBy(line => line.ProductId.Value)
-                .Select(group => (ProductId: group.Key,
-                    QuantityMilliUnits: group.Aggregate(0L, (total, line) => checked(total + line.Quantity.MilliUnits))))
+                .Select(group =>
+                {
+                    var first = group.First();
+                    if (group.Any(line => line.ProductNameSnapshot != first.ProductNameSnapshot ||
+                                          line.UnitSnapshot != first.UnitSnapshot))
+                    {
+                        throw new ArgumentException("Un mismo producto debe conservar el mismo nombre y unidad en toda la compra.");
+                    }
+
+                    return (ProductId: group.Key,
+                        ProductNameSnapshot: first.ProductNameSnapshot,
+                        UnitSnapshot: first.UnitSnapshot,
+                        QuantityMilliUnits: group.Aggregate(0L, (total, line) => checked(total + line.Quantity.MilliUnits)));
+                })
                 .ToList();
+        }
+        catch (ArgumentException exception)
+        {
+            return PurchaseResult.Failure(exception.Message);
         }
         catch (OverflowException)
         {
@@ -62,7 +85,7 @@ internal sealed class EfPurchaseService(
             purchase.OperationId,
             purchase.OccurredAtUtc,
             normalizedLines.Select((line, index) => new PurchaseRecordedLinePayload(
-                index, line.ProductId, line.QuantityMilliUnits)).ToArray()));
+                index, line.ProductId, line.ProductNameSnapshot, line.UnitSnapshot, line.QuantityMilliUnits)).ToArray()));
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var stageResult = await movementWriter.StageAsync(
@@ -80,12 +103,25 @@ internal sealed class EfPurchaseService(
 
         if (stageResult.AlreadyApplied)
         {
-            var hasPurchase = await context.Purchases.AnyAsync(
+            var existingPurchase = await context.Purchases.AsNoTracking().SingleOrDefaultAsync(
                 existing => existing.OperationId == purchase.OperationId && existing.ActorUserId == actor.Id.Value,
                 cancellationToken);
-            return hasPurchase
+            var persistedLineCount = existingPurchase is null ? 0 : await context.PurchaseLines.AsNoTracking()
+                .CountAsync(line => line.OperationId == purchase.OperationId, cancellationToken);
+            return existingPurchase is not null && persistedLineCount == normalizedLines.Count
                 ? PurchaseResult.Success(alreadyApplied: true)
                 : PurchaseResult.Failure("La operación ya existe, pero no se encontró su compra asociada. No se modificó el inventario.");
+        }
+
+        var productIds = normalizedLines.Select(line => line.ProductId).ToArray();
+        var currentProducts = await context.Products.AsNoTracking()
+            .Where(product => productIds.Contains(product.ProductId))
+            .ToDictionaryAsync(product => product.ProductId, cancellationToken);
+        if (currentProducts.Count != normalizedLines.Count || normalizedLines.Any(line =>
+                !currentProducts.TryGetValue(line.ProductId, out var product) ||
+                !product.IsActive || product.Name != line.ProductNameSnapshot || product.Unit != line.UnitSnapshot))
+        {
+            return PurchaseResult.Failure("Un producto cambió desde que se agregó a la compra. Actualiza la pantalla y vuelve a prepararla.");
         }
 
         context.Purchases.Add(new PurchaseEntity
@@ -101,6 +137,8 @@ internal sealed class EfPurchaseService(
                 OperationId = purchase.OperationId,
                 LineNumber = index,
                 ProductId = line.ProductId,
+                ProductNameSnapshot = line.ProductNameSnapshot,
+                UnitSnapshot = line.UnitSnapshot,
                 QuantityMilliUnits = line.QuantityMilliUnits
             });
         }
@@ -114,5 +152,49 @@ internal sealed class EfPurchaseService(
         {
             return PurchaseResult.Failure("No se pudo guardar la compra completa. Inténtalo de nuevo con el mismo identificador de operación.");
         }
+    }
+
+    public async Task<IReadOnlyList<PurchaseHistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        if (authenticationService.CurrentUser is null)
+        {
+            return [];
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var purchases = await context.Purchases.AsNoTracking()
+            .OrderByDescending(purchase => purchase.OccurredAtUtc)
+            .ThenByDescending(purchase => purchase.OperationId)
+            .Select(purchase => new { purchase.OperationId, purchase.OccurredAtUtc })
+            .ToListAsync(cancellationToken);
+        if (purchases.Count == 0)
+        {
+            return [];
+        }
+
+        var operationIds = purchases.Select(purchase => purchase.OperationId).ToArray();
+        var lines = await context.PurchaseLines.AsNoTracking()
+            .Where(line => operationIds.Contains(line.OperationId))
+            .OrderBy(line => line.LineNumber)
+            .Select(line => new
+            {
+                line.OperationId,
+                line.ProductNameSnapshot,
+                line.UnitSnapshot,
+                line.QuantityMilliUnits
+            })
+            .ToListAsync(cancellationToken);
+        var linesByOperation = lines.GroupBy(line => line.OperationId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<PurchaseHistoryLine>)group.Select(line => new PurchaseHistoryLine(
+                    line.ProductNameSnapshot,
+                    line.UnitSnapshot,
+                    line.QuantityMilliUnits)).ToArray());
+
+        return purchases.Select(purchase => new PurchaseHistoryEntry(
+            purchase.OperationId,
+            purchase.OccurredAtUtc,
+            linesByOperation.GetValueOrDefault(purchase.OperationId, []))).ToArray();
     }
 }
