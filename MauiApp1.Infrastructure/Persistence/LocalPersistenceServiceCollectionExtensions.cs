@@ -6,6 +6,9 @@ using MauiApp1.Infrastructure.Categories;
 using MauiApp1.Application.Products;
 using MauiApp1.Infrastructure.Products;
 using MauiApp1.Application.Inventory;
+using MauiApp1.Application.Purchases;
+using MauiApp1.Infrastructure.Inventory;
+using MauiApp1.Infrastructure.Purchases;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +35,9 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddTransient<ICategoryService, EfCategoryService>();
         services.AddTransient<IProductService, EfProductService>();
         services.AddTransient<IInventoryMovementService, EfInventoryMovementService>();
+        services.AddSingleton(provider => new InventoryMovementWriter(
+            provider.GetRequiredService<ILocalDeviceIdentity>()));
+        services.AddTransient<IPurchaseService, EfPurchaseService>();
         return services;
     }
 }

@@ -23,6 +23,10 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<InventoryMovementEntity> InventoryMovements => Set<InventoryMovementEntity>();
 
+    internal DbSet<PurchaseEntity> Purchases => Set<PurchaseEntity>();
+
+    internal DbSet<PurchaseLineEntity> PurchaseLines => Set<PurchaseLineEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -144,6 +148,46 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.HasIndex(item => new { item.OperationId, item.LineNumber }).IsUnique();
             entity.HasIndex(item => new { item.ProductId, item.OccurredAtUtc });
             entity.HasIndex(item => item.OperationId);
+        });
+
+        modelBuilder.Entity<PurchaseEntity>(entity =>
+        {
+            entity.ToTable("Purchases");
+            entity.HasKey(item => item.OperationId);
+            entity.Property(item => item.OperationId).ValueGeneratedNever();
+            entity.Property(item => item.OccurredAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.OccurredAtUtc);
+        });
+
+        modelBuilder.Entity<PurchaseLineEntity>(entity =>
+        {
+            entity.ToTable("PurchaseLines", table =>
+            {
+                table.HasCheckConstraint("CK_PurchaseLines_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+                table.HasCheckConstraint("CK_PurchaseLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+            });
+            entity.HasKey(item => new { item.OperationId, item.LineNumber });
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.LineNumber).IsRequired();
+            entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.QuantityMilliUnits).IsRequired();
+            entity.HasOne<PurchaseEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.ProductId);
         });
     }
 }

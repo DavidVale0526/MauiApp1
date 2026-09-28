@@ -33,6 +33,8 @@ namespace MauiApp1
             builder.Services.AddTransient<ProductManagementViewModel>();
             builder.Services.AddTransient<StockConsultationPage>();
             builder.Services.AddTransient<StockConsultationViewModel>();
+            builder.Services.AddTransient<PurchaseRegistrationPage>();
+            builder.Services.AddTransient<PurchaseRegistrationViewModel>();
             builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,
                 LocalPersistenceServiceCollectionExtensions.DatabaseFileName));
 

@@ -69,3 +69,11 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - El reintento idéntico del mismo usuario y `OperationId` devuelve “ya aplicado”; reutilizar el identificador con otro usuario/tipo/contenido se rechaza. La cantidad debe ser positiva y las fechas deben llegar en UTC.
 - La regla operativa para existencias negativas aún no está aprobada. Por ello, el caso de uso exige que la operación indique explícitamente `NegativeStockPolicy` (`Reject` o `Allow`) y no supone una política predeterminada. T3.4/T4.1 deben resolver esa decisión antes de habilitar salidas correspondientes.
 - Este paso solo crea modelo, persistencia, migración y servicio de aplicación. Los flujos/pantallas de compras, ventas, otras salidas y consulta del historial pertenecen a sus tareas posteriores.
+
+## Compras y entradas (T3.2)
+
+- `Purchases` guarda una cabecera identificada por el mismo `OperationId` de la compra, con fecha/hora UTC y usuario; `PurchaseLines` guarda producto, número de línea y cantidad en milésimas. La combinación `(OperationId, LineNumber)` es única y las relaciones de producto/usuario son restrictivas para conservar historial.
+- El alcance aprobado de compra contiene solo fecha/hora automática, productos y cantidades recibidas. No incluye proveedor, costo, documento, lotes ni vencimiento. La pantalla incluye solo productos activos y acumula cantidades repetidas del mismo producto.
+- `EfPurchaseService` usa el escritor común de movimientos para preparar en el mismo contexto EF la compra, sus líneas, los movimientos `PurchaseEntry`, el saldo del producto y Outbox. Una única llamada a `SaveChangesAsync` persiste todo en la transacción local SQLite.
+- El payload Outbox `Purchase.Recorded` contiene la compra completa. Repetir la misma operación y contenido no vuelve a sumar existencias; reutilizar el `OperationId` con otro contenido se rechaza. Fallos de validación/persistencia no registran una parte de la compra.
+- La página presenta el resumen antes de guardar. Una respuesta fallida conserva el borrador de operación para reintentar sin cambiar su identificador/contenido. La consulta histórica se implementa en T3.3.

@@ -189,6 +189,52 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.ToTable("Products", (string)null);
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PurchaseEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.ToTable("Purchases", (string)null);
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PurchaseLineEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QuantityMilliUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OperationId", "LineNumber");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("PurchaseLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PurchaseLines_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+
+                            t.HasCheckConstraint("CK_PurchaseLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -252,6 +298,30 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.CategoryEntity", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PurchaseEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PurchaseLineEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.PurchaseEntity", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

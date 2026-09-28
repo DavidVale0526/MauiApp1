@@ -51,4 +51,14 @@ public partial class MainPage : ContentPage
 
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
+
+    private async void OnRegisterPurchaseClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<PurchaseRegistrationPage>() is not { } page)
+        {
+            return;
+        }
+
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
 }
