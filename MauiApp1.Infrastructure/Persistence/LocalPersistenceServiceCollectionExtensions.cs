@@ -5,6 +5,7 @@ using MauiApp1.Application.Categories;
 using MauiApp1.Infrastructure.Categories;
 using MauiApp1.Application.Products;
 using MauiApp1.Infrastructure.Products;
+using MauiApp1.Application.Inventory;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,7 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddSingleton<IAuthenticationService, LocalAuthenticationService>();
         services.AddTransient<ICategoryService, EfCategoryService>();
         services.AddTransient<IProductService, EfProductService>();
+        services.AddTransient<IInventoryMovementService, EfInventoryMovementService>();
         return services;
     }
 }

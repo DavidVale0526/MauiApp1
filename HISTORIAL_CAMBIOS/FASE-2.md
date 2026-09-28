@@ -69,4 +69,21 @@ Nombre y unidad editables, obligatorios y recortados; no se impuso unicidad de n
 
 Migración aplicada a SQLite temporal. Smoke check verificó valores exactos, recorte/validación de nombre y unidad, rechazo de precios/mínimos negativos y categoría inexistente, creación/edición con existencia intacta, desactivación/reactivación con retención, bloqueo FK al borrar categoría en uso y que el fallo no agregó Outbox parcial. Se conservaron cinco operaciones Outbox correspondientes a cambios correctos. Windows y Android compilaron con 0 advertencias y 0 errores. El usuario confirmó visualmente en Windows que la página carga y muestra un producto con categoría, precio, unidad, existencia y mínimo. No se hizo prueba visual Android por falta de emulador/dispositivo.
 
+## T2.3 — Consulta de productos y existencias
+
+### Creados
+
+- `MauiApp1/Presentation/ViewModels/StockConsultationViewModel.cs` — estado, recarga y mensajes de error de la consulta.
+- `MauiApp1/Presentation/Views/StockConsultationPage.xaml`, `.xaml.cs` — pantalla de consulta de solo lectura y botón para volver.
+
+### Modificados
+
+- `MauiApp1/MauiProgram.cs` — registro de página y ViewModel.
+- `MauiApp1/Presentation/Views/MainPage.xaml`, `.xaml.cs` — botón «Consultar existencias».
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — alcance y evidencia de consulta.
+
+### Alcance y verificación
+
+La pantalla muestra producto, estado, categoría, precio vigente, existencia/unidad y mínimo; incluye activos e inactivos, no añade búsqueda/filtros/alertas, recarga al abrir y permite refresco manual. Reutiliza el mismo servicio y tabla de catálogo para reflejar datos persistidos y quedar preparada para que T7 aplique cambios sincronizados en esa tabla. La consulta SQLite de T2.2 verificó lectura tras alta, edición y desactivación. Windows y Android compilaron con 0 advertencias y 0 errores. El usuario confirmó que la consulta visual de existencias funciona en Windows. Prueba visual Android pendiente; no hay dispositivo/emulador disponible.
+
 

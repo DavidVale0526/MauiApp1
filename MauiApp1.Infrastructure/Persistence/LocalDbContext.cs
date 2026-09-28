@@ -21,6 +21,8 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<ProductEntity> Products => Set<ProductEntity>();
 
+    internal DbSet<InventoryMovementEntity> InventoryMovements => Set<InventoryMovementEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -109,6 +111,39 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.CategoryId);
             entity.HasIndex(item => item.IsActive);
+        });
+
+        modelBuilder.Entity<InventoryMovementEntity>(entity =>
+        {
+            entity.ToTable("InventoryMovements", table =>
+            {
+                table.HasCheckConstraint("CK_InventoryMovements_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+                table.HasCheckConstraint("CK_InventoryMovements_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+            });
+            entity.HasKey(item => item.MovementId);
+            entity.Property(item => item.MovementId).ValueGeneratedNever();
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.LineNumber).IsRequired();
+            entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.Type).IsRequired();
+            entity.Property(item => item.QuantityMilliUnits).IsRequired();
+            entity.Property(item => item.Reason);
+            entity.Property(item => item.OccurredAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.OperationId, item.LineNumber }).IsUnique();
+            entity.HasIndex(item => new { item.ProductId, item.OccurredAtUtc });
+            entity.HasIndex(item => item.OperationId);
         });
     }
 }

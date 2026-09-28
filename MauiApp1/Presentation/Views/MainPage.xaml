@@ -15,6 +15,7 @@
             <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
             <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" />
             <Button Text="Administrar productos" Clicked="OnManageProductsClicked" />
+            <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
             <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />

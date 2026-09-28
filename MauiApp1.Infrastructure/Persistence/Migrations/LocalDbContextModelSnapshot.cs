@@ -60,6 +60,54 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.InventoryMovementEntity", b =>
+                {
+                    b.Property<Guid>("MovementId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QuantityMilliUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("MovementId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OperationId");
+
+                    b.HasIndex("OperationId", "LineNumber")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId", "OccurredAtUtc");
+
+                    b.ToTable("InventoryMovements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InventoryMovements_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+
+                            t.HasCheckConstraint("CK_InventoryMovements_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.OutboxMessageEntity", b =>
                 {
                     b.Property<Guid>("OperationId")
@@ -182,6 +230,21 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("UserAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.InventoryMovementEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", b =>

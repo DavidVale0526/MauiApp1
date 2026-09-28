@@ -55,3 +55,17 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - El alta inicia `StockMilliUnits` en cero. La edición del catálogo no puede cambiar existencia; los movimientos de T3 serán su única vía de actualización.
 - Retirar un producto lo marca inactivo en vez de borrarlo. El registro y su identificador permanecen disponibles para historial; se puede reactivar. Alta, edición y cambio de estado escriben el snapshot completo en Outbox en la misma transacción local.
 - La página MAUI compartida permite alta/consulta/edición/desactivación/reactivación y muestra precio, categoría, unidad, existencia y mínimo. La existencia de nuevos productos no requiere LAN ni Internet.
+
+## Consulta de existencias (T2.3)
+
+- La pantalla de solo lectura reutiliza `IProductService.GetAllAsync`; no crea otra tabla ni copia el catálogo. Muestra todos los productos y distingue activos/inactivos, con categoría, precio vigente, existencia/unidad y mínimo.
+- Se recarga al abrir y permite volver a consultar con gesto de actualización. No tiene búsqueda, filtros ni alertas porque no fueron aprobados en este módulo. La sincronización LAN queda en T7; sus cambios deberán actualizar la misma tabla local que esta consulta lee.
+
+## Movimientos de inventario (T3.1)
+
+- `InventoryMovements` es el historial de líneas de movimiento. Cada línea conserva identificador, `OperationId`, número de línea, producto, tipo, cantidad en milésimas, motivo opcional, fecha UTC y usuario responsable. La clave única `(OperationId, LineNumber)` y la clave de idempotencia del Outbox impiden volver a aplicar el mismo movimiento.
+- Los tipos de dominio son `PurchaseEntry`, `SaleExit` y `OtherExit`. Una salida distinta de venta exige motivo. Una operación agrupa líneas de un mismo tipo; futuras entidades de compra y venta deberán reutilizar su `OperationId` como vínculo.
+- `Products.StockMilliUnits` conserva el saldo actual consultable. `EfInventoryMovementService` actualiza saldo, añade historial y añade Outbox usando el mismo contexto/`SaveChanges`, que EF Core confirma como una transacción SQLite. El servicio solo agrega movimientos; no ofrece editar ni borrar el historial.
+- El reintento idéntico del mismo usuario y `OperationId` devuelve “ya aplicado”; reutilizar el identificador con otro usuario/tipo/contenido se rechaza. La cantidad debe ser positiva y las fechas deben llegar en UTC.
+- La regla operativa para existencias negativas aún no está aprobada. Por ello, el caso de uso exige que la operación indique explícitamente `NegativeStockPolicy` (`Reject` o `Allow`) y no supone una política predeterminada. T3.4/T4.1 deben resolver esa decisión antes de habilitar salidas correspondientes.
+- Este paso solo crea modelo, persistencia, migración y servicio de aplicación. Los flujos/pantallas de compras, ventas, otras salidas y consulta del historial pertenecen a sus tareas posteriores.

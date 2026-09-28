@@ -5,4 +5,5 @@ Este directorio registra los cambios de implementación de la solución `MauiApp
 - [Fase 0 — Revisión y decisiones](FASE-0.md)
 - [Fase 1 — Base MAUI, persistencia y acceso](FASE-1.md)
 - [Fase 2 — Categorías y catálogo](FASE-2.md)
+- [Fase 3 — Movimientos, compras y salidas no comerciales](FASE-3.md)
 
