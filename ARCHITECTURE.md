@@ -88,3 +88,11 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - Política aprobada: bloquear si el saldo local resultante sería negativo. La pantalla valida el saldo actual para anticipar el error y el escritor lo vuelve a validar al guardar. La respuesta incluye saldo disponible y cantidad solicitada.
 - Producto, saldo, línea inmutable de movimiento y Outbox se guardan en la misma transacción SQLite. Solo se aceptan productos activos; la consulta/registro local no requiere LAN ni Internet. T4.1 debe respetar la misma política de stock negativo.
 - La pantalla es de una salida y un producto por operación, con resumen/confirmación. Las anulaciones/correcciones y los conflictos por operaciones simultáneas fuera de LAN siguen pendientes.
+
+## Registro de ventas (T4.1)
+
+- `Sales` guarda una cabecera por `OperationId`, fecha UTC, usuario y total en centavos. `SaleLines` conserva producto, nombre/unidad/precio históricos, cantidad en milésimas e importe de línea en centavos. Renglones con el mismo producto se consolidan; el mismo producto debe conservar un único snapshot de nombre, unidad y precio por venta.
+- El cálculo convierte precio a centavos y cantidad a milésimas. Cada subtotal de línea se redondea a centavos con `MidpointRounding.AwayFromZero` (mitades hacia arriba); el total de venta suma los importes de línea ya redondeados.
+- `EfSaleService` aplica el stock policy `Reject` e incorpora `SaleExit`, saldo actualizado, venta/cabecera/renglones y payload `Sale.Recorded` en el mismo contexto y `SaveChanges`. SQLite confirma la operación local de forma atómica. La falta de existencia, el producto inactivo o la operación inválida no alteran saldos.
+- Un `OperationId` ya procesado con el mismo actor, tipo y payload devuelve éxito idempotente; reutilizarlo con contenido distinto se rechaza. Los nombres/unidades snapshots del renglón también se guardan en el movimiento para que T3.5 muestre la misma historia.
+- La pantalla permite agregar y quitar líneas antes de confirmar, enseña precio y stock disponible, muestra importes por línea y total, y solicita confirmación. Reintentos mantienen el mismo borrador/id de operación. No registra forma de pago, cliente/crédito, impuesto, descuento o comprobante.

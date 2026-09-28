@@ -27,6 +27,10 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<PurchaseLineEntity> PurchaseLines => Set<PurchaseLineEntity>();
 
+    internal DbSet<SaleEntity> Sales => Set<SaleEntity>();
+
+    internal DbSet<SaleLineEntity> SaleLines => Set<SaleLineEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -184,6 +188,54 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.UnitSnapshot).IsRequired();
             entity.Property(item => item.QuantityMilliUnits).IsRequired();
             entity.HasOne<PurchaseEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.ProductId);
+        });
+
+        modelBuilder.Entity<SaleEntity>(entity =>
+        {
+            entity.ToTable("Sales", table => table.HasCheckConstraint(
+                "CK_Sales_Total_NonNegative", "\"TotalMinorUnits\" >= 0"));
+            entity.HasKey(item => item.OperationId);
+            entity.Property(item => item.OperationId).ValueGeneratedNever();
+            entity.Property(item => item.OccurredAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.Property(item => item.TotalMinorUnits).IsRequired();
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.OccurredAtUtc);
+        });
+
+        modelBuilder.Entity<SaleLineEntity>(entity =>
+        {
+            entity.ToTable("SaleLines", table =>
+            {
+                table.HasCheckConstraint("CK_SaleLines_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+                table.HasCheckConstraint("CK_SaleLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+                table.HasCheckConstraint("CK_SaleLines_Price_NonNegative", "\"SalePriceMinorUnits\" >= 0");
+                table.HasCheckConstraint("CK_SaleLines_Total_NonNegative", "\"LineTotalMinorUnits\" >= 0");
+            });
+            entity.HasKey(item => new { item.OperationId, item.LineNumber });
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.LineNumber).IsRequired();
+            entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.ProductNameSnapshot).IsRequired();
+            entity.Property(item => item.UnitSnapshot).IsRequired();
+            entity.Property(item => item.QuantityMilliUnits).IsRequired();
+            entity.Property(item => item.SalePriceMinorUnits).IsRequired();
+            entity.Property(item => item.LineTotalMinorUnits).IsRequired();
+            entity.HasOne<SaleEntity>()
                 .WithMany()
                 .HasForeignKey(item => item.OperationId)
                 .OnDelete(DeleteBehavior.Restrict);

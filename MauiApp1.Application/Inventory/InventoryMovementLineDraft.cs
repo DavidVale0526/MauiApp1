@@ -9,4 +9,6 @@ public sealed record InventoryMovementLineDraft(
     ProductId ProductId,
     InventoryMovementType Type,
     Quantity Quantity,
-    string? Reason = null);
+    string? Reason = null,
+    string? ProductNameSnapshot = null,
+    string? UnitSnapshot = null);

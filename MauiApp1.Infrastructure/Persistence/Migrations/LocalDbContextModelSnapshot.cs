@@ -253,6 +253,76 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TotalMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.ToTable("Sales", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sales_Total_NonNegative", "\"TotalMinorUnits\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleLineEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LineTotalMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QuantityMilliUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("SalePriceMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UnitSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OperationId", "LineNumber");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("SaleLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SaleLines_LineNumber_NonNegative", "\"LineNumber\" >= 0");
+
+                            t.HasCheckConstraint("CK_SaleLines_Price_NonNegative", "\"SalePriceMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_SaleLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+
+                            t.HasCheckConstraint("CK_SaleLines_Total_NonNegative", "\"LineTotalMinorUnits\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -332,6 +402,30 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PurchaseLineEntity", b =>
                 {
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.PurchaseEntity", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleLineEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
                         .WithMany()
                         .HasForeignKey("OperationId")
                         .OnDelete(DeleteBehavior.Restrict)

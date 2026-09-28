@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.SaleRegistrationPage"
+             x:DataType="viewModels:SaleRegistrationViewModel"
+             Title="Registrar venta">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+            <Label Text="Registrar venta" FontSize="28" FontAttributes="Bold" />
+            <Label Text="Selecciona productos activos, verifica su precio y existencia, y agrega cantidades." />
+            <Picker Title="Producto activo"
+                    ItemsSource="{Binding Products}"
+                    ItemDisplayBinding="{Binding DisplayName}"
+                    SelectedItem="{Binding SelectedProduct}"
+                    IsEnabled="{Binding CanEditLines}" />
+            <Label Text="{Binding SelectedProductDetails}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Entry Grid.Column="0" Placeholder="Cantidad a vender" Keyboard="Numeric"
+                       Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" />
+                <Button Grid.Column="1" Text="Agregar" Command="{Binding AddLineCommand}" />
+            </Grid>
+
+            <Label Text="Resumen de la venta" FontSize="20" FontAttributes="Bold" />
+            <CollectionView ItemsSource="{Binding Lines}" HeightRequest="260">
+                <CollectionView.EmptyView>
+                    <Label Text="Aún no hay productos en la venta." Padding="8" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SaleCartLine">
+                        <Grid Padding="8" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label Text="{Binding QuantityText}" />
+                                <Label Text="{Binding PriceText}" FontSize="12" />
+                                <Label Text="{Binding TotalText}" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Quitar" Clicked="OnRemoveLineClicked"
+                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Label Text="{Binding TotalText}" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="End" />
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
+            <Label Text="{Binding StatusMessage}" TextColor="Green" />
+            <Label Text="La venta actualiza existencias. El cobro y los comprobantes se definen en etapas posteriores."
+                   FontSize="12" Opacity="0.8" />
+            <Button Text="{Binding ConfirmButtonText}" Clicked="OnReviewClicked" IsEnabled="{Binding CanConfirm}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
