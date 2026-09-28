@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.OtherExitPage"
+             x:DataType="viewModels:OtherExitViewModel"
+             Title="Salida de inventario">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+            <Label Text="Registrar salida de inventario" FontSize="28" FontAttributes="Bold" />
+            <Label Text="Registra productos que salen por un motivo distinto a una venta." />
+
+            <Label Text="Producto" />
+            <Picker Title="Selecciona un producto activo"
+                    ItemsSource="{Binding Products}"
+                    ItemDisplayBinding="{Binding Name}"
+                    SelectedItem="{Binding SelectedProduct}"
+                    IsEnabled="{Binding CanEdit}" />
+            <Label Text="{Binding AvailableStockText}" />
+
+            <Label Text="Cantidad" />
+            <Entry Placeholder="Cantidad a retirar" Keyboard="Numeric"
+                   Text="{Binding QuantityInput}" IsEnabled="{Binding CanEdit}" />
+
+            <Label Text="Motivo" />
+            <Picker Title="Selecciona el motivo"
+                    ItemsSource="{Binding ReasonOptions}"
+                    ItemDisplayBinding="{Binding Name}"
+                    SelectedItem="{Binding SelectedReason}"
+                    IsEnabled="{Binding CanEdit}" />
+            <Entry Placeholder="Describe la otra causa"
+                   Text="{Binding OtherReasonDetail}"
+                   IsVisible="{Binding IsOtherReason}"
+                   IsEnabled="{Binding CanEdit}" />
+
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
+            <Button Text="{Binding SubmitButtonText}" Clicked="OnReviewClicked"
+                    IsEnabled="{Binding CanEdit}" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

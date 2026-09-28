@@ -79,3 +79,11 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - La página presenta el resumen antes de guardar. Una respuesta fallida conserva el borrador de operación para reintentar sin cambiar su identificador/contenido.
 - T3.3 consulta `Purchases` y `PurchaseLines`, sin copiar datos ni aplicar filtros. Ordena por fecha UTC descendente, muestra la hora en la zona local del dispositivo y presenta snapshots de producto/cantidad/unidad. El usuario puede recargar manualmente.
 - Compatibilidad pendiente para T7.2: payloads `Purchase.Recorded` generados antes de los snapshots no contienen nombre/unidad; el coordinador deberá admitirlos y resolver esos datos sin cambiar el `OperationId`.
+
+## Salidas de inventario no comerciales (T3.4)
+
+- La pantalla permite seleccionar un producto activo, una cantidad positiva en milésimas y una causa: `Vencimiento`, `Daño`, `Pérdida` u `Otro`. `Otro` requiere descripción; el texto completo queda en el campo `Reason` del movimiento y en el payload Outbox.
+- Cada confirmación crea un `OperationId` estable y una salida `OtherExit`; la repetición exacta se reconoce como ya aplicada y no descuenta existencias otra vez. Un mismo identificador con motivo/cantidad/contenido distinto se rechaza.
+- Política aprobada: bloquear si el saldo local resultante sería negativo. La pantalla valida el saldo actual para anticipar el error y el escritor lo vuelve a validar al guardar. La respuesta incluye saldo disponible y cantidad solicitada.
+- Producto, saldo, línea inmutable de movimiento y Outbox se guardan en la misma transacción SQLite. Solo se aceptan productos activos; la consulta/registro local no requiere LAN ni Internet. T4.1 debe respetar la misma política de stock negativo.
+- La pantalla es de una salida y un producto por operación, con resumen/confirmación. Las anulaciones/correcciones y los conflictos por operaciones simultáneas fuera de LAN siguen pendientes.

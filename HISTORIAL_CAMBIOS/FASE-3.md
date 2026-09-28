@@ -95,3 +95,29 @@ Se persisten solamente fecha/hora UTC, producto y cantidad recibida. No se añad
 - Infrastructure, Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores.
 - Smoke check SQLite validó migración desde una base anterior de T3.2 y backfill de nombre/unidad; consulta ordenada; producto, cantidad consolidada y unidad histórica; persistencia del nombre/unidad originales tras cambiar el catálogo; e idempotencia después de renombrar el producto sin doble aumento de existencias.
 - No se añadieron filtros ni búsqueda. Falta la comprobación visual manual en Windows por el usuario; la prueba Android físico/emulador sigue pendiente.
+
+## T3.4 — Registrar salidas distintas de venta
+
+### Creados
+
+- `MauiApp1/Presentation/ViewModels/OtherExitViewModel.cs` — selección de producto, cantidad, motivos, validación del saldo y protección del borrador al reintentar.
+- `MauiApp1/Presentation/Views/OtherExitPage.xaml`, `.xaml.cs` — pantalla compartida para preparar, revisar y confirmar una salida.
+
+### Modificados
+
+- `MauiApp1.Infrastructure/Inventory/InventoryMovementWriter.cs` — mensaje detallado de existencia insuficiente.
+- `MauiApp1.Infrastructure/Products/EfInventoryMovementService.cs` — solo permite productos activos en movimientos iniciados desde el flujo local.
+- `MauiApp1/MauiProgram.cs`, `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs` — acceso a la página de salidas; menú principal ahora permite desplazamiento vertical en pantallas pequeñas.
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — regla de stock negativo, causas y evidencia de T3.4.
+
+### Decisiones y reglas
+
+- Se bloquea la salida si las existencias locales no alcanzan. T4.1 debe aplicar la misma regla; conflictos de ventas simultáneas sin LAN quedan pendientes para T7.2.
+- Motivos disponibles: Vencimiento, Daño, Pérdida y Otro. Otro requiere una descripción; se guarda con prefijo `Otro:` junto al motivo.
+- El flujo registra un producto por operación, ofrece revisión antes de confirmar y conserva `OperationId` y contenido si hace falta reintentar. Los fallos no dejan saldo, movimiento ni Outbox parciales.
+
+### Verificación
+
+- Infrastructure, MAUI Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron correctamente con 0 advertencias y 0 errores.
+- Smoke check SQLite: exceso rechazado con saldo intacto y sin Outbox/movimiento parcial; motivo vacío rechazado; vencimiento y Otro con descripción aceptados; saldo y movimiento guardados una vez; reintento idempotente; mismo identificador con razón distinta rechazado.
+- La revisión visual manual en Windows queda pendiente del usuario; Android físico/emulador también pendiente.

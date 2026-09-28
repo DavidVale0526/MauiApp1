@@ -71,7 +71,11 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
                 var resultingStock = checked(products[productId].StockMilliUnits + delta);
                 if (delta < 0 && resultingStock < 0 && operation.NegativeStockPolicy == NegativeStockPolicy.Reject)
                 {
-                    return InventoryOperationResult.Failure("La salida supera la existencia disponible según la política de inventario.");
+                    var product = products[productId];
+                    var available = (product.StockMilliUnits / 1000m).ToString("0.000", System.Globalization.CultureInfo.CurrentCulture);
+                    var requested = (-delta / 1000m).ToString("0.000", System.Globalization.CultureInfo.CurrentCulture);
+                    return InventoryOperationResult.Failure(
+                        $"Existencia insuficiente para {product.Name}. Disponible: {available} {product.Unit}; solicitada: {requested} {product.Unit}.");
                 }
 
                 products[productId].StockMilliUnits = resultingStock;
@@ -154,6 +158,12 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
             return false;
         }
 
+        if (lines.Any(line => line.Type == InventoryMovementType.OtherExit && !IsApprovedOtherExitReason(line.Reason)))
+        {
+            errorMessage = "Usa Vencimiento, Daño, Pérdida o una descripción que comience con «Otro:».";
+            return false;
+        }
+
         if (lines.Any(line => line.Type != InventoryMovementType.OtherExit && line.Reason is not null))
         {
             errorMessage = "El motivo solo se registra para salidas distintas de una venta.";
@@ -163,4 +173,9 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
         errorMessage = string.Empty;
         return true;
     }
+
+    private static bool IsApprovedOtherExitReason(string? reason) =>
+        reason is "Vencimiento" or "Daño" or "Pérdida" ||
+        (reason is not null && reason.StartsWith("Otro: ", StringComparison.Ordinal) &&
+         !string.IsNullOrWhiteSpace(reason["Otro: ".Length..]));
 }

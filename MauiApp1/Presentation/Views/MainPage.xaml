@@ -6,7 +6,8 @@
              x:DataType="viewModels:MainPageViewModel"
              Title="{Binding Title}">
     <Grid Padding="24">
-        <VerticalStackLayout Spacing="16" VerticalOptions="Center" HorizontalOptions="Center">
+        <ScrollView>
+        <VerticalStackLayout Spacing="16" VerticalOptions="Start" HorizontalOptions="Center">
             <Label Text="{Binding Title}" FontSize="28" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
             <Label Text="Sesión iniciada como" FontSize="16" HorizontalTextAlignment="Center" />
@@ -18,9 +19,11 @@
             <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" />
             <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" />
             <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" />
+            <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
             <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />
         </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>

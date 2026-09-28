@@ -39,7 +39,7 @@ internal sealed class EfInventoryMovementService(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var result = await movementWriter.StageAsync(
             context, operation, actor.Id.Value, OutboxOperationType, payloadJson,
-            requireActiveProducts: false, cancellationToken);
+            requireActiveProducts: true, cancellationToken);
         if (!result.Succeeded || result.AlreadyApplied)
         {
             return result;
