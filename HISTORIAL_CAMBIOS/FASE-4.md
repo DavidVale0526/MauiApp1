@@ -57,4 +57,25 @@
 - La consulta es de solo lectura y requiere una sesión local. No habilita cambios, eliminación, anulaciones, filtros, pagos ni comprobantes.
 - Infrastructure, MAUI Windows y Android compilaron con 0 advertencias y 0 errores.
 - Smoke check SQLite pasó historial vacío/consultable, sesión requerida, orden de dos ventas, usuario correcto, importes/snapshots tras renombrar y reprecificar el producto y stock sin cambios por consultar.
-- Falta la revisión visual manual del usuario en Windows y Android para T4.2.
+- El usuario confirmó manualmente que el historial funciona.
+
+## T4.3 — Ticket interno de venta
+
+### Creados y modificados
+
+- `MauiApp1/Presentation/ViewModels/SaleTicketViewModel.cs` — presentación de fecha, actor, referencia, moneda y snapshots de las líneas.
+- `MauiApp1/Presentation/Views/SaleTicketPage.xaml`, `.xaml.cs` — ticket interno visible en pantalla, navegación de regreso.
+- `MauiApp1/Presentation/Views/SaleRegistrationPage.xaml.cs`, `SaleRegistrationViewModel.cs` — abrir el ticket tras persistir la venta confirmada.
+- `MauiApp1/Presentation/Views/SaleHistoryPage.xaml`, `.xaml.cs` — acceso para volver a consultar el ticket desde historial.
+- `MauiApp1/ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — decisión y alcance aprobados.
+
+### Decisión y alcance
+
+- Se aprobó ticket interno no fiscal, solo en pantalla, con referencia corta del `OperationId` y snapshots históricos de la venta.
+- La moneda se muestra como córdobas nicaragüenses (`C$`), incluido el total y cada importe de línea.
+- No se agregan impresión, impuestos, datos fiscales ni información de cobro. Una factura fiscal se mantiene fuera del alcance hasta que se definan sus requisitos.
+
+### Verificación
+
+- Infrastructure, MAUI Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores tras el ajuste de moneda.
+- Revisión visual manual del usuario pendiente.

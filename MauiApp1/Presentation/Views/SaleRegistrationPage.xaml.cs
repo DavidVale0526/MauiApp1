@@ -1,15 +1,18 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Sales;
 
 namespace MauiApp1.Presentation.Views;
 
 public partial class SaleRegistrationPage : ContentPage
 {
     private readonly SaleRegistrationViewModel _viewModel;
+    private readonly ISaleService _saleService;
 
-    public SaleRegistrationPage(SaleRegistrationViewModel viewModel)
+    public SaleRegistrationPage(SaleRegistrationViewModel viewModel, ISaleService saleService)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _saleService = saleService;
         BindingContext = viewModel;
     }
 
@@ -49,6 +52,37 @@ public partial class SaleRegistrationPage : ContentPage
             return;
         }
 
-        await _viewModel.RecordPendingAsync();
+        if (await _viewModel.RecordPendingAsync())
+        {
+            await ShowSavedTicketAsync();
+        }
+    }
+
+    private async Task ShowSavedTicketAsync()
+    {
+        if (_viewModel.LastCompletedSaleOperationId is not { } operationId)
+        {
+            return;
+        }
+
+        try
+        {
+            var sale = (await _saleService.GetHistoryAsync())
+                .SingleOrDefault(item => item.OperationId == operationId);
+            if (sale is not null)
+            {
+                await Navigation.PushAsync(new SaleTicketPage(sale));
+                return;
+            }
+        }
+        catch
+        {
+            // The sale is already saved; the history page remains available to reopen its ticket.
+        }
+
+        await DisplayAlertAsync(
+            "Venta guardada",
+            "La venta se guardó, pero no se pudo abrir el ticket ahora. Puedes consultarlo desde el historial de ventas.",
+            "Aceptar");
     }
 }

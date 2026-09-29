@@ -22,6 +22,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private SaleDraft? _pendingSale;
     private bool _pendingSaleAttempted;
+    private Guid? _lastCompletedSaleOperationId;
 
     public SaleRegistrationViewModel(IProductService productService, ISaleService saleService)
     {
@@ -91,6 +92,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     public bool CanConfirm => !IsBusy && (_pendingSale is not null || Lines.Count > 0);
 
     public string ConfirmButtonText => _pendingSaleAttempted ? "Reintentar la misma venta" : "Revisar y confirmar venta";
+
+    public Guid? LastCompletedSaleOperationId => _lastCompletedSaleOperationId;
 
     public string TotalText
     {
@@ -231,6 +234,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
                 return false;
             }
 
+            _lastCompletedSaleOperationId = _pendingSale.OperationId;
+            OnPropertyChanged(nameof(LastCompletedSaleOperationId));
             Lines.Clear();
             _pendingSale = null;
             _pendingSaleAttempted = false;

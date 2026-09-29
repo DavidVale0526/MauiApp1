@@ -22,4 +22,14 @@ public partial class SaleHistoryPage : ContentPage
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 
     private async void OnRefreshClicked(object? sender, EventArgs eventArgs) => await _viewModel.LoadAsync();
+
+    private async void OnViewTicketClicked(object? sender, EventArgs eventArgs)
+    {
+        if ((sender as Button)?.BindingContext is not SaleHistoryCard card)
+        {
+            return;
+        }
+
+        await Navigation.PushAsync(new SaleTicketPage(card.Sale));
+    }
 }

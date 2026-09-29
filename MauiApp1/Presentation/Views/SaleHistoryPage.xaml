@@ -28,6 +28,7 @@
                                 <Label Text="{Binding ActorText}" FontSize="13" />
                                 <Label Text="{Binding LinesText}" LineBreakMode="WordWrap" />
                                 <Label Text="{Binding TotalText}" FontSize="18" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                <Button Text="Ver ticket" HorizontalOptions="End" Clicked="OnViewTicketClicked" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>
