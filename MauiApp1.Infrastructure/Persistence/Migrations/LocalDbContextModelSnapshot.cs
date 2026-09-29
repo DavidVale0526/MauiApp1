@@ -194,6 +194,35 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.ToTable("OutboxMessages", (string)null);
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PaymentEntity", b =>
+                {
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AmountMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PaymentId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OperationId", "OccurredAtUtc");
+
+                    b.ToTable("Payments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Payments_Amount_Positive", "\"AmountMinorUnits\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", b =>
                 {
                     b.Property<Guid>("ProductId")
@@ -300,6 +329,7 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<long>("OutstandingMinorUnits")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.HasKey("OperationId");
@@ -446,6 +476,21 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PaymentEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ReceivableEntity", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

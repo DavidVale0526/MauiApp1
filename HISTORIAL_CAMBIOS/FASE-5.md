@@ -34,3 +34,33 @@
 - Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores.
 - Smoke check SQLite: migración, cliente único normalizado, teléfono opcional, venta de contado de regresión, venta a crédito y vencimiento a 15 días, saldo/historial/inventario consistentes e idempotencia.
 - Revisión visual manual de las pantallas por el usuario pendiente.
+
+## T5.2 — Registrar pagos y consultar saldos
+
+### Creados
+
+- `MauiApp1.Application/Credit/CreditAccountSummary.cs`, `PaymentDraft.cs`, `PaymentHistoryEntry.cs`, `PaymentResult.cs`, `IPaymentService.cs` — contratos de cuentas, pagos y resultados.
+- `MauiApp1.Infrastructure/Credit/EfPaymentService.cs` — validación, escritura idempotente, reducción de saldo, Outbox e historial.
+- `MauiApp1.Infrastructure/Persistence/Entities/PaymentEntity.cs` — línea inmutable de pago.
+- `MauiApp1.Infrastructure/Persistence/Migrations/20260929042014_CreditPayments.cs` y `.Designer.cs` — tabla de pagos, claves foráneas, índice e importe positivo.
+- `MauiApp1/Presentation/ViewModels/PaymentManagementViewModel.cs` — selección de deuda, revisión, confirmación, reintento e historial.
+- `MauiApp1/Presentation/Views/PaymentManagementPage.xaml`, `.xaml.cs` — consulta y registro de pagos con confirmación.
+
+### Modificados
+
+- `MauiApp1.Infrastructure/Persistence/LocalDbContext.cs`, `LocalDbContextModelSnapshot.cs`, `LocalPersistenceServiceCollectionExtensions.cs` — entidad, concurrencia optimista y DI.
+- `MauiApp1/MauiProgram.cs`, `MauiApp1/Presentation/Views/MainPage.xaml`, `.xaml.cs` — registro y navegación de la pantalla.
+- `TASK.md`, `PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md`, `ARCHITECTURE.md` — reglas confirmadas y evidencia.
+
+### Decisiones aplicadas
+
+- Se permiten abonos parciales positivos; se rechaza cualquier monto mayor al saldo pendiente.
+- Los pagos guardan monto y fecha/hora UTC automática, usuario, deuda y un identificador idempotente. No guardan método de pago.
+- Los pagos son inmutables y no se editan ni eliminan desde la interfaz.
+- Pago, actualización del saldo y Outbox se confirman atómicamente. Un identificador repetido con mismo contenido se reconoce; con contenido distinto se rechaza.
+
+### Verificación
+
+- Windows y Android compilaron con 0 advertencias y 0 errores.
+- Smoke check SQLite: migración, dos abonos parciales, sobrepago rechazado sin cambios, liquidación a cero, historial, reintento idempotente y contenido alterado rechazado.
+- Revisión visual manual de la pantalla T5.2 por el usuario pendiente.

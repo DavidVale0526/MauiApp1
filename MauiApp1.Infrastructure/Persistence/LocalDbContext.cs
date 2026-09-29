@@ -35,6 +35,8 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<ReceivableEntity> Receivables => Set<ReceivableEntity>();
 
+    internal DbSet<PaymentEntity> Payments => Set<PaymentEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -283,6 +285,7 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.CustomerId).IsRequired();
             entity.Property(item => item.OriginalAmountMinorUnits).IsRequired();
             entity.Property(item => item.OutstandingMinorUnits).IsRequired();
+            entity.Property(item => item.OutstandingMinorUnits).IsConcurrencyToken();
             entity.Property(item => item.DueAtUtc)
                 .HasConversion(UtcDateTimeConverter)
                 .HasColumnType("INTEGER")
@@ -296,6 +299,31 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasForeignKey(item => item.CustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.CustomerId, item.DueAtUtc });
+        });
+
+
+        modelBuilder.Entity<PaymentEntity>(entity =>
+        {
+            entity.ToTable("Payments", table => table.HasCheckConstraint(
+                "CK_Payments_Amount_Positive", "\"AmountMinorUnits\" > 0"));
+            entity.HasKey(item => item.PaymentId);
+            entity.Property(item => item.PaymentId).ValueGeneratedNever();
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.Property(item => item.AmountMinorUnits).IsRequired();
+            entity.Property(item => item.OccurredAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.HasOne<ReceivableEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.OperationId, item.OccurredAtUtc });
         });
     }
 }

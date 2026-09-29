@@ -23,6 +23,7 @@
             <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" />
             <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" />
             <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" />
+            <Button Text="Registrar pagos y consultar saldos" Clicked="OnPaymentsClicked" />
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />

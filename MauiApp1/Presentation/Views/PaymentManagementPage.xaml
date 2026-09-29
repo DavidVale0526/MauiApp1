@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.PaymentManagementPage"
+             x:DataType="viewModels:PaymentManagementViewModel"
+             Title="Crédito y pagos">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14">
+            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+            <Label Text="Crédito y pagos" FontSize="28" FontAttributes="Bold" />
+            <Label Text="Selecciona una deuda para consultar sus abonos o registrar un pago." />
+            <Picker Title="Cliente y cuenta por cobrar" ItemsSource="{Binding Accounts}"
+                    ItemDisplayBinding="{Binding DisplayText}" SelectedItem="{Binding SelectedAccount}"
+                    IsEnabled="{Binding CanEditPayment}" />
+            <Label Text="{Binding SelectedAccount.AccountDetails}" />
+            <Label Text="Registrar un abono" FontSize="20" FontAttributes="Bold" />
+            <Entry Placeholder="Monto del pago" Keyboard="Numeric" Text="{Binding AmountInput}"
+                   IsEnabled="{Binding CanEditPayment}" />
+            <Button Text="{Binding RecordButtonText}" Clicked="OnReviewPaymentClicked"
+                    IsEnabled="{Binding CanRecord}" />
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
+            <Label Text="{Binding StatusMessage}" TextColor="Green" />
+            <Label Text="Historial de pagos de esta deuda" FontSize="20" FontAttributes="Bold" />
+            <CollectionView ItemsSource="{Binding Payments}" HeightRequest="300">
+                <CollectionView.EmptyView><Label Text="Esta cuenta aún no tiene pagos registrados." Padding="8" /></CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:PaymentHistoryItem">
+                        <Border Padding="12" Margin="0,4">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                                <Label Grid.Row="0" Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
+                                <Label Grid.Row="0" Grid.Column="1" Text="{Binding AmountText}" FontAttributes="Bold" />
+                                <Label Grid.Row="1" Grid.Column="0" Text="{Binding ActorText}" FontSize="12" />
+                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding ReferenceText}" FontSize="12" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Label Text="Los pagos se conservan en el historial; no se editan ni eliminan desde esta pantalla."
+                   FontSize="12" Opacity="0.8" />
+            <Button Text="Actualizar" Clicked="OnRefreshClicked" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
