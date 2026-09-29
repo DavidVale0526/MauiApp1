@@ -30,7 +30,7 @@ Android requiere la carga MAUI de Android y un SDK/emulador o dispositivo config
 - Los identificadores de producto y categoría son Guid (`ProductId` y `CategoryId`). Las fechas se manejan como `DateTime` UTC y se guardan en SQLite como ticks enteros, para preservar el instante UTC y ordenar con precisión. Los importes se representan en unidades menores enteras con dos decimales; las cantidades se representan en milésimas enteras con tres decimales. Cada producto conserva su propia unidad editable. La moneda aprobada para el sistema es el córdoba nicaragüense, mostrado como `C$`.
 - Se usa EF Core 10.0.12 y `SQLitePCLRaw.bundle_e_sqlite3` 3.0.5. La versión explícita del bundle evita restaurar la versión 2.1.11 señalada por la auditoría de NuGet.
 
-La base central no se comparte como archivo con las aplicaciones. Se agregará al servicio coordinador Windows cuando se implemente ese módulo; en esta etapa cada app solo accede a su archivo privado local.
+La base central no se comparte como archivo con las aplicaciones. El proyecto coordinador Windows la inicializa en `ProgramData`; cada aplicación MAUI conserva su archivo privado local. El intercambio de cambios entre esos archivos se implementará en T7.2.
 
 El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 
@@ -142,3 +142,12 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - Inicio muestra el resumen de productos bajo mínimo cada vez que aparece, por lo que al volver de registrar una compra, venta o salida se consulta el inventario local actualizado.
 - Consulta de existencias muestra el mismo resumen y lo recalcula al abrir y al ejecutar el gesto de actualización. El panel incluye nombre, existencia/unidad y mínimo/unidad; si no hay alertas presenta un estado vacío informativo.
 - No hay notificaciones en segundo plano ni otro almacenamiento para alertas. La pantalla refleja los datos locales de la instalación hasta que T7 implemente sincronización.
+
+## Coordinador LAN (T7.1 en curso)
+
+- `MauiApp1.Coordinator` es un proyecto separado basado en ASP.NET Core sobre .NET 10; referencia Application e Infrastructure y registra el host SignalR. `UseWindowsService` configura el ciclo de vida para ejecutarlo como servicio de Windows cuando se instale.
+- El URL de escucha se configura con `Coordinator:Url` en `appsettings.json` o la variable `Coordinator__Url`; predeterminado durante desarrollo: `http://0.0.0.0:5080`. La instalación, el perfil de firewall y su regla privada todavía no se han configurado.
+- La base central está en `CommonApplicationData\\Miscelanea Ari\\Coordinator\\miscelanea-ari-central.db` (normalmente `C:\\ProgramData\\...`); se puede cambiar con `Coordinator:DataDirectory`. Antes de arrancar, el host exige la importación inicial. `--bootstrap-from <ruta-db-Windows> --data-directory <directorio>` verifica integridad SQLite, guarda un respaldo fechado en `Backups` y copia con SQLite Backup API sin modificar el archivo local ni sobrescribir una central existente. El servicio es el único proceso que accederá a la base central.
+- La importación real de Windows aún debe ejecutarse. La base Android se conserva intacta; se debe respaldar antes de habilitar su sincronización y su contenido no se combinará automáticamente.
+- `GET /health` solo devuelve el estado genérico del proceso. No hay todavía rutas de datos, autenticación, vinculación de dispositivos ni un hub SignalR público. No exponer operaciones de negocio antes de completar autenticación, autorización y protección del canal.
+- El puerto 5080 es un valor inicial configurable, no un compromiso de despliegue; la autoridad de cuentas será el coordinador y los dispositivos deberán vincularse por un Administrador. Los detalles de flujo de alta inicial y emparejamiento quedan para el resto de T7.1.

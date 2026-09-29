@@ -3,4 +3,5 @@
   <Project Path="MauiApp1.Domain/MauiApp1.Domain.csproj" />
   <Project Path="MauiApp1.Application/MauiApp1.Application.csproj" />
   <Project Path="MauiApp1.Infrastructure/MauiApp1.Infrastructure.csproj" />
+  <Project Path="MauiApp1.Coordinator/MauiApp1.Coordinator.csproj" />
 </Solution>
