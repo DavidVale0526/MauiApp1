@@ -31,6 +31,7 @@
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
+            <Button Text="Vinculación por red local" Clicked="OnDevicePairingClicked" />
             <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />
         </VerticalStackLayout>
         </ScrollView>

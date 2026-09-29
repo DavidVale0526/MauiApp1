@@ -1,12 +1,18 @@
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.RateLimiting;
+using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
 using MauiApp1.Coordinator.Persistence;
+using MauiApp1.Coordinator.Pairing;
+using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 internal static class Program
 {
+    private static readonly SemaphoreSlim PairingCredentialLock = new(1, 1);
+
     public static async Task<int> Main(string[] args)
     {
         try
@@ -15,10 +21,7 @@ internal static class Program
             if (bootstrapSource is not null)
             {
                 var dataDirectoryOption = ReadOption(args, "--data-directory");
-                var bootstrapDataDirectory = string.IsNullOrWhiteSpace(dataDirectoryOption)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                        "Miscelanea Ari", "Coordinator")
-                    : dataDirectoryOption;
+                var bootstrapDataDirectory = GetCoordinatorDataDirectory(dataDirectoryOption);
                 var createdPath = await CoordinatorDatabaseBootstrapper.BootstrapAsync(bootstrapSource, bootstrapDataDirectory);
                 Console.WriteLine($"Base central inicial creada desde Windows: {createdPath}");
                 return 0;
@@ -58,7 +61,8 @@ internal static class Program
 
         if (endpoint.Scheme == Uri.UriSchemeHttps)
         {
-            var certificate = LoadCoordinatorCertificate(builder.Configuration["Coordinator:CertificateThumbprint"]);
+            var certificate = LoadCoordinatorCertificate(
+                builder.Configuration["Coordinator:CertificateThumbprint"], isDevelopment);
             builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(endpoint.Port,
                 listenOptions => listenOptions.UseHttps(certificate)));
         }
@@ -74,6 +78,16 @@ internal static class Program
         }
 
         builder.Services.AddSignalR();
+        builder.Services.AddRateLimiter(options => options.AddPolicy("device-pairing", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                })));
 
         var configuredDataDirectory = builder.Configuration["Coordinator:DataDirectory"];
         var dataDirectory = !string.IsNullOrWhiteSpace(configuredDataDirectory)
@@ -95,9 +109,79 @@ internal static class Program
         }
 
         await app.Services.GetRequiredService<ILocalDatabaseInitializer>().InitializeAsync();
+        var pairingStore = new CoordinatorPairingStore(centralDatabasePath);
+        await pairingStore.InitializeAsync();
 
         // This liveness endpoint exposes no account, inventory, or transaction data.
         app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
+
+        app.UseRateLimiter();
+        app.MapPost("/api/devices/pairing-code", async (
+            CreatePairingCodeRequest request,
+            HttpContext httpContext,
+            IAuthenticationService authenticationService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+            {
+                return Results.Problem(
+                    "La vinculación de dispositivos requiere una conexión HTTPS.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrEmpty(request.Password))
+            {
+                return Results.Unauthorized();
+            }
+
+            await PairingCredentialLock.WaitAsync(cancellationToken);
+            try
+            {
+                var authentication = await authenticationService.SignInAsync(
+                    request.UserName, request.Password, cancellationToken);
+                if (!authentication.Succeeded || authentication.User?.Role != UserRole.Administrator)
+                {
+                    return Results.Unauthorized();
+                }
+
+                var pairing = await pairingStore.CreateCodeAsync(cancellationToken);
+                return Results.Ok(new CreatePairingCodeResponse(pairing.Code, pairing.ExpiresAtUtc));
+            }
+            finally
+            {
+                authenticationService.SignOut();
+                PairingCredentialLock.Release();
+            }
+        }).RequireRateLimiting("device-pairing");
+
+        app.MapPost("/api/devices/pair", async (
+            PairDeviceRequest request,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+            {
+                return Results.Problem(
+                    "La vinculación de dispositivos requiere una conexión HTTPS.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (request.Code is null || request.DeviceToken is null)
+            {
+                return Results.BadRequest(new PairDeviceResponse(false, "Código inválido o vencido."));
+            }
+
+            var result = await pairingStore.CompletePairingAsync(request.DeviceId, request.Code, request.DeviceToken, cancellationToken);
+            if (result.IsAlreadyAuthorized)
+            {
+                return Results.Conflict(new PairDeviceResponse(false,
+                    "Este dispositivo ya está vinculado. Solicita al Administrador que lo revoque antes de vincularlo de nuevo."));
+            }
+
+            return result.IsAuthorized
+                ? Results.Ok(new PairDeviceResponse(true, "Dispositivo vinculado."))
+                : Results.BadRequest(new PairDeviceResponse(false, "Código inválido o vencido."));
+        }).RequireRateLimiting("device-pairing");
 
         await app.RunAsync();
         return 0;
@@ -112,7 +196,13 @@ internal static class Program
             : null;
     }
 
-    private static X509Certificate2 LoadCoordinatorCertificate(string? thumbprint)
+    private static string GetCoordinatorDataDirectory(string? configuredDataDirectory) =>
+        string.IsNullOrWhiteSpace(configuredDataDirectory)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Miscelanea Ari", "Coordinator")
+            : configuredDataDirectory;
+
+    private static X509Certificate2 LoadCoordinatorCertificate(string? thumbprint, bool isDevelopment)
     {
         var normalizedThumbprint = thumbprint?.Replace(" ", string.Empty, StringComparison.Ordinal);
         if (string.IsNullOrWhiteSpace(normalizedThumbprint))
@@ -121,16 +211,28 @@ internal static class Program
                 "Falta Coordinator:CertificateThumbprint. Instala el certificado local antes de iniciar el servicio.");
         }
 
-        using var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
-        store.Open(OpenFlags.ReadOnly);
-        var certificate = store.Certificates
-            .Find(X509FindType.FindByThumbprint, normalizedThumbprint, validOnly: false)
-            .OfType<X509Certificate2>()
-            .FirstOrDefault(item => item.HasPrivateKey);
+        var certificate = FindCertificate(StoreLocation.LocalMachine, normalizedThumbprint) ??
+            (isDevelopment ? FindCertificate(StoreLocation.CurrentUser, normalizedThumbprint) : null);
 
         return certificate ?? throw new InvalidOperationException(
-            "No se encontró el certificado coordinador con clave privada en el almacén LocalMachine/My.");
+            isDevelopment
+                ? "No se encontró el certificado coordinador con clave privada en LocalMachine/My ni CurrentUser/My."
+                : "No se encontró el certificado coordinador con clave privada en LocalMachine/My.");
+    }
+
+    private static X509Certificate2? FindCertificate(StoreLocation location, string thumbprint)
+    {
+        using var store = new X509Store(StoreName.My, location);
+        store.Open(OpenFlags.ReadOnly);
+        return store.Certificates
+            .Find(X509FindType.FindByThumbprint, thumbprint, validOnly: false)
+            .OfType<X509Certificate2>()
+            .FirstOrDefault(item => item.HasPrivateKey);
     }
 }
 
 internal sealed record HealthResponse(string Status);
+internal sealed record CreatePairingCodeRequest(string UserName, string Password);
+internal sealed record CreatePairingCodeResponse(string Code, DateTime ExpiresAtUtc);
+internal sealed record PairDeviceRequest(Guid DeviceId, string? Code, string? DeviceToken);
+internal sealed record PairDeviceResponse(bool Success, string Message);

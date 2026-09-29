@@ -5,6 +5,11 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class MainPage : ContentPage
 {
+    private async void OnDevicePairingClicked(object? sender, EventArgs args)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<DevicePairingPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
     private readonly MainPageViewModel _viewModel;
 
     public MainPage(MainPageViewModel viewModel)

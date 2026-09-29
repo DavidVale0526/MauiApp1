@@ -21,6 +21,10 @@ namespace MauiApp1
                 });
 
             builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorLinkStorage, MauiApp1.Services.SecureCoordinatorLinkStorage>();
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient, MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
+            builder.Services.AddTransient<DevicePairingViewModel>();
+            builder.Services.AddTransient<DevicePairingPage>();
             builder.Services.AddTransient<AccessPage>();
             builder.Services.AddTransient<AccessPageViewModel>();
             builder.Services.AddTransient<MainPage>();
