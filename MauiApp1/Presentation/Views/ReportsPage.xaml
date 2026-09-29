@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.ReportsPage"
+             x:DataType="viewModels:ReportsViewModel"
+             Title="Reportes">
+    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+        <VerticalStackLayout Grid.Row="1" Spacing="8">
+            <Label Text="Reportes" FontSize="28" FontAttributes="Bold" />
+            <Label Text="{Binding DataNotice}" FontSize="12" Opacity="0.8" />
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="Ventas" Clicked="OnSalesClicked" />
+                <Button Grid.Column="1" Text="Inventario" Clicked="OnInventoryClicked" />
+                <Button Grid.Column="2" Text="Movimientos" Clicked="OnMovementsClicked" />
+            </Grid>
+        </VerticalStackLayout>
+        <Label Grid.Row="2" Text="{Binding ErrorMessage}" TextColor="Red" />
+        <Grid Grid.Row="3">
+            <ScrollView IsVisible="{Binding IsSalesSection}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Ventas registradas" FontSize="20" FontAttributes="Bold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Desde" FontSize="12" />
+                            <DatePicker Date="{Binding DateFrom}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="Hasta (inclusive)" FontSize="12" />
+                            <DatePicker Date="{Binding DateTo}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Picker Title="Modalidad" ItemsSource="{Binding SalesModes}" ItemDisplayBinding="{Binding Label}"
+                            SelectedItem="{Binding SelectedSalesMode}" />
+                    <Picker Title="Cliente" ItemsSource="{Binding Customers}" ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedCustomer}" />
+                    <Button Text="Consultar ventas" Clicked="OnRefreshClicked" />
+                    <CollectionView ItemsSource="{Binding Sales}" HeightRequest="520">
+                        <CollectionView.EmptyView><Label Text="No hay ventas en el periodo y filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:SalesReportCard">
+                                <Border Padding="12" Margin="0,4">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
+                                        <Label Grid.Row="0" Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
+                                        <Label Grid.Row="0" Grid.Column="1" Text="{Binding ReferenceText}" />
+                                        <Label Grid.Row="1" Grid.Column="0" Text="{Binding ActorText}" />
+                                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding TypeText}" />
+                                        <Label Grid.Row="2" Grid.Column="0" Text="{Binding CustomerText}" />
+                                        <Label Grid.Row="3" Grid.Column="1" Text="{Binding TotalText}" FontAttributes="Bold" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <Label Text="Los importes son ventas registradas; no representan cobros recibidos ni ganancia." FontSize="12" />
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <ScrollView IsVisible="{Binding IsInventorySection}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Existencia actual" FontSize="20" FontAttributes="Bold" />
+                    <Label Text="{Binding InventoryAsOfText}" FontSize="12" />
+                    <Picker Title="Categoría" ItemsSource="{Binding Categories}" ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedCategory}" />
+                    <Picker Title="Estado" ItemsSource="{Binding Statuses}" ItemDisplayBinding="{Binding Label}"
+                            SelectedItem="{Binding SelectedStatus}" />
+                    <Button Text="Consultar inventario" Clicked="OnRefreshClicked" />
+                    <CollectionView ItemsSource="{Binding Inventory}" HeightRequest="520">
+                        <CollectionView.EmptyView><Label Text="No hay productos para los filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:InventoryReportCard">
+                                <Border Padding="12" Margin="0,4">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" Text="{Binding Name}" FontAttributes="Bold" />
+                                            <Label Grid.Column="1" Text="{Binding StatusText}" />
+                                        </Grid>
+                                        <Label Text="{Binding CategoryText}" />
+                                        <Label Text="{Binding StockText}" />
+                                        <Label Text="{Binding MinimumText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <ScrollView IsVisible="{Binding IsMovementsSection}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Movimientos de inventario" FontSize="20" FontAttributes="Bold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Desde" FontSize="12" />
+                            <DatePicker Date="{Binding DateFrom}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="Hasta (inclusive)" FontSize="12" />
+                            <DatePicker Date="{Binding DateTo}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Picker Title="Producto" ItemsSource="{Binding Products}" ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedProduct}" />
+                    <Picker Title="Tipo de movimiento" ItemsSource="{Binding MovementTypes}" ItemDisplayBinding="{Binding Label}"
+                            SelectedItem="{Binding SelectedMovementType}" />
+                    <Button Text="Consultar movimientos" Clicked="OnRefreshClicked" />
+                    <CollectionView ItemsSource="{Binding Movements}" HeightRequest="520">
+                        <CollectionView.EmptyView><Label Text="No hay movimientos en el periodo y filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:MovementReportCard">
+                                <Border Padding="12" Margin="0,4">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
+                                            <Label Grid.Column="1" Text="{Binding ReferenceText}" />
+                                        </Grid>
+                                        <Label Text="{Binding ProductText}" FontAttributes="Bold" />
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" Text="{Binding TypeText}" />
+                                            <Label Grid.Column="1" Text="{Binding QuantityText}" />
+                                        </Grid>
+                                        <Label Text="{Binding ReasonText}" />
+                                        <Label Text="{Binding ActorText}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                               HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True" />
+        </Grid>
+    </Grid>
+</ContentPage>

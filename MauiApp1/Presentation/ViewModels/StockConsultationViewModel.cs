@@ -12,6 +12,7 @@ public sealed class StockConsultationViewModel : INotifyPropertyChanged
     private string _errorMessage = string.Empty;
     private bool _isBusy;
     private bool _isRefreshing;
+    private string _lowStockAlertMessage = string.Empty;
 
     public StockConsultationViewModel(IProductService productService)
     {
@@ -22,6 +23,20 @@ public sealed class StockConsultationViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ProductSummary> Products { get; } = [];
+
+    public string LowStockAlertMessage
+    {
+        get => _lowStockAlertMessage;
+        private set
+        {
+            if (SetProperty(ref _lowStockAlertMessage, value))
+            {
+                OnPropertyChanged(nameof(HasLowStockAlert));
+            }
+        }
+    }
+
+    public bool HasLowStockAlert => !string.IsNullOrWhiteSpace(LowStockAlertMessage);
 
     public ICommand RefreshCommand { get; }
 
@@ -62,11 +77,17 @@ public sealed class StockConsultationViewModel : INotifyPropertyChanged
         try
         {
             var products = await _productService.GetAllAsync();
+            var lowStockProducts = LowStockProductQuery.Select(products);
             Products.Clear();
             foreach (var product in products)
             {
                 Products.Add(product);
             }
+
+            LowStockAlertMessage = lowStockProducts.Count == 0
+                ? "No hay productos activos en el mínimo o por debajo."
+                : "Productos activos en el mínimo o por debajo:\n" + string.Join("\n", lowStockProducts.Select(product =>
+                    $"• {product.Name}: {product.Stock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit} (mínimo {product.MinimumStock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit})"));
         }
         catch
         {
@@ -90,4 +111,7 @@ public sealed class StockConsultationViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         return true;
     }
+
+    private void OnPropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

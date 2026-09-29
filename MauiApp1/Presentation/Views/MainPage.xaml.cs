@@ -5,10 +5,19 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class MainPage : ContentPage
 {
+    private readonly MainPageViewModel _viewModel;
+
     public MainPage(MainPageViewModel viewModel)
     {
         InitializeComponent();
+        _viewModel = viewModel;
         BindingContext = viewModel;
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await _viewModel.LoadLowStockAlertsAsync();
     }
 
     private async void OnCreateCashierAccountClicked(object? sender, EventArgs eventArgs)
@@ -111,6 +120,12 @@ public partial class MainPage : ContentPage
     private async void OnPaymentsClicked(object? sender, EventArgs eventArgs)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<PaymentManagementPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async void OnReportsClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<ReportsPage>() is not { } page) return;
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 

@@ -14,6 +14,9 @@
             <Label Text="{Binding CurrentUserName}" FontSize="22" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
             <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
+            <Border IsVisible="{Binding HasLowStockAlert}" Stroke="OrangeRed" Padding="12">
+                <Label Text="{Binding LowStockAlertMessage}" TextColor="OrangeRed" />
+            </Border>
             <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" />
             <Button Text="Administrar productos" Clicked="OnManageProductsClicked" />
             <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" />
@@ -24,6 +27,7 @@
             <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" />
             <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" />
             <Button Text="Registrar pagos y consultar saldos" Clicked="OnPaymentsClicked" />
+            <Button Text="Reportes" Clicked="OnReportsClicked" />
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />

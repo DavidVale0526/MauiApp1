@@ -59,7 +59,7 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 ## Consulta de existencias (T2.3)
 
 - La pantalla de solo lectura reutiliza `IProductService.GetAllAsync`; no crea otra tabla ni copia el catálogo. Muestra todos los productos y distingue activos/inactivos, con categoría, precio vigente, existencia/unidad y mínimo.
-- Se recarga al abrir y permite volver a consultar con gesto de actualización. No tiene búsqueda, filtros ni alertas porque no fueron aprobados en este módulo. La sincronización LAN queda en T7; sus cambios deberán actualizar la misma tabla local que esta consulta lee.
+- Se recarga al abrir y permite volver a consultar con gesto de actualización. No tiene búsqueda ni filtros. Las alertas se añadieron posteriormente en T6.3. La sincronización LAN queda en T7; sus cambios deberán actualizar la misma tabla local que esta consulta lee.
 
 ## Movimientos de inventario (T3.1)
 
@@ -120,3 +120,25 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - `EfPaymentService` reduce `Receivables.OutstandingMinorUnits`, agrega el pago y Outbox en un solo `SaveChangesAsync`. La concurrencia optimista sobre el saldo detecta cambios simultáneos; sobrepago o conflicto no dejan escrituras parciales.
 - Se aceptan varios abonos siempre que sean positivos y no superen el saldo pendiente. Un reintento con el mismo identificador/contenido no vuelve a reducirlo; usar ese identificador con otros datos se rechaza.
 - La pantalla «Crédito y pagos» consulta cuentas (incluidas las saldadas) y el historial de pagos asociado a la deuda seleccionada. Muestra hora local, usuario, referencia y montos en córdobas (`C$`). No guarda medio de pago ni permite editar/eliminar registros.
+
+## Especificación de reportes (T6.1)
+
+- **Ventas:** lista por rango inclusivo de fechas locales con fecha/hora, referencia corta, usuario, modalidad contado/crédito, cliente si aplica y total de cada venta en `C$`. Filtros por modalidad y cliente. El total es venta registrada; no equivale a dinero cobrado.
+- **Inventario:** fotografía actual con producto, categoría, estado activo/inactivo, existencia y unidad, mínimo y unidad. Filtros por categoría y estado. No se calcula valoración porque no hay costos de compra persistidos.
+- **Movimientos:** lista por rango inclusivo de fechas locales con fecha/hora, nombre/unidad históricos, tipo, cantidad, motivo, referencia corta y usuario. Filtros por producto y tipo; no suma magnitudes de tipos distintos.
+- Los tres reportes muestran el aviso «Datos locales de este dispositivo; pueden incluir operaciones aún no sincronizadas». No se agregan ganancia/margen, costos, rankings, cobros, gráficos ni exportación.
+- T6.3 define la alerta para productos activos cuando existencia sea menor o igual al mínimo; su presentación está en Inicio y Consulta de existencias.
+
+## Reportes locales (T6.2)
+
+- `IReportService` ofrece consultas autenticadas y no modifica las tablas de negocio. `EfReportService` proyecta desde ventas/usuarios/clientes, productos/categorías y movimientos/usuarios usando consultas SQLite `AsNoTracking`.
+- Los filtros temporales reciben límites UTC: la interfaz transforma las fechas calendario locales inclusivas a inicio UTC inclusivo y comienzo del día siguiente exclusivo. Fechas visibles se presentan en la zona local del dispositivo.
+- La pantalla «Reportes» permite cambiar entre ventas, inventario y movimientos, ajustar los filtros acordados y recargar. Muestra aviso de datos locales, periodos, estado sin resultados y la hora de la fotografía de inventario.
+- Ventas y movimientos aparecen en orden cronológico descendente; el inventario por categoría y nombre. No se muestran cifras agregadas no acordadas.
+
+## Alertas de existencia mínima (T6.3)
+
+- `LowStockProductQuery` comparte un criterio único: solo productos activos con existencia menor o igual al mínimo, ordenados alfabéticamente. La comparación usa las cantidades enteras en milésimas; no depende del formato decimal mostrado.
+- Inicio muestra el resumen de productos bajo mínimo cada vez que aparece, por lo que al volver de registrar una compra, venta o salida se consulta el inventario local actualizado.
+- Consulta de existencias muestra el mismo resumen y lo recalcula al abrir y al ejecutar el gesto de actualización. El panel incluye nombre, existencia/unidad y mínimo/unidad; si no hay alertas presenta un estado vacío informativo.
+- No hay notificaciones en segundo plano ni otro almacenamiento para alertas. La pantalla refleja los datos locales de la instalación hasta que T7 implemente sincronización.

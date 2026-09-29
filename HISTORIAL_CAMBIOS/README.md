@@ -8,4 +8,5 @@ Este directorio registra los cambios de implementación de la solución `MauiApp
 - [Fase 3 — Movimientos, compras y salidas no comerciales](FASE-3.md)
 - [Fase 4 — Ventas e historial](FASE-4.md)
 - [Fase 5 — Clientes, crédito y pagos](FASE-5.md)
+- [Fase 6 — Reportes y alertas](FASE-6.md)
 
