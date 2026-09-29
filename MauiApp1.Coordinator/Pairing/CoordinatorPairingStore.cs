@@ -77,6 +77,19 @@ internal sealed class CoordinatorPairingStore(string databasePath)
         return new NewDevicePairing(code, expires);
     }
 
+    public async Task<bool> IsAuthorizedAsync(Guid deviceId, string deviceToken, CancellationToken cancellationToken = default)
+    {
+        if (deviceId == Guid.Empty || string.IsNullOrWhiteSpace(deviceToken)) return false;
+        var tokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(deviceToken));
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT TokenHash FROM AuthorizedDevices WHERE DeviceId = $deviceId AND IsRevoked = 0 LIMIT 1;";
+        command.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+        if (await command.ExecuteScalarAsync(cancellationToken) is not byte[] expectedHash) return false;
+        return CryptographicOperations.FixedTimeEquals(expectedHash, tokenHash);
+    }
+
     public async Task<DevicePairingResult> CompletePairingAsync(
         Guid deviceId,
         string code,

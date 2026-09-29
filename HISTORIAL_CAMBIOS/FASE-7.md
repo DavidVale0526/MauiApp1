@@ -73,3 +73,24 @@
 - Al simular un fallo al guardar la confirmación local, permaneció la clave pendiente y el reintento recuperó la autorización. Una huella incorrecta no guarda una configuración bloqueada.
 - Comprobaciones directas de la base temporal: otro código invalida el anterior; código vencido rechazado; un identificador de dispositivo sin su clave no recupera la autorización.
 - Las bases, certificado/clave y proceso de prueba se retiraron al terminar. La prueba usa almacenamiento simulado para comprobar el protocolo; el funcionamiento visual y SecureStorage real del teléfono/Windows quedan pendientes. No se considera habilitada la sincronización de cuentas o negocio.
+
+## T7.1 — API para sobres de sincronización (2026-09-29)
+
+### Archivos creados
+
+- `MauiApp1.Coordinator/Sync/CoordinatorOperationStore.cs`: almacén SQLite del diario central, con identificador de operación único, hash de contenido para reconocer reintentos idénticos y secuencia incremental para consultar cambios.
+- `MauiApp1.Coordinator/Deployment/SINCRONIZACION_API.md`: contrato de los endpoints, encabezados de autorización, límites y alcance aún pendiente.
+
+### Archivos modificados
+
+- `MauiApp1.Coordinator/Program.cs`: agrega `POST /api/sync/operations` y `GET /api/sync/changes`; ambas requieren HTTPS y una clave de dispositivo vinculado. El envío confirma solo tras guardar la operación; la consulta pagina por cursor y excluye las operaciones originadas por el mismo dispositivo.
+- `MauiApp1.Coordinator/Pairing/CoordinatorPairingStore.cs`: añade comprobación de autorización del dispositivo comparando el hash de la clave en tiempo constante.
+- `D:\Trabajo\Tesis\TASK.md` y `ARCHITECTURE.md`: registran el alcance terminado y que todavía no se aplica el diario a las tablas de negocio.
+
+### Verificación y límites
+
+- `dotnet build MauiApp1.Coordinator/MauiApp1.Coordinator.csproj -c Debug --no-restore`: correcto, 0 advertencias y 0 errores.
+- Prueba aislada del diario sobre SQLite temporal: primer guardado aceptado, reintento idéntico reconocido con la misma secuencia, contenido distinto para el mismo identificador rechazado; el cursor incluyó operaciones de otro dispositivo y excluyó las propias.
+- Arranque temporal de desarrollo: migraciones centrales aplicadas y `GET /health` respondió `{"status":"ok"}`. No se pudo ejecutar una llamada de extremo a extremo a las rutas de sincronización: el entorno denegó escritura en el almacén de certificados de usuario requerido para HTTPS. Por eso, las rutas tienen verificación de compilación y revisión del código; el almacenamiento SQLite sí pasó la comprobación aislada descrita arriba.
+- La base temporal y cualquier artefacto de prueba se retiraron al cerrar la comprobación.
+- No se ha importado la base real ni instalado/expuesto el servicio. La API aún no es consumida por la Outbox MAUI, no aplica operaciones a las tablas de negocio, no valida la sesión/identidad central del usuario y no publica eventos SignalR; esas tareas quedan pendientes según T7.1–T7.3.

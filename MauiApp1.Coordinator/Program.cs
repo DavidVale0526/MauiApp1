@@ -5,6 +5,7 @@ using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
 using MauiApp1.Coordinator.Persistence;
 using MauiApp1.Coordinator.Pairing;
+using MauiApp1.Coordinator.Sync;
 using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -111,6 +112,8 @@ internal static class Program
         await app.Services.GetRequiredService<ILocalDatabaseInitializer>().InitializeAsync();
         var pairingStore = new CoordinatorPairingStore(centralDatabasePath);
         await pairingStore.InitializeAsync();
+        var operationStore = new CoordinatorOperationStore(centralDatabasePath);
+        await operationStore.InitializeAsync();
 
         // This liveness endpoint exposes no account, inventory, or transaction data.
         app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
@@ -183,6 +186,42 @@ internal static class Program
                 : Results.BadRequest(new PairDeviceResponse(false, "Código inválido o vencido."));
         }).RequireRateLimiting("device-pairing");
 
+        app.MapPost("/api/sync/operations", async (
+            IncomingOperation request,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La sincronización requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var stored = await operationStore.StoreAsync(request, deviceId.Value, cancellationToken);
+            if (!stored.Accepted)
+                return stored == StoredOperationResult.Conflict
+                    ? Results.Conflict(new SyncOperationResponse(false, false, null, "El identificador de operación ya existe con otro contenido."))
+                    : Results.BadRequest(new SyncOperationResponse(false, false, null, "La operación contiene datos inválidos."));
+            return Results.Ok(new SyncOperationResponse(true, stored.AlreadyAccepted, stored.Sequence,
+                stored.AlreadyAccepted ? "La operación ya estaba confirmada." : "Operación guardada por el coordinador."));
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1_100_000));
+
+        app.MapGet("/api/sync/changes", async (
+            long? afterSequence,
+            int? limit,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La consulta de cambios requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var cursor = afterSequence ?? 0;
+            if (cursor < 0) return Results.BadRequest(new { message = "El cursor no puede ser negativo." });
+            var pageSize = Math.Clamp(limit ?? 100, 1, 500);
+            var changes = await operationStore.GetAfterAsync(cursor, pageSize, deviceId, cancellationToken);
+            return Results.Ok(new SyncChangesResponse(changes, changes.Count > 0
+                ? changes[^1].Sequence : cursor));
+        });
+
         await app.RunAsync();
         return 0;
     }
@@ -194,6 +233,18 @@ internal static class Program
         return optionIndex >= 0 && optionIndex + 1 < arguments.Length
             ? arguments[optionIndex + 1]
             : null;
+    }
+
+    private static async Task<Guid?> GetAuthorizedDeviceIdAsync(
+        HttpContext context, CoordinatorPairingStore pairingStore, CancellationToken cancellationToken)
+    {
+        var authorization = context.Request.Headers["Authorization"].FirstOrDefault();
+        if (!Guid.TryParse(context.Request.Headers["X-Device-Id"].FirstOrDefault(), out var deviceId) ||
+            !string.Equals(authorization?.Split(' ', 2).FirstOrDefault(),
+                "Bearer", StringComparison.OrdinalIgnoreCase)) return null;
+        var token = authorization is not null && authorization.Contains(' ')
+            ? authorization[(authorization.IndexOf(' ') + 1)..].Trim() : string.Empty;
+        return await pairingStore.IsAuthorizedAsync(deviceId, token, cancellationToken) ? deviceId : null;
     }
 
     private static string GetCoordinatorDataDirectory(string? configuredDataDirectory) =>
@@ -236,3 +287,5 @@ internal sealed record CreatePairingCodeRequest(string UserName, string Password
 internal sealed record CreatePairingCodeResponse(string Code, DateTime ExpiresAtUtc);
 internal sealed record PairDeviceRequest(Guid DeviceId, string? Code, string? DeviceToken);
 internal sealed record PairDeviceResponse(bool Success, string Message);
+internal sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);
+internal sealed record SyncChangesResponse(IReadOnlyList<ConfirmedOperation> Changes, long NextSequence);
