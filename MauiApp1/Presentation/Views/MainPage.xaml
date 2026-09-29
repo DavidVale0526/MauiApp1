@@ -21,6 +21,7 @@
             <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" />
             <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" />
             <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" />
+            <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" />
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />

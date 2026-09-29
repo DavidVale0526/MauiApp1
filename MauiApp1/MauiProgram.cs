@@ -41,6 +41,8 @@ namespace MauiApp1
             builder.Services.AddTransient<InventoryMovementHistoryViewModel>();
             builder.Services.AddTransient<SaleRegistrationPage>();
             builder.Services.AddTransient<SaleRegistrationViewModel>();
+            builder.Services.AddTransient<SaleHistoryPage>();
+            builder.Services.AddTransient<SaleHistoryViewModel>();
             builder.Services.AddTransient<OtherExitPage>();
             builder.Services.AddTransient<OtherExitViewModel>();
             builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,

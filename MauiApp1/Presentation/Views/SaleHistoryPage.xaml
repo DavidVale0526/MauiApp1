@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
+             x:Class="MauiApp1.Presentation.Views.SaleHistoryPage"
+             x:DataType="viewModels:SaleHistoryViewModel"
+             Title="Historial de ventas">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
+        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
+        <Label Grid.Row="1" Text="Historial de ventas" FontSize="28" FontAttributes="Bold" />
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <Label Grid.Column="0" Text="Ventas confirmadas, de la más reciente a la más antigua." VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked" />
+        </Grid>
+        <Grid Grid.Row="3">
+            <CollectionView ItemsSource="{Binding Sales}">
+                <CollectionView.EmptyView>
+                    <Label Text="Aún no hay ventas registradas." HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SaleHistoryCard">
+                        <Border Padding="16" Margin="0,0,0,12" Stroke="#808080" StrokeThickness="1">
+                            <VerticalStackLayout Spacing="7">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Grid.Column="0" Text="{Binding DateText}" FontSize="18" FontAttributes="Bold" />
+                                    <Label Grid.Column="1" Text="{Binding ReferenceText}" HorizontalTextAlignment="End" />
+                                </Grid>
+                                <Label Text="{Binding ActorText}" FontSize="13" />
+                                <Label Text="{Binding LinesText}" LineBreakMode="WordWrap" />
+                                <Label Text="{Binding TotalText}" FontSize="18" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center" InputTransparent="True" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                               HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
+    </Grid>
+</ContentPage>

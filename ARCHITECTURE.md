@@ -96,3 +96,9 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - `EfSaleService` aplica el stock policy `Reject` e incorpora `SaleExit`, saldo actualizado, venta/cabecera/renglones y payload `Sale.Recorded` en el mismo contexto y `SaveChanges`. SQLite confirma la operación local de forma atómica. La falta de existencia, el producto inactivo o la operación inválida no alteran saldos.
 - Un `OperationId` ya procesado con el mismo actor, tipo y payload devuelve éxito idempotente; reutilizarlo con contenido distinto se rechaza. Los nombres/unidades snapshots del renglón también se guardan en el movimiento para que T3.5 muestre la misma historia.
 - La pantalla permite agregar y quitar líneas antes de confirmar, enseña precio y stock disponible, muestra importes por línea y total, y solicita confirmación. Reintentos mantienen el mismo borrador/id de operación. No registra forma de pago, cliente/crédito, impuesto, descuento o comprobante.
+
+## Historial de ventas (T4.2)
+
+- `ISaleService.GetHistoryAsync` retorna ventas locales solo para una sesión autenticada, ordenadas por fecha UTC descendente y con sus renglones persistidos. No agrega una copia del catálogo ni actualiza saldos.
+- Cada registro muestra fecha/hora local, usuario, referencia corta al `OperationId`, nombre/unidad/precio/cantidad/importe históricos por renglón y total de la venta.
+- La pantalla no permite editar/eliminar una venta. Anulaciones, correcciones, filtros, cobros y comprobantes siguen fuera de alcance hasta aprobar sus reglas.

@@ -149,4 +149,60 @@ internal sealed class EfSaleService(
             return SaleResult.Failure("No se pudo guardar la venta completa. Reintenta con el mismo identificador de operación.");
         }
     }
+
+    public async Task<IReadOnlyList<SaleHistoryEntry>> GetHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        if (authenticationService.CurrentUser is null)
+        {
+            return [];
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var sales = await (
+            from sale in context.Sales.AsNoTracking()
+            join actor in context.UserAccounts.AsNoTracking() on sale.ActorUserId equals actor.UserId
+            orderby sale.OccurredAtUtc descending, sale.OperationId descending
+            select new
+            {
+                sale.OperationId,
+                sale.OccurredAtUtc,
+                ActorUserName = actor.UserName,
+                sale.TotalMinorUnits
+            }).ToListAsync(cancellationToken);
+        if (sales.Count == 0)
+        {
+            return [];
+        }
+
+        var operationIds = sales.Select(sale => sale.OperationId).ToArray();
+        var lines = await context.SaleLines.AsNoTracking()
+            .Where(line => operationIds.Contains(line.OperationId))
+            .OrderBy(line => line.LineNumber)
+            .Select(line => new
+            {
+                line.OperationId,
+                line.ProductNameSnapshot,
+                line.UnitSnapshot,
+                line.QuantityMilliUnits,
+                line.SalePriceMinorUnits,
+                line.LineTotalMinorUnits
+            })
+            .ToListAsync(cancellationToken);
+        var linesBySale = lines.GroupBy(line => line.OperationId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<SaleHistoryLine>)group.Select(line => new SaleHistoryLine(
+                    line.ProductNameSnapshot,
+                    line.UnitSnapshot,
+                    line.QuantityMilliUnits,
+                    line.SalePriceMinorUnits,
+                    line.LineTotalMinorUnits)).ToArray());
+
+        return sales.Select(sale => new SaleHistoryEntry(
+            sale.OperationId,
+            sale.OccurredAtUtc,
+            sale.ActorUserName,
+            sale.TotalMinorUnits,
+            linesBySale.GetValueOrDefault(sale.OperationId, []))).ToArray();
+    }
 }

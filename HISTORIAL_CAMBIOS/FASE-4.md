@@ -34,4 +34,27 @@
 
 - Infrastructure, MAUI Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron con 0 advertencias y 0 errores.
 - Smoke check de SQLite: migración/relaciones; compra de stock; venta con dos renglones repetidos; consolidación; redondeo de mitad hacia arriba; persistencia de snapshots; descuento único en reintento; rechazo de contenido distinto y de stock insuficiente sin cabecera, movimiento ni cambio de saldo parcial.
-- Falta la revisión visual manual en Windows por el usuario; Android físico/emulador queda pendiente.
+- El usuario confirmó que la pantalla funciona manualmente en Windows y en su teléfono Android físico el 2026-09-28.
+
+## T4.2 — Consultar historial de ventas
+
+### Creados
+
+- `MauiApp1.Application/Sales/SaleHistoryEntry.cs` — resultado de consulta para cabecera y renglones de venta históricos.
+- `MauiApp1/Presentation/ViewModels/SaleHistoryViewModel.cs` — carga, formato de fecha local, renglones y totales.
+- `MauiApp1/Presentation/Views/SaleHistoryPage.xaml`, `.xaml.cs` — lista de ventas confirmadas, estado vacío/error, actualización manual y regreso.
+
+### Modificados
+
+- `MauiApp1.Application/Sales/ISaleService.cs` — contrato de consulta del historial.
+- `MauiApp1.Infrastructure/Sales/EfSaleService.cs` — consulta autenticada/no tracking, ordenada por fecha descendente, con usuario y renglones snapshots.
+- `MauiApp1/MauiProgram.cs`, `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs` — registro DI y acceso a «Historial de ventas».
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`, `D:\Trabajo\Tesis\PLAN_MODULOS_SISTEMA_MISCELANEA_ARI.md` — alcance y evidencia de T4.2.
+
+### Reglas y verificación
+
+- La pantalla muestra fecha/hora local, usuario que registró, referencia corta del `OperationId`, productos con nombre/unidad históricos, cantidad, precio unitario aplicado, importe de cada línea y total.
+- La consulta es de solo lectura y requiere una sesión local. No habilita cambios, eliminación, anulaciones, filtros, pagos ni comprobantes.
+- Infrastructure, MAUI Windows y Android compilaron con 0 advertencias y 0 errores.
+- Smoke check SQLite pasó historial vacío/consultable, sesión requerida, orden de dos ventas, usuario correcto, importes/snapshots tras renombrar y reprecificar el producto y stock sin cambios por consultar.
+- Falta la revisión visual manual del usuario en Windows y Android para T4.2.
