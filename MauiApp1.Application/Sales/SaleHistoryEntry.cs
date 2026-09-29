@@ -5,7 +5,10 @@ public sealed record SaleHistoryEntry(
     DateTime OccurredAtUtc,
     string ActorUserName,
     long TotalMinorUnits,
-    IReadOnlyList<SaleHistoryLine> Lines);
+    IReadOnlyList<SaleHistoryLine> Lines,
+    bool IsCredit = false,
+    string? CustomerName = null,
+    DateTime? CreditDueAtUtc = null);
 
 public sealed record SaleHistoryLine(
     string ProductName,

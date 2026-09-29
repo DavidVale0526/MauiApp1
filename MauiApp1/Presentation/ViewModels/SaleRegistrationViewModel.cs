@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using MauiApp1.Application.Products;
+using MauiApp1.Application.Customers;
 using MauiApp1.Application.Sales;
 using MauiApp1.Domain.Identifiers;
 using MauiApp1.Domain.Values;
@@ -15,6 +16,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 {
     private readonly IProductService _productService;
     private readonly ISaleService _saleService;
+    private readonly ICustomerService _customerService;
     private SaleProductOption? _selectedProduct;
     private string _quantityInput = string.Empty;
     private string _errorMessage = string.Empty;
@@ -23,11 +25,14 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     private SaleDraft? _pendingSale;
     private bool _pendingSaleAttempted;
     private Guid? _lastCompletedSaleOperationId;
+    private bool _isCredit;
+    private CreditCustomerOption? _selectedCustomer;
 
-    public SaleRegistrationViewModel(IProductService productService, ISaleService saleService)
+    public SaleRegistrationViewModel(IProductService productService, ISaleService saleService, ICustomerService customerService)
     {
         _productService = productService;
         _saleService = saleService;
+        _customerService = customerService;
         Lines.CollectionChanged += OnLinesChanged;
         AddLineCommand = new Command(AddLine, () => CanEditLines && SelectedProduct is not null);
     }
@@ -37,6 +42,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     public ObservableCollection<SaleProductOption> Products { get; } = [];
 
     public ObservableCollection<SaleCartLine> Lines { get; } = [];
+
+    public ObservableCollection<CreditCustomerOption> Customers { get; } = [];
 
     public ICommand AddLineCommand { get; }
 
@@ -50,6 +57,28 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedProductDetails));
                 ((Command)AddLineCommand).ChangeCanExecute();
             }
+        }
+    }
+
+    public bool IsCredit
+    {
+        get => _isCredit;
+        set
+        {
+            if (SetProperty(ref _isCredit, value))
+            {
+                OnPropertyChanged(nameof(CanConfirm));
+                ((Command)AddLineCommand).ChangeCanExecute();
+            }
+        }
+    }
+
+    public CreditCustomerOption? SelectedCustomer
+    {
+        get => _selectedCustomer;
+        set
+        {
+            if (SetProperty(ref _selectedCustomer, value)) OnPropertyChanged(nameof(CanConfirm));
         }
     }
 
@@ -89,7 +118,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 
     public bool CanEditLines => !IsBusy && _pendingSale is null;
 
-    public bool CanConfirm => !IsBusy && (_pendingSale is not null || Lines.Count > 0);
+    public bool CanConfirm => !IsBusy && (_pendingSale is not null || (Lines.Count > 0 && (!IsCredit || SelectedCustomer is not null)));
 
     public string ConfirmButtonText => _pendingSaleAttempted ? "Reintentar la misma venta" : "Revisar y confirmar venta";
 
@@ -119,6 +148,23 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         }
 
         await RefreshProductsAsync();
+        await RefreshCustomersAsync();
+    }
+
+    private async Task RefreshCustomersAsync()
+    {
+        try
+        {
+            var selectedId = SelectedCustomer?.Id;
+            Customers.Clear();
+            foreach (var customer in await _customerService.GetAllAsync())
+                Customers.Add(new CreditCustomerOption(customer.CustomerId, customer.Name));
+            SelectedCustomer = Customers.FirstOrDefault(item => item.Id == selectedId);
+        }
+        catch
+        {
+            ErrorMessage = "No se pudieron cargar los clientes. Inténtalo de nuevo.";
+        }
     }
 
     private async Task RefreshProductsAsync()
@@ -165,15 +211,25 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             return null;
         }
 
+        if (IsCredit && SelectedCustomer is null)
+        {
+            ErrorMessage = "Selecciona un cliente para registrar la venta a crédito.";
+            return null;
+        }
+
+        var occurredAtUtc = DateTime.UtcNow;
         _pendingSale = new SaleDraft(
             Guid.NewGuid(),
-            DateTime.UtcNow,
+            occurredAtUtc,
             Lines.Select(line => new SaleLineDraft(
                 line.ProductId,
                 line.Name,
                 line.Unit,
                 line.Quantity,
-                line.SalePrice)).ToArray());
+                line.SalePrice)).ToArray(),
+            IsCredit,
+            IsCredit ? SelectedCustomer!.Id : null,
+            IsCredit ? occurredAtUtc.AddDays(15) : null);
         _pendingSaleAttempted = false;
         OnPropertyChanged(nameof(CanEditLines));
         OnPropertyChanged(nameof(CanConfirm));
@@ -196,7 +252,10 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         }).ToArray();
         var totalMinorUnits = _pendingSale.Lines.Aggregate(0L,
             (sum, line) => checked(sum + SaleAmountCalculator.CalculateLineTotalMinorUnits(line.SalePrice, line.Quantity)));
-        return $"{string.Join("\n", lines)}\n\n{(totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}\n\nLa fecha y hora se registrarán automáticamente. Esta etapa registra la venta y actualiza existencias; no registra cobros ni emite comprobantes.";
+        var creditDetails = _pendingSale.IsCredit
+            ? $"\n\nVenta a crédito para: {SelectedCustomer?.Name ?? "cliente"}\nVence: {_pendingSale.CreditDueAtUtc!.Value.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)}\nEl saldo inicial será C$ {(totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}."
+            : "\n\nVenta de contado.";
+        return $"{string.Join("\n", lines)}\n\nTotal: C$ {(totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}{creditDetails}\n\nLa fecha y hora se registrarán automáticamente.";
     }
 
     public void CancelReview()
@@ -234,14 +293,17 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
                 return false;
             }
 
-            _lastCompletedSaleOperationId = _pendingSale.OperationId;
+            var completedSale = _pendingSale;
+            _lastCompletedSaleOperationId = completedSale.OperationId;
             OnPropertyChanged(nameof(LastCompletedSaleOperationId));
             Lines.Clear();
             _pendingSale = null;
             _pendingSaleAttempted = false;
             StatusMessage = result.AlreadyApplied
                 ? "Esta venta ya se había guardado; no se descontó la existencia otra vez."
-                : "Venta guardada y existencias actualizadas. El cobro y el comprobante se definirán en sus etapas correspondientes.";
+                : completedSale.IsCredit
+                    ? "Venta a crédito registrada y existencias actualizadas; la deuda quedó asociada al cliente."
+                    : "Venta de contado guardada y existencias actualizadas.";
             await RefreshProductsAsync();
             OnPropertyChanged(nameof(CanEditLines));
             OnPropertyChanged(nameof(CanConfirm));
@@ -353,6 +415,11 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+
+public sealed record CreditCustomerOption(Guid Id, string Name)
+{
+    public string DisplayName => Name;
 }
 
 public sealed record SaleProductOption(ProductId Id, string Name, string Unit, MoneyAmount SalePrice, Quantity Stock)

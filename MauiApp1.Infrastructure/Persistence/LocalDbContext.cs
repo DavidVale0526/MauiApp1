@@ -31,6 +31,10 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<SaleLineEntity> SaleLines => Set<SaleLineEntity>();
 
+    internal DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
+
+    internal DbSet<ReceivableEntity> Receivables => Set<ReceivableEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -210,11 +214,17 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .IsRequired();
             entity.Property(item => item.ActorUserId).IsRequired();
             entity.Property(item => item.TotalMinorUnits).IsRequired();
+            entity.Property(item => item.IsCredit).IsRequired();
+            entity.HasOne<CustomerEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<UserAccountEntity>()
                 .WithMany()
                 .HasForeignKey(item => item.ActorUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.OccurredAtUtc);
+            entity.HasIndex(item => item.CustomerId);
         });
 
         modelBuilder.Entity<SaleLineEntity>(entity =>
@@ -244,6 +254,48 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.ProductId);
+        });
+
+        modelBuilder.Entity<CustomerEntity>(entity =>
+        {
+            entity.ToTable("Customers");
+            entity.HasKey(item => item.CustomerId);
+            entity.Property(item => item.CustomerId).ValueGeneratedNever();
+            entity.Property(item => item.Name).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.NormalizedName).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Phone).HasMaxLength(40);
+            entity.Property(item => item.CreatedAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.HasIndex(item => item.NormalizedName).IsUnique();
+        });
+
+        modelBuilder.Entity<ReceivableEntity>(entity =>
+        {
+            entity.ToTable("Receivables", table =>
+            {
+                table.HasCheckConstraint("CK_Receivables_Original_NonNegative", "\"OriginalAmountMinorUnits\" >= 0");
+                table.HasCheckConstraint("CK_Receivables_Outstanding_NonNegative", "\"OutstandingMinorUnits\" >= 0");
+            });
+            entity.HasKey(item => item.OperationId);
+            entity.Property(item => item.OperationId).ValueGeneratedNever();
+            entity.Property(item => item.CustomerId).IsRequired();
+            entity.Property(item => item.OriginalAmountMinorUnits).IsRequired();
+            entity.Property(item => item.OutstandingMinorUnits).IsRequired();
+            entity.Property(item => item.DueAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.HasOne<SaleEntity>()
+                .WithOne()
+                .HasForeignKey<ReceivableEntity>(item => item.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CustomerEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.CustomerId, item.DueAtUtc });
         });
     }
 }

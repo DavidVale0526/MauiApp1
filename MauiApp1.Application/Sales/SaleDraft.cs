@@ -6,7 +6,10 @@ namespace MauiApp1.Application.Sales;
 public sealed record SaleDraft(
     Guid OperationId,
     DateTime OccurredAtUtc,
-    IReadOnlyList<SaleLineDraft> Lines);
+    IReadOnlyList<SaleLineDraft> Lines,
+    bool IsCredit = false,
+    Guid? CustomerId = null,
+    DateTime? CreditDueAtUtc = null);
 
 public sealed record SaleLineDraft(
     ProductId ProductId,

@@ -102,6 +102,12 @@ public partial class MainPage : ContentPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 
+    private async void OnCustomersClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<CustomerManagementPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
     private async void OnRegisterOtherExitClicked(object? sender, EventArgs eventArgs)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<OtherExitPage>() is not { } page)

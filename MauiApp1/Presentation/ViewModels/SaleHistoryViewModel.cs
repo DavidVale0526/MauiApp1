@@ -70,6 +70,14 @@ public sealed record SaleHistoryCard(SaleHistoryEntry Sale)
 
     public string TotalText => $"Total: {(Sale.TotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
 
+    public string SaleTypeText => Sale.IsCredit ? "Venta a crédito" : "Venta de contado";
+
+    public string CustomerText => Sale.IsCredit ? $"Cliente: {Sale.CustomerName ?? "No disponible"}" : string.Empty;
+
+    public string DueText => Sale.CreditDueAtUtc is { } due
+        ? $"Vence: {due.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)}"
+        : string.Empty;
+
     public string LinesText => string.Join(
         Environment.NewLine,
         Sale.Lines.Select(line =>

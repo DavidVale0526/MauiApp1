@@ -4,7 +4,10 @@ public sealed record SaleRecordedPayload(
     Guid OperationId,
     DateTime OccurredAtUtc,
     IReadOnlyList<SaleRecordedLinePayload> Lines,
-    long TotalMinorUnits);
+    long TotalMinorUnits,
+    bool IsCredit = false,
+    Guid? CustomerId = null,
+    DateTime? CreditDueAtUtc = null);
 
 public sealed record SaleRecordedLinePayload(
     int LineNumber,

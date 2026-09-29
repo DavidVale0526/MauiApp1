@@ -38,6 +38,36 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.ToTable("Categories", (string)null);
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.CustomerEntity", b =>
+                {
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("CustomerId");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("Customers", (string)null);
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.DeviceIdentityEntity", b =>
                 {
                     b.Property<int>("SingletonKey")
@@ -82,8 +112,9 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ProductNameSnapshot")
                         .IsRequired()
-                        .HasDefaultValue("")
-                        .HasColumnType("TEXT");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("");
 
                     b.Property<long>("QuantityMilliUnits")
                         .HasColumnType("INTEGER");
@@ -96,8 +127,9 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("UnitSnapshot")
                         .IsRequired()
-                        .HasDefaultValue("")
-                        .HasColumnType("TEXT");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("");
 
                     b.HasKey("MovementId");
 
@@ -253,6 +285,35 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.ReceivableEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("DueAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OriginalAmountMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OutstandingMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("CustomerId", "DueAtUtc");
+
+                    b.ToTable("Receivables", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Receivables_Original_NonNegative", "\"OriginalAmountMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_Receivables_Outstanding_NonNegative", "\"OutstandingMinorUnits\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", b =>
                 {
                     b.Property<Guid>("OperationId")
@@ -260,6 +321,12 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("ActorUserId")
                         .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCredit")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("OccurredAtUtc")
                         .HasColumnType("INTEGER");
@@ -270,6 +337,8 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasKey("OperationId");
 
                     b.HasIndex("ActorUserId");
+
+                    b.HasIndex("CustomerId");
 
                     b.HasIndex("OccurredAtUtc");
 
@@ -290,11 +359,11 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<long>("LineTotalMinorUnits")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ProductNameSnapshot")
-                        .IsRequired()
+                    b.Property<Guid>("ProductId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("ProductId")
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<long>("QuantityMilliUnits")
@@ -414,6 +483,21 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.ReceivableEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.CustomerEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
+                        .WithOne()
+                        .HasForeignKey("MauiApp1.Infrastructure.Persistence.Entities.ReceivableEntity", "OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", b =>
                 {
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
@@ -421,6 +505,11 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ActorUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.CustomerEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleLineEntity", b =>

@@ -30,7 +30,9 @@ internal sealed class EfSaleService(
         if (sale is null || sale.OperationId == Guid.Empty || sale.OccurredAtUtc.Kind != DateTimeKind.Utc ||
             sale.Lines is null || sale.Lines.Count == 0 || sale.Lines.Any(line =>
                 line.ProductId.IsEmpty || line.Quantity.MilliUnits <= 0 || line.SalePrice.MinorUnits < 0 ||
-                string.IsNullOrWhiteSpace(line.ProductNameSnapshot) || string.IsNullOrWhiteSpace(line.UnitSnapshot)))
+                string.IsNullOrWhiteSpace(line.ProductNameSnapshot) || string.IsNullOrWhiteSpace(line.UnitSnapshot)) ||
+            sale.IsCredit != sale.CustomerId.HasValue || sale.IsCredit != sale.CreditDueAtUtc.HasValue ||
+            (sale.CreditDueAtUtc.HasValue && sale.CreditDueAtUtc.Value.Kind != DateTimeKind.Utc))
         {
             return SaleResult.Failure("La venta requiere fecha UTC, productos válidos, cantidades positivas y precios no negativos.");
         }
@@ -89,9 +91,25 @@ internal sealed class EfSaleService(
             sale.OccurredAtUtc,
             lines.Select((line, index) => new SaleRecordedLinePayload(
                 index, line.ProductId, line.Name, line.Unit, line.Quantity, line.Price, line.LineTotal)).ToArray(),
-            totalMinorUnits));
+            totalMinorUnits,
+            sale.IsCredit,
+            sale.CustomerId,
+            sale.CreditDueAtUtc));
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (sale.IsCredit)
+        {
+            if (!await context.Customers.AnyAsync(customer => customer.CustomerId == sale.CustomerId, cancellationToken))
+            {
+                return SaleResult.Failure("El cliente seleccionado ya no existe. Actualiza la lista e inténtalo de nuevo.");
+            }
+
+            if (sale.CreditDueAtUtc != sale.OccurredAtUtc.AddDays(15))
+            {
+                return SaleResult.Failure("La fecha de vencimiento debe ser 15 días después de la fecha de venta.");
+            }
+        }
+
         var stageResult = await movementWriter.StageAsync(
             context,
             operation,
@@ -112,9 +130,19 @@ internal sealed class EfSaleService(
                 cancellationToken);
             var persistedLineCount = existingSale is null ? 0 : await context.SaleLines.AsNoTracking()
                 .CountAsync(line => line.OperationId == sale.OperationId, cancellationToken);
-            return existingSale is not null && existingSale.TotalMinorUnits == totalMinorUnits && persistedLineCount == lines.Count
+            var persistedReceivable = sale.IsCredit
+                ? await context.Receivables.AsNoTracking().SingleOrDefaultAsync(item => item.OperationId == sale.OperationId, cancellationToken)
+                : null;
+            var creditMatches = sale.IsCredit
+                ? persistedReceivable is not null && persistedReceivable.CustomerId == sale.CustomerId &&
+                  persistedReceivable.OriginalAmountMinorUnits == totalMinorUnits &&
+                  persistedReceivable.OutstandingMinorUnits == totalMinorUnits && persistedReceivable.DueAtUtc == sale.CreditDueAtUtc
+                : !await context.Receivables.AnyAsync(item => item.OperationId == sale.OperationId, cancellationToken);
+            return existingSale is not null && existingSale.TotalMinorUnits == totalMinorUnits &&
+                   existingSale.IsCredit == sale.IsCredit && existingSale.CustomerId == sale.CustomerId &&
+                   persistedLineCount == lines.Count && creditMatches
                 ? SaleResult.Success(alreadyApplied: true)
-                : SaleResult.Failure("La operación ya existe, pero no se encontró la venta completa asociada. No se modificó el inventario.");
+                : SaleResult.Failure("La operación ya existe, pero no se encontró la venta y deuda completas asociadas. No se modificó el inventario.");
         }
 
         context.Sales.Add(new SaleEntity
@@ -122,8 +150,21 @@ internal sealed class EfSaleService(
             OperationId = sale.OperationId,
             OccurredAtUtc = sale.OccurredAtUtc,
             ActorUserId = actor.Id.Value,
-            TotalMinorUnits = totalMinorUnits
+            TotalMinorUnits = totalMinorUnits,
+            IsCredit = sale.IsCredit,
+            CustomerId = sale.CustomerId
         });
+        if (sale.IsCredit)
+        {
+            context.Receivables.Add(new ReceivableEntity
+            {
+                OperationId = sale.OperationId,
+                CustomerId = sale.CustomerId!.Value,
+                OriginalAmountMinorUnits = totalMinorUnits,
+                OutstandingMinorUnits = totalMinorUnits,
+                DueAtUtc = sale.CreditDueAtUtc!.Value
+            });
+        }
         foreach (var (line, index) in lines.Select((line, index) => (line, index)))
         {
             context.SaleLines.Add(new SaleLineEntity
@@ -167,6 +208,8 @@ internal sealed class EfSaleService(
                 sale.OperationId,
                 sale.OccurredAtUtc,
                 ActorUserName = actor.UserName,
+                sale.IsCredit,
+                sale.CustomerId,
                 sale.TotalMinorUnits
             }).ToListAsync(cancellationToken);
         if (sales.Count == 0)
@@ -198,11 +241,24 @@ internal sealed class EfSaleService(
                     line.SalePriceMinorUnits,
                     line.LineTotalMinorUnits)).ToArray());
 
+        var customerIds = sales.Where(sale => sale.CustomerId.HasValue).Select(sale => sale.CustomerId!.Value).Distinct().ToArray();
+        var customerNames = customerIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await context.Customers.AsNoTracking()
+                .Where(customer => customerIds.Contains(customer.CustomerId))
+                .ToDictionaryAsync(customer => customer.CustomerId, customer => customer.Name, cancellationToken);
+        var dueDates = await context.Receivables.AsNoTracking()
+            .Where(item => operationIds.Contains(item.OperationId))
+            .ToDictionaryAsync(item => item.OperationId, item => item.DueAtUtc, cancellationToken);
+
         return sales.Select(sale => new SaleHistoryEntry(
             sale.OperationId,
             sale.OccurredAtUtc,
             sale.ActorUserName,
             sale.TotalMinorUnits,
-            linesBySale.GetValueOrDefault(sale.OperationId, []))).ToArray();
+            linesBySale.GetValueOrDefault(sale.OperationId, []),
+            sale.IsCredit,
+            sale.CustomerId.HasValue ? customerNames.GetValueOrDefault(sale.CustomerId.Value) : null,
+            dueDates.TryGetValue(sale.OperationId, out var dueAtUtc) ? dueAtUtc : null)).ToArray();
     }
 }

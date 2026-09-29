@@ -9,4 +9,8 @@ internal sealed class SaleEntity
     public Guid ActorUserId { get; set; }
 
     public long TotalMinorUnits { get; set; }
+
+    public bool IsCredit { get; set; }
+
+    public Guid? CustomerId { get; set; }
 }

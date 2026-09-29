@@ -27,6 +27,10 @@ public sealed class SaleTicketViewModel
 
     public string CurrencyText => "Córdobas nicaragüenses (C$)";
 
+    public string CreditDetailsText => Sale.IsCredit
+        ? $"Venta a crédito · Cliente: {Sale.CustomerName ?? "No disponible"} · Vence: {Sale.CreditDueAtUtc?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "No disponible"}"
+        : "Venta de contado";
+
     public string TotalText => $"C$ {FormatMoney(Sale.TotalMinorUnits)}";
 
     internal static string FormatMoney(long minorUnits) =>

@@ -10,6 +10,13 @@
             <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
             <Label Text="Registrar venta" FontSize="28" FontAttributes="Bold" />
             <Label Text="Selecciona productos activos, verifica su precio y existencia, y agrega cantidades." />
+            <HorizontalStackLayout Spacing="10">
+                <CheckBox IsChecked="{Binding IsCredit}" IsEnabled="{Binding CanEditLines}" />
+                <Label Text="Registrar como venta a crédito" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+            <Picker Title="Cliente de crédito" ItemsSource="{Binding Customers}"
+                    ItemDisplayBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedCustomer}"
+                    IsVisible="{Binding IsCredit}" IsEnabled="{Binding CanEditLines}" />
             <Picker Title="Producto activo"
                     ItemsSource="{Binding Products}"
                     ItemDisplayBinding="{Binding DisplayName}"

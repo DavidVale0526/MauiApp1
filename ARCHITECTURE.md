@@ -108,3 +108,11 @@ El inventario de cambios por fase se conserva en `HISTORIAL_CAMBIOS/`.
 - Se presenta después de una venta confirmada y se puede volver a abrir desde el historial. Usa exclusivamente la venta y los renglones persistidos, conservando sus snapshots.
 - Muestra referencia corta del `OperationId`, fecha/hora local, usuario, productos/cantidades/precios/importes y total con símbolo `C$` (córdobas nicaragüenses).
 - Es solo para consulta en pantalla y se identifica como no fiscal. No imprime ni agrega cobros, impuestos o campos fiscales; una factura fiscal requiere definición y aprobación aparte.
+
+## Clientes y ventas a crédito (T5.1)
+
+- `Customers` conserva identificador Guid, nombre visible y normalizado, teléfono opcional y fecha UTC de alta. El nombre se recorta y normaliza sin distinguir mayúsculas/minúsculas; un índice único impide duplicados. El alta local se guarda con `Customer.Created` en Outbox.
+- La pantalla «Clientes y crédito» registra y consulta clientes y suma los saldos pendientes locales. No edita ni elimina clientes; no se incorporan otros datos personales.
+- La venta conserva `IsCredit` y `CustomerId`. Para crédito requiere cliente y vencimiento a 15 días de la fecha de venta UTC. `Receivables`, con `OperationId` como vínculo único de venta, guarda cliente, monto original, saldo inicial y vencimiento.
+- El registro de venta a crédito persiste venta, renglones históricos, cuenta por cobrar, movimiento de salida, saldo de existencias y Outbox `Sale.Recorded` bajo la misma unidad de trabajo SQLite. La idempotencia abarca importe, cliente y datos de crédito para que un reintento no duplique deuda ni salida.
+- El historial y ticket distinguen contado/crédito y muestran cliente y vencimiento si corresponde. Pagos, abonos y reducción de saldo quedan para T5.2; el saldo inicial permanece igual al original hasta implementar esa etapa.
