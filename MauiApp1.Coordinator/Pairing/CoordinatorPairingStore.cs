@@ -157,6 +157,46 @@ internal sealed class CoordinatorPairingStore(string databasePath)
         return CryptographicOperations.FixedTimeEquals(expectedHash, tokenHash);
     }
 
+    public async Task<bool> RevokeDeviceAsync(Guid deviceId, string deviceToken, CancellationToken cancellationToken = default)
+    {
+        if (deviceId == Guid.Empty || string.IsNullOrWhiteSpace(deviceToken)) return false;
+        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(deviceToken));
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction(deferred: false);
+        byte[]? expectedHash;
+        await using (var find = connection.CreateCommand())
+        {
+            find.Transaction = transaction;
+            find.CommandText = "SELECT TokenHash FROM AuthorizedDevices WHERE DeviceId = $deviceId LIMIT 1;";
+            find.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+            expectedHash = await find.ExecuteScalarAsync(cancellationToken) as byte[];
+        }
+        if (expectedHash is null || !CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+        var now = DateTime.UtcNow.Ticks;
+        await using (var revoke = connection.CreateCommand())
+        {
+            revoke.Transaction = transaction;
+            revoke.CommandText = "UPDATE AuthorizedDevices SET IsRevoked = 1 WHERE DeviceId = $deviceId;";
+            revoke.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+            await revoke.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await using (var revokeSessions = connection.CreateCommand())
+        {
+            revokeSessions.Transaction = transaction;
+            revokeSessions.CommandText = "UPDATE CoordinatorUserSessions SET RevokedAtUtc = $now WHERE DeviceId = $deviceId AND RevokedAtUtc IS NULL;";
+            revokeSessions.Parameters.AddWithValue("$now", now);
+            revokeSessions.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+            await revokeSessions.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<DevicePairingResult> CompletePairingAsync(
         Guid deviceId,
         string code,

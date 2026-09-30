@@ -6,6 +6,7 @@ public interface ICoordinatorPairingClient
     Task<CoordinatorAvailability> CheckAvailabilityAsync();
     Task<PairingCodeResult> CreateCodeAsync(string address, string fingerprint, string userName, string password);
     Task<PairingActionResult> PairAsync(string address, string fingerprint, string code);
+    Task<PairingActionResult> UnlinkAsync();
 }
 
 public sealed record CoordinatorLinkStatus(string Address, string CertificateFingerprint, bool IsConfirmed, string? PendingCode);
@@ -17,6 +18,7 @@ public interface ICoordinatorLinkStorage
 {
     Task<CoordinatorDeviceLink?> ReadAsync();
     Task SaveAsync(CoordinatorDeviceLink link);
+    Task RemoveAsync();
 }
 
 // A class avoids generating a record ToString that could reveal the device secret.

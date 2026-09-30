@@ -212,3 +212,21 @@
 - Se reconstruyeron Windows y Android. Ambos destinos compilaron sin advertencias ni errores.
 - Se actualizó el Samsung SM-S928U mediante instalación de actualización, sin borrar la base ni los datos de la app. El inicio permaneció abierto; al tocar «Vinculación por red local» la pantalla cargó sin cerrar la app y mostró «Este dispositivo está vinculado».
 - No se generó ni escaneó QR durante esta verificación porque este teléfono ya está vinculado. La lectura de cámara desde otro dispositivo sin vincular queda pendiente.
+
+## T7.1 — Desvinculación segura del dispositivo (2026-09-30)
+
+### Cambios realizados
+
+- `MauiApp1.Application/Lan/ICoordinatorPairingClient.cs`: añade las operaciones para desvincular y eliminar las credenciales de vinculación local.
+- `MauiApp1/Services/SecureCoordinatorLinkStorage.cs`: elimina solo la entrada de SecureStorage correspondiente a la vinculación; no toca SQLite de negocio ni el identificador del dispositivo.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: llama al coordinador con HTTPS y certificado fijado, autentica la solicitud con el token del dispositivo y borra SecureStorage solo tras confirmación. Ante fallo de red conserva credenciales y muestra cómo reintentar.
+- `MauiApp1.Coordinator/Pairing/CoordinatorPairingStore.cs`: revoca autorización y sesiones ligadas al dispositivo en una sola transacción, comparando de forma constante el hash SHA-256 del token.
+- `MauiApp1.Coordinator/Program.cs`: añade `POST /api/devices/unlink`, limitado al dispositivo autenticado del mismo token; admite reintentos seguros tras una respuesta perdida.
+- `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs`, `Presentation/Views/DevicePairingPage.xaml` y `.xaml.cs`: botón visible al estar vinculado y confirmación que explica la conservación de los datos locales.
+- `ARCHITECTURE.md` y `D:\Trabajo\Tesis\TASK.md`: documentan el comportamiento y dejan pendiente la confirmación manual en ambos destinos.
+
+### Verificación y límites
+
+- `MauiApp1.Coordinator` compila con 0 advertencias y 0 errores.
+- La app MAUI compila para Windows y Android con 0 advertencias y 0 errores.
+- La desvinculación aún no se probó con el servicio real ni en teléfono: el servicio Windows instalado requiere actualizarse como Administrador para exponer `POST /api/devices/unlink`. Hasta entonces, el botón de la app nueva no podrá completar la revocación con el coordinador actualmente instalado.

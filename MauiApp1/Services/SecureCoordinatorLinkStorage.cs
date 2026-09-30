@@ -16,4 +16,10 @@ public sealed class SecureCoordinatorLinkStorage : ICoordinatorLinkStorage
 
     public Task SaveAsync(CoordinatorDeviceLink link) =>
         SecureStorage.Default.SetAsync(StorageKey, JsonSerializer.Serialize(link));
+
+    public Task RemoveAsync()
+    {
+        SecureStorage.Default.Remove(StorageKey);
+        return Task.CompletedTask;
+    }
 }

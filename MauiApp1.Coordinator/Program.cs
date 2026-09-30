@@ -224,6 +224,24 @@ internal static class Program
                 : Results.BadRequest(new PairDeviceResponse(false, "Código inválido o vencido."));
         }).RequireRateLimiting("device-pairing");
 
+        app.MapPost("/api/devices/unlink", async (
+            UnlinkDeviceRequest request,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La desvinculación requiere una conexión HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var authorization = httpContext.Request.Headers["Authorization"].FirstOrDefault();
+            var token = authorization is not null && authorization.Contains(' ')
+                ? authorization[(authorization.IndexOf(' ') + 1)..].Trim() : string.Empty;
+            if (!string.Equals(authorization?.Split(' ', 2).FirstOrDefault(), "Bearer", StringComparison.OrdinalIgnoreCase) ||
+                !Guid.TryParse(httpContext.Request.Headers["X-Device-Id"].FirstOrDefault(), out var headerDeviceId) ||
+                headerDeviceId == Guid.Empty || request.DeviceId != headerDeviceId)
+                return Results.Unauthorized();
+            var revoked = await pairingStore.RevokeDeviceAsync(headerDeviceId, token, cancellationToken);
+            return revoked ? Results.Ok(new { success = true, message = "Dispositivo desvinculado." }) : Results.Unauthorized();
+        }).RequireRateLimiting("device-pairing");
+
         app.MapPost("/api/sync/operations", async (
             IncomingOperation request,
             HttpContext httpContext,
@@ -339,6 +357,7 @@ internal sealed record CreatePairingCodeResponse(string Code, DateTime ExpiresAt
 internal sealed record CreateUserSessionRequest(string UserName, string Password);
 internal sealed record CreateUserSessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
 internal sealed record PairDeviceRequest(Guid DeviceId, string? Code, string? DeviceToken);
+internal sealed record UnlinkDeviceRequest(Guid DeviceId);
 internal sealed record PairDeviceResponse(bool Success, string Message);
 internal sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);
 internal sealed record SyncChangesResponse(IReadOnlyList<ConfirmedOperation> Changes, long NextSequence);

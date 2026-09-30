@@ -17,6 +17,15 @@ public partial class DevicePairingPage : ContentPage
     }
     private async void OnBackClicked(object? sender, EventArgs args) => await Navigation.PopModalAsync();
 
+    private async void OnUnlinkClicked(object? sender, EventArgs args)
+    {
+        var confirmed = await DisplayAlertAsync("Desvincular este dispositivo",
+            "Se revocará el acceso al coordinador y se cerrarán las sesiones de este dispositivo. Sus productos, ventas y demás datos locales se conservarán. ¿Deseas continuar?",
+            "Desvincular", "Cancelar");
+        if (confirmed && _viewModel.UnlinkCommand.CanExecute(null))
+            _viewModel.UnlinkCommand.Execute(null);
+    }
+
     private async void OnScanQrClicked(object? sender, EventArgs args)
     {
 #if ANDROID

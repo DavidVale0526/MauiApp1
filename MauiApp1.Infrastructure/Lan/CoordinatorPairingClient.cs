@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using MauiApp1.Application.Lan;
@@ -63,6 +64,40 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
     {
         await _pairingLock.WaitAsync();
         try { return await PairCoreAsync(address, fingerprint, code); }
+        finally { _pairingLock.Release(); }
+    }
+
+    public async Task<PairingActionResult> UnlinkAsync()
+    {
+        await _pairingLock.WaitAsync();
+        try
+        {
+            CoordinatorDeviceLink? link;
+            try { link = await ReadLinkAsync(); }
+            catch { return new(false, "No se pudo leer la autorización segura. No se modificó la vinculación."); }
+            if (link is null) return new(true, "Este dispositivo ya está desvinculado.");
+            if (!link.IsConfirmed) return new(false, "La vinculación está pendiente. Reintenta o corrige sus datos antes de desvincular.");
+            if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _))
+                return new(false, "La conexión guardada no es válida. No se borraron las credenciales.");
+
+            try
+            {
+                using var client = CreateClient(uri!, fingerprint);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+                client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+                using var response = await client.PostAsJsonAsync("api/devices/unlink", new { deviceId = link.DeviceId });
+                if (!response.IsSuccessStatusCode)
+                    return new(false, response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                        ? "El coordinador no confirmó la revocación. Las credenciales locales se conservaron; comprueba la conexión y vuelve a intentar."
+                        : ErrorFor(response.StatusCode));
+
+                try { await storage.RemoveAsync(); }
+                catch { return new(false, "El coordinador revocó el dispositivo, pero no se pudo borrar la credencial local. Vuelve a intentar con el coordinador disponible."); }
+                return new(true, "Dispositivo desvinculado. Los productos, ventas y demás datos guardados en este dispositivo se conservaron.");
+            }
+            catch (HttpRequestException) { return new(false, "No se pudo contactar al coordinador. Conéctate a la red local y vuelve a intentar; no se borró ninguna credencial."); }
+            catch (TaskCanceledException) { return new(false, "El coordinador no respondió a tiempo. No se borró ninguna credencial; vuelve a intentar cuando esté disponible."); }
+        }
         finally { _pairingLock.Release(); }
     }
 
