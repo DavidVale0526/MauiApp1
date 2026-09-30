@@ -22,8 +22,10 @@ public partial class DevicePairingPage : ContentPage
         var confirmed = await DisplayAlertAsync("Desvincular este dispositivo",
             "Se revocará el acceso al coordinador y se cerrarán las sesiones de este dispositivo. Sus productos, ventas y demás datos locales se conservarán. ¿Deseas continuar?",
             "Desvincular", "Cancelar");
-        if (confirmed && _viewModel.UnlinkCommand.CanExecute(null))
-            _viewModel.UnlinkCommand.Execute(null);
+        if (!confirmed) return;
+        var result = await _viewModel.UnlinkAsync();
+        await DisplayAlertAsync(result.Succeeded ? "Dispositivo desvinculado" : "No se pudo desvincular",
+            result.Message, "Aceptar");
     }
 
     private async void OnScanQrClicked(object? sender, EventArgs args)

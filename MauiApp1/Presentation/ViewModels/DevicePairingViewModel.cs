@@ -23,7 +23,6 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         UserName = authentication.CurrentUser?.UserName ?? string.Empty;
         GenerateCodeCommand = new Command(async () => await GenerateCodeAsync(), () => CanGenerateCode && !IsBusy && _ready);
         PairCommand = new Command(async () => await PairAsync(), () => ShowPairForm && !IsBusy && _ready);
-        UnlinkCommand = new Command(async () => await UnlinkAsync(), () => CanUnlink);
     }
 
     public string Address { get => _address; set => Set(ref _address, value); }
@@ -56,7 +55,6 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public bool IsBusy { get => _busy; private set { if (Set(ref _busy, value)) RefreshState(); } }
     public ICommand GenerateCodeCommand { get; }
     public ICommand PairCommand { get; }
-    public ICommand UnlinkCommand { get; }
 
     public async Task LoadAsync()
     {
@@ -139,17 +137,24 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         finally { IsBusy = false; await LoadAsync(); }
     }
 
-    private async Task UnlinkAsync()
+    public async Task<PairingActionResult> UnlinkAsync()
     {
-        if (IsBusy || !_confirmed || !_ready) return;
+        if (IsBusy || !_confirmed || !_ready)
+            return new(false, "No se pudo iniciar la desvinculación. Comprueba el estado del dispositivo y vuelve a intentar.");
         IsBusy = true;
         try
         {
             var result = await _client.UnlinkAsync();
             Message = result.Message;
             if (result.Succeeded) await LoadAsync();
+            return result;
         }
-        catch { Message = "No fue posible desvincular este dispositivo. No se borraron sus datos locales."; }
+        catch
+        {
+            var result = new PairingActionResult(false, "No fue posible desvincular este dispositivo. Sigue vinculado; sus datos locales se conservaron.");
+            Message = result.Message;
+            return result;
+        }
         finally { IsBusy = false; RefreshState(); }
     }
 
@@ -167,7 +172,6 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();
         ((Command)PairCommand).ChangeCanExecute();
-        ((Command)UnlinkCommand).ChangeCanExecute();
     }
 
     private sealed record PairingQrData(string Type, int Version, string Address, string Fingerprint,

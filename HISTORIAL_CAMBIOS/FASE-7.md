@@ -230,3 +230,19 @@
 - `MauiApp1.Coordinator` compila con 0 advertencias y 0 errores.
 - La app MAUI compila para Windows y Android con 0 advertencias y 0 errores.
 - La desvinculación aún no se probó con el servicio real ni en teléfono: el servicio Windows instalado requiere actualizarse como Administrador para exponer `POST /api/devices/unlink`. Hasta entonces, el botón de la app nueva no podrá completar la revocación con el coordinador actualmente instalado.
+
+## T7.1 — Hacer visible el resultado de desvincular (2026-09-30)
+
+- Tras el primer intento en Android se confirmó que la pantalla seguía indicando «vinculado»: no se debe borrar el token local ni cambiar el estado hasta que el coordinador confirme la revocación.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: ahora identifica la respuesta 404 como servicio coordinador sin la nueva función y explica que la vinculación se conserva.
+- `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs` y `Presentation/Views/DevicePairingPage.xaml.cs`: el intento se espera y siempre presenta un diálogo final explícito de éxito o fallo, además del estado persistente de vinculación.
+- Verificación: Windows y Android compilaron con 0 advertencias y 0 errores. La revocación real continúa pendiente porque el servicio Windows todavía debe actualizarse como Administrador; después se repetirá la prueba física.
+
+## T7.1 — Preparar publicación compatible con el Windows del negocio (2026-09-30)
+
+- El primer intento de actualización del servicio creó correctamente el respaldo y luego falló al iniciar el nuevo binario: el equipo tiene disponible .NET x86 10.0.9, pero no el runtime x64 requerido por una publicación dependiente. El actualizador revirtió los binarios y el registro de eventos confirmó que el servicio volvió a iniciar.
+- Se republicó `MauiApp1.Coordinator` como `win-x64 --self-contained true`; se verificó la presencia de `hostfxr.dll`, `hostpolicy.dll` y `coreclr.dll` en la publicación.
+- `MauiApp1.Coordinator/Deployment/update-coordinator.ps1` ahora valida esos componentes antes de respaldar o detener el servicio, para evitar repetir una actualización con publicación incompleta.
+- La nueva actualización aún debe ejecutarse desde PowerShell 7 como Administrador. El script conservará un respaldo previo y comprobará el estado del servicio y `/health` antes de anunciar éxito.
+- Ejecución completada correctamente por el usuario el 2026-09-30. Respaldo: `C:\ProgramData\Miscelanea Ari\Coordinator\Backups\PreUpdate-20260930-083716`. Se comprobó `/health` (`ok`) y que `POST /api/devices/unlink` responde 401 sin credenciales, lo que confirma que la ruta está activa y protegida.
+- Se instaló con `adb install -r` la APK actualizada en el Samsung SM-S928U conectado, conservando datos y vínculo para la prueba final del usuario.

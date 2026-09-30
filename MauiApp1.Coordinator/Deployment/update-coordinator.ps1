@@ -32,6 +32,12 @@ foreach ($path in @($serviceExecutable, $publishExecutable, $databasePath)) {
         throw "Falta un archivo requerido: $path"
     }
 }
+foreach ($runtimeFile in @('hostfxr.dll', 'hostpolicy.dll', 'coreclr.dll')) {
+    $runtimePath = Join-Path $publishDirectory $runtimeFile
+    if (-not (Test-Path -LiteralPath $runtimePath -PathType Leaf)) {
+        throw "La publicación debe ser independiente del runtime e incluir $runtimeFile. Publica con -r win-x64 --self-contained true. El servicio no se detuvo."
+    }
+}
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $backupRoot = Join-Path (Join-Path $dataDirectory 'Backups') "PreUpdate-$stamp"

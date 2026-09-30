@@ -87,7 +87,9 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
                 client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
                 using var response = await client.PostAsJsonAsync("api/devices/unlink", new { deviceId = link.DeviceId });
                 if (!response.IsSuccessStatusCode)
-                    return new(false, response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                    return new(false, response.StatusCode == HttpStatusCode.NotFound
+                        ? "El coordinador de Windows aún no tiene habilitada la desvinculación. Hay que actualizar el servicio coordinador como Administrador; este dispositivo sigue vinculado y sus datos no se modificaron."
+                        : response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
                         ? "El coordinador no confirmó la revocación. Las credenciales locales se conservaron; comprueba la conexión y vuelve a intentar."
                         : ErrorFor(response.StatusCode));
 
