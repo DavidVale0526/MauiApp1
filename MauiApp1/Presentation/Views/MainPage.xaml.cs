@@ -1,5 +1,6 @@
 using MauiApp1.Presentation.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Networking;
 
 namespace MauiApp1.Presentation.Views;
 
@@ -11,18 +12,35 @@ public partial class MainPage : ContentPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
     private readonly MainPageViewModel _viewModel;
+    private readonly IConnectivity _connectivity;
 
-    public MainPage(MainPageViewModel viewModel)
+    public MainPage(MainPageViewModel viewModel, IConnectivity connectivity)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _connectivity = connectivity;
         BindingContext = viewModel;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _connectivity.ConnectivityChanged += OnConnectivityChanged;
+        _viewModel.RefreshInternetStatus();
         await _viewModel.LoadLowStockAlertsAsync();
+        await _viewModel.RefreshCoordinatorStatusAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        _connectivity.ConnectivityChanged -= OnConnectivityChanged;
+        base.OnDisappearing();
+    }
+
+    private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args)
+    {
+        _viewModel.RefreshInternetStatus();
+        await _viewModel.RefreshCoordinatorStatusAsync();
     }
 
     private async void OnCreateCashierAccountClicked(object? sender, EventArgs eventArgs)

@@ -34,8 +34,75 @@ internal sealed class CoordinatorPairingStore(string databasePath)
                 AuthorizedAtUtc INTEGER NOT NULL,
                 IsRevoked INTEGER NOT NULL DEFAULT 0 CHECK (IsRevoked IN (0, 1))
             );
+            CREATE TABLE IF NOT EXISTS CoordinatorUserSessions (
+                TokenHash BLOB NOT NULL PRIMARY KEY,
+                DeviceId TEXT NOT NULL,
+                UserId TEXT NOT NULL,
+                CreatedAtUtc INTEGER NOT NULL,
+                ExpiresAtUtc INTEGER NOT NULL,
+                RevokedAtUtc INTEGER NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_CoordinatorUserSessions_Device_Expiry
+                ON CoordinatorUserSessions (DeviceId, ExpiresAtUtc);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<DateTime> CreateUserSessionAsync(
+        Guid deviceId, Guid userId, string sessionToken, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var expires = now.AddHours(12);
+        var tokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(sessionToken));
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var clean = connection.CreateCommand())
+        {
+            clean.Transaction = (SqliteTransaction)transaction;
+            clean.CommandText = "DELETE FROM CoordinatorUserSessions WHERE ExpiresAtUtc <= $now OR RevokedAtUtc IS NOT NULL;";
+            clean.Parameters.AddWithValue("$now", now.Ticks);
+            await clean.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = (SqliteTransaction)transaction;
+            insert.CommandText = "INSERT INTO CoordinatorUserSessions (TokenHash, DeviceId, UserId, CreatedAtUtc, ExpiresAtUtc) VALUES ($hash, $device, $user, $created, $expires);";
+            insert.Parameters.AddWithValue("$hash", tokenHash);
+            insert.Parameters.AddWithValue("$device", deviceId.ToString("D"));
+            insert.Parameters.AddWithValue("$user", userId.ToString("D"));
+            insert.Parameters.AddWithValue("$created", now.Ticks);
+            insert.Parameters.AddWithValue("$expires", expires.Ticks);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return expires;
+    }
+
+    public async Task<Guid?> GetSessionUserIdAsync(
+        Guid deviceId, string sessionToken, CancellationToken cancellationToken = default)
+    {
+        if (deviceId == Guid.Empty || string.IsNullOrWhiteSpace(sessionToken)) return null;
+        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(sessionToken));
+        var now = DateTime.UtcNow.Ticks;
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT s.TokenHash, s.UserId
+            FROM CoordinatorUserSessions AS s
+            INNER JOIN UserAccounts AS u ON u.UserId = s.UserId
+            WHERE s.DeviceId = $device AND s.ExpiresAtUtc > $now AND s.RevokedAtUtc IS NULL AND u.IsEnabled = 1;
+            """;
+        command.Parameters.AddWithValue("$device", deviceId.ToString("D"));
+        command.Parameters.AddWithValue("$now", now);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (reader[0] is byte[] expectedHash && CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash))
+                return Guid.TryParse(reader.GetString(1), out var userId) ? userId : null;
+        }
+        return null;
     }
 
     public async Task<NewDevicePairing> CreateCodeAsync(CancellationToken cancellationToken = default)

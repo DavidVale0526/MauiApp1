@@ -17,6 +17,26 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
         return link is null ? null : new(link.Address, link.CertificateFingerprint, link.IsConfirmed, link.PendingCode);
     }
 
+    public async Task<CoordinatorAvailability> CheckAvailabilityAsync()
+    {
+        CoordinatorDeviceLink? link;
+        try { link = await ReadLinkAsync(); }
+        catch { return new(true, false, false); }
+        if (link is null) return new(false, false, false);
+
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _))
+            return new(true, false, link.IsConfirmed);
+        try
+        {
+            using var client = CreateClient(uri!, fingerprint);
+            var health = await client.GetFromJsonAsync<HealthResponse>("health");
+            return new(true, health?.Status == "ok", link.IsConfirmed);
+        }
+        catch (HttpRequestException) { return new(true, false, link.IsConfirmed); }
+        catch (TaskCanceledException) { return new(true, false, link.IsConfirmed); }
+        catch (System.Text.Json.JsonException) { return new(true, false, link.IsConfirmed); }
+    }
+
     public async Task<PairingCodeResult> CreateCodeAsync(string address, string fingerprint, string userName, string password)
     {
         if (!TryValidateConnection(address, fingerprint, out var uri, out var normalizedFingerprint, out var error))

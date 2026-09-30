@@ -126,4 +126,61 @@
 - La Wi-Fi actual `CLARO_hU5Us7` permanece con perfil `Public`; no se cambió la clasificación de red. El firewall, por diseño, bloquea clientes entrantes por esa red hasta que el usuario confirme que es la red confiable del negocio y cambie su perfil a `Private`. Aún no se ha probado conexión LAN desde Android.
 - El instalador requiere PowerShell 7 o posterior y privilegios de Administrador; `install-coordinator.ps1` ahora verifica la versión antes de comenzar.
 - No se configuró reenvío de puertos ni se expuso el servicio a Internet. La sincronización de negocio sigue pendiente de T7.2/T7.3.
-- No se ha importado la base real ni instalado/expuesto el servicio. La API aún no es consumida por la Outbox MAUI, no aplica operaciones a las tablas de negocio, no valida la sesión/identidad central del usuario y no publica eventos SignalR; esas tareas quedan pendientes según T7.1–T7.3.
+- La base central ya fue importada y el servicio ya está instalado; los pasos posteriores de este mismo historial registran ambas verificaciones. La API todavía no es consumida por la Outbox MAUI ni aplica operaciones a las tablas de negocio (T7.2), y aún no publica eventos SignalR (T7.3).
+
+## T7.1 — Indicador de disponibilidad del coordinador (2026-09-30)
+
+### Archivos modificados
+
+- `MauiApp1.Application/Lan/ICoordinatorPairingClient.cs`: agrega el resultado y contrato de comprobación de disponibilidad.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: consulta `/health` con la dirección y huella HTTPS ya guardadas, respetando la validación de certificado y el límite de espera del cliente; maneja desconexión, timeout o respuesta inválida como no disponible.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: representa estados sin configuración, coordinador disponible, vinculación pendiente y falta de respuesta; informa que el trabajo local continúa disponible.
+- `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs`: muestra el estado en Inicio y lo actualiza cuando la pantalla reaparece.
+- `ARCHITECTURE.md`: documenta el comportamiento y aclara que `/health` no significa que los datos estén sincronizados.
+- `D:\Trabajo\Tesis\TASK.md`: marca completado este ítem de T7.1.
+
+### Verificación y límites
+
+- Aplicación MAUI Windows (`net10.0-windows10.0.19041.0`): compilación exitosa, 0 advertencias y 0 errores.
+- Aplicación MAUI Android (`net10.0-android`): compilación exitosa, 0 advertencias y 0 errores.
+- El indicador es de solo lectura y no bloquea operaciones locales. Cuando no existe vínculo, muestra que el coordinador no está configurado en esa instalación; cuando existe, verifica el proceso remoto usando la huella fijada. La validación visual y de pérdida real de LAN en Android queda para una comprobación con el dispositivo del usuario.
+
+## T7.1 — Sesiones centrales de usuario y atribución segura (2026-09-30)
+
+### Archivos modificados
+
+- `MauiApp1.Coordinator/Pairing/CoordinatorPairingStore.cs`: crea sesiones centrales ligadas a dispositivo/usuario, guarda solo hash SHA-256 de un token aleatorio, establece expiración de 12 horas y rechaza sesiones vencidas, de otro dispositivo o cuya cuenta ya esté deshabilitada.
+- `MauiApp1.Coordinator/Program.cs`: agrega `POST /api/auth/session`; protege la consulta y recepción de operaciones con token de dispositivo y sesión de usuario; controla solicitudes por HTTPS, cuenta habilitada y límite de intentos.
+- `MauiApp1.Coordinator/Sync/CoordinatorOperationStore.cs`: registra el usuario autenticado de la sesión, no el `ActorUserId` no confiable enviado en el cuerpo.
+- `MauiApp1.Coordinator/Deployment/SINCRONIZACION_API.md`: describe el contrato, vigencia, encabezados y límite de la sesión.
+- `MauiApp1.Coordinator/Deployment/update-coordinator.ps1`: actualiza el servicio con copia previa de SQLite vía Backup API y de los binarios, verificación local de `/health` y reversión del ejecutable si falla.
+- `ARCHITECTURE.md`: documenta la autenticación central disponible y que todavía no se integra al inicio de sesión MAUI.
+- `D:\Trabajo\Tesis\TASK.md`: marca la autenticación de API y las reglas vigentes de dispositivo/usuario; mueve la integración MAUI, resolución de cuentas entre bases y conjunto de datos compartido al trabajo de sincronización T7.2.
+
+### Verificación y límites
+
+- `dotnet build MauiApp1.Coordinator/MauiApp1.Coordinator.csproj -c Debug --no-restore`: correcto, 0 advertencias y 0 errores.
+- Sesiones sobre SQLite temporal: token correcto aceptado solo para su dispositivo; token incorrecto y otro dispositivo rechazados; al deshabilitar la cuenta central se invalida la sesión. Los datos de prueba se retiraron.
+- Publicación `Release` autocontenida `win-x64`: correcta. El script actualizador pasó análisis sintáctico de PowerShell.
+- Se creó una copia coherente de la base central en `C:\ProgramData\Miscelanea Ari\Coordinator\Backups\Pre-T7.1-Upgrade-20260930` y copia de binarios anteriores en su subcarpeta `CoordinatorBin`.
+- La sesión de desarrollo no pudo detener el servicio por carecer de privilegio administrativo; no se reemplazó el binario instalado. El servicio siguió `Running` y `/health` respondió `{"status":"ok"}` desde la comprobación local autorizada. El actualizador preparado debe ejecutarse como Administrador antes de consumir la API nueva.
+- La ruta del servidor queda definida; el flujo MAUI aún no solicita esta sesión ni envía su token. La vinculación visual/SecureStorage y la integración de usuarios en ambos dispositivos deben confirmarse antes de cerrar T7.1; las operaciones de negocio compartidas corresponden a T7.2.
+- La política de respaldo y recuperación aún requiere acuerdo antes de marcar T7.1 completo.
+
+## T7.1 — Separar LAN de Internet y validar modo sin ISP (2026-09-30)
+
+### Archivos modificados
+
+- `MauiApp1/MauiProgram.cs`: registra `IConnectivity` para consultar el estado de red de la plataforma.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: traduce `Internet`, `ConstrainedInternet`, `Local`, `None` y `Unknown` en mensajes separados del estado LAN del coordinador.
+- `MauiApp1/Presentation/Views/MainPage.xaml` y `.xaml.cs`: presenta ambos estados y actualiza el indicador al cambiar la conectividad mientras Inicio está visible.
+- `ARCHITECTURE.md`: documenta qué comprueba cada estado y el resultado de la revisión de dependencias de red.
+- `D:\Trabajo\Tesis\TASK.md`: marca las comprobaciones de LAN frente a ISP y de funcionamiento local sin servicios externos.
+
+### Verificación y límites
+
+- .NET MAUI define `NetworkAccess.Local` como acceso a red local solamente y `Internet` como acceso local e Internet; la app presenta esa lectura del sistema operativo separada de la consulta directa al coordinador. El dato del sistema operativo es indicativo: la disponibilidad real del coordinador se decide por su respuesta HTTPS fijada.
+- Búsqueda del código de red en todos los proyectos MAUI/Application/Infrastructure/Coordinator: un solo `HttpClient`, dirigido a la IP privada configurada y con huella fijada; no hay endpoints de nube o ISP. El resto de los servicios de negocio persiste en SQLite local.
+- La prueba de funcionamiento LAN durante una caída real del ISP queda pendiente de desconectar solo el acceso WAN y observar los dispositivos en el local; no se marca como prueba física.
+- Aplicación MAUI Windows: build correcto, 0 advertencias y 0 errores. Aplicación MAUI Android: build correcto, 0 advertencias y 0 errores.
+- Se instaló la actualización Android con `adb install -r` en el Samsung SM-S928U conectado, usando actualización que preserva los datos de la app. No se ingresaron credenciales ni se modificó la base local. La revisión visual de Inicio y SecureStorage aún debe confirmarse en el teléfono.

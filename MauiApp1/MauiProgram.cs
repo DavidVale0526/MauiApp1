@@ -4,6 +4,7 @@ using MauiApp1.Presentation.Views;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Infrastructure.Persistence;
+using Microsoft.Maui.Networking;
 
 namespace MauiApp1
 {
@@ -21,6 +22,7 @@ namespace MauiApp1
                 });
 
             builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorLinkStorage, MauiApp1.Services.SecureCoordinatorLinkStorage>();
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient, MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
             builder.Services.AddTransient<DevicePairingViewModel>();

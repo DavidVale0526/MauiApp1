@@ -3,11 +3,13 @@ namespace MauiApp1.Application.Lan;
 public interface ICoordinatorPairingClient
 {
     Task<CoordinatorLinkStatus?> GetStatusAsync();
+    Task<CoordinatorAvailability> CheckAvailabilityAsync();
     Task<PairingCodeResult> CreateCodeAsync(string address, string fingerprint, string userName, string password);
     Task<PairingActionResult> PairAsync(string address, string fingerprint, string code);
 }
 
 public sealed record CoordinatorLinkStatus(string Address, string CertificateFingerprint, bool IsConfirmed, string? PendingCode);
+public sealed record CoordinatorAvailability(bool IsConfigured, bool IsAvailable, bool IsConfirmed);
 public sealed record PairingCodeResult(bool Succeeded, string Message, string? Code = null, DateTime? ExpiresAtUtc = null);
 public sealed record PairingActionResult(bool Succeeded, string Message);
 

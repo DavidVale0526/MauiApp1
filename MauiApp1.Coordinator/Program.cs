@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
@@ -119,6 +120,43 @@ internal static class Program
         app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
 
         app.UseRateLimiter();
+        app.MapPost("/api/auth/session", async (
+            CreateUserSessionRequest request,
+            HttpContext httpContext,
+            IAuthenticationService authenticationService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La autenticación requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrEmpty(request.Password) ||
+                request.UserName.Length > 80 || request.Password.Length > 1024)
+                return Results.Unauthorized();
+
+            await PairingCredentialLock.WaitAsync(cancellationToken);
+            try
+            {
+                var authentication = await authenticationService.SignInAsync(
+                    request.UserName, request.Password, cancellationToken);
+                if (!authentication.Succeeded || authentication.User is null ||
+                    authentication.User.Role is not (UserRole.Administrator or UserRole.Cashier))
+                    return Results.Unauthorized();
+
+                var sessionToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+                var expiresAtUtc = await pairingStore.CreateUserSessionAsync(
+                    deviceId.Value, authentication.User.Id.Value, sessionToken, cancellationToken);
+                return Results.Ok(new CreateUserSessionResponse(sessionToken, authentication.User.Id.Value,
+                    authentication.User.UserName, authentication.User.Role.ToString(), expiresAtUtc));
+            }
+            finally
+            {
+                authenticationService.SignOut();
+                PairingCredentialLock.Release();
+            }
+        }).RequireRateLimiting("device-pairing");
+
         app.MapPost("/api/devices/pairing-code", async (
             CreatePairingCodeRequest request,
             HttpContext httpContext,
@@ -195,7 +233,9 @@ internal static class Program
                 return Results.Problem("La sincronización requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
             var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
             if (deviceId is null) return Results.Unauthorized();
-            var stored = await operationStore.StoreAsync(request, deviceId.Value, cancellationToken);
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+            var stored = await operationStore.StoreAsync(request, deviceId.Value, userId.Value, cancellationToken);
             if (!stored.Accepted)
                 return stored == StoredOperationResult.Conflict
                     ? Results.Conflict(new SyncOperationResponse(false, false, null, "El identificador de operación ya existe con otro contenido."))
@@ -214,6 +254,8 @@ internal static class Program
                 return Results.Problem("La consulta de cambios requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
             var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
             if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
             var cursor = afterSequence ?? 0;
             if (cursor < 0) return Results.BadRequest(new { message = "El cursor no puede ser negativo." });
             var pageSize = Math.Clamp(limit ?? 100, 1, 500);
@@ -245,6 +287,15 @@ internal static class Program
         var token = authorization is not null && authorization.Contains(' ')
             ? authorization[(authorization.IndexOf(' ') + 1)..].Trim() : string.Empty;
         return await pairingStore.IsAuthorizedAsync(deviceId, token, cancellationToken) ? deviceId : null;
+    }
+
+    private static async Task<Guid?> GetAuthenticatedUserIdAsync(
+        HttpContext context, CoordinatorPairingStore pairingStore, Guid deviceId, CancellationToken cancellationToken)
+    {
+        var sessionToken = context.Request.Headers["X-User-Session"].FirstOrDefault();
+        return string.IsNullOrWhiteSpace(sessionToken)
+            ? null
+            : await pairingStore.GetSessionUserIdAsync(deviceId, sessionToken, cancellationToken);
     }
 
     private static string GetCoordinatorDataDirectory(string? configuredDataDirectory) =>
@@ -285,6 +336,8 @@ internal static class Program
 internal sealed record HealthResponse(string Status);
 internal sealed record CreatePairingCodeRequest(string UserName, string Password);
 internal sealed record CreatePairingCodeResponse(string Code, DateTime ExpiresAtUtc);
+internal sealed record CreateUserSessionRequest(string UserName, string Password);
+internal sealed record CreateUserSessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
 internal sealed record PairDeviceRequest(Guid DeviceId, string? Code, string? DeviceToken);
 internal sealed record PairDeviceResponse(bool Success, string Message);
 internal sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);

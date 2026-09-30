@@ -37,10 +37,11 @@ internal sealed class CoordinatorOperationStore(string databasePath)
     }
 
     public async Task<StoredOperationResult> StoreAsync(
-        IncomingOperation operation, Guid authenticatedDeviceId, CancellationToken cancellationToken = default)
+        IncomingOperation operation, Guid authenticatedDeviceId, Guid authenticatedUserId,
+        CancellationToken cancellationToken = default)
     {
         if (operation.OperationId == Guid.Empty || operation.ActorUserId == Guid.Empty ||
-            operation.DeviceId != authenticatedDeviceId || string.IsNullOrWhiteSpace(operation.OperationType) ||
+            operation.DeviceId != authenticatedDeviceId || authenticatedUserId == Guid.Empty || string.IsNullOrWhiteSpace(operation.OperationType) ||
             operation.OperationType.Length > 120 || string.IsNullOrWhiteSpace(operation.PayloadJson) ||
             operation.PayloadJson.Length > 1_000_000 || operation.CreatedAtUtc.Kind != DateTimeKind.Utc)
             return StoredOperationResult.Invalid;
@@ -69,7 +70,7 @@ internal sealed class CoordinatorOperationStore(string databasePath)
             if (await reader.ReadAsync(cancellationToken))
             {
                 var same = Guid.Parse(reader.GetString(1)) == authenticatedDeviceId &&
-                    Guid.Parse(reader.GetString(2)) == operation.ActorUserId &&
+                    Guid.Parse(reader.GetString(2)) == authenticatedUserId &&
                     string.Equals(reader.GetString(3), operation.OperationType, StringComparison.Ordinal) &&
                     CryptographicOperations.FixedTimeEquals((byte[])reader[4], payloadHash);
                 var sequence = reader.GetInt64(0);
@@ -91,7 +92,7 @@ internal sealed class CoordinatorOperationStore(string databasePath)
                 """;
             insert.Parameters.AddWithValue("$id", operation.OperationId.ToString("D"));
             insert.Parameters.AddWithValue("$device", authenticatedDeviceId.ToString("D"));
-            insert.Parameters.AddWithValue("$actor", operation.ActorUserId.ToString("D"));
+            insert.Parameters.AddWithValue("$actor", authenticatedUserId.ToString("D"));
             insert.Parameters.AddWithValue("$type", operation.OperationType);
             insert.Parameters.AddWithValue("$payload", operation.PayloadJson);
             insert.Parameters.AddWithValue("$hash", payloadHash);
