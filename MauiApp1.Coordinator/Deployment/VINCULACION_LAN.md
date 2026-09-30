@@ -1,11 +1,11 @@
 # Vincular Windows y Android por la red local
 
-Este flujo prepara la autorización de dispositivos. La instalación del servicio, importación real de Windows y respaldo de Android siguen pendientes en T7.1. La sincronización de cuentas y datos se incorporará después.
+Este flujo prepara la autorización de dispositivos. El coordinador está instalado como Servicio de Windows y usa la base central importada desde Windows; la sincronización de cuentas y datos se incorporará después.
 
 ## Antes de usar la vinculación
 
-1. El coordinador debe estar instalado, con la base inicial aprobada y HTTPS funcionando.
-2. Conecta Windows y Android a la misma red del negocio. La red puede funcionar aunque el proveedor de Internet esté caído.
+1. El servicio automático debe estar activo, con la base central y HTTPS funcionando en el puerto 5080.
+2. Conecta Windows y Android a la misma red del negocio. El perfil de red de Windows debe ser **Privada** para que la regla de firewall del coordinador permita conexiones entrantes. La regla del servicio solo se habilita para el perfil Privado. No se requiere Internet del proveedor.
 3. Usa la dirección IPv4 privada del equipo Windows, por ejemplo `https://192.168.1.10:5080`. El puerto debe coincidir con el configurado para el servicio. Reserva la IP en el router para mantener esa dirección.
 4. Copia la huella SHA-256 desde `coordinator-certificate-fingerprint.txt`, guardado junto a la base del coordinador (por defecto `C:\ProgramData\Miscelanea Ari\Coordinator`). Tiene 64 caracteres. No es el código temporal de ocho dígitos.
 
@@ -36,3 +36,9 @@ Este flujo prepara la autorización de dispositivos. La instalación del servici
 - Vincular cada instalación, cerrar/reabrir la app y comprobar que conserve su estado.
 - Revisar el mensaje cuando el coordinador esté apagado y recuperar la vinculación después.
 - Confirmar el flujo en el teléfono físico. Hasta entonces, las compilaciones y pruebas del cliente compartido no sustituyen esta revisión.
+
+## Preparar el instalador del servicio
+
+- Publicar `MauiApp1.Coordinator` para `win-x64` como autocontenido y ejecutar `install-coordinator.ps1` desde PowerShell 7 o posterior como Administrador. El instalador registra inicio automático, certificado HTTPS y una regla de entrada TCP en perfil Privado únicamente.
+- Esta PC está actualmente clasificada por Windows como perfil `Public`; por eso el firewall no acepta aún conexiones desde Android por esa Wi-Fi. Para usar el coordinador allí, confirma que es la red confiable del negocio y cambia su perfil en Configuración de Windows a `Privada` antes de emparejar dispositivos.
+- No configures reenvío de puertos en el router ni expongas el coordinador a Internet.

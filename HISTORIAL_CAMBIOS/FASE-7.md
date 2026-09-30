@@ -91,6 +91,39 @@
 
 - `dotnet build MauiApp1.Coordinator/MauiApp1.Coordinator.csproj -c Debug --no-restore`: correcto, 0 advertencias y 0 errores.
 - Prueba aislada del diario sobre SQLite temporal: primer guardado aceptado, reintento idéntico reconocido con la misma secuencia, contenido distinto para el mismo identificador rechazado; el cursor incluyó operaciones de otro dispositivo y excluyó las propias.
-- Arranque temporal de desarrollo: migraciones centrales aplicadas y `GET /health` respondió `{"status":"ok"}`. No se pudo ejecutar una llamada de extremo a extremo a las rutas de sincronización: el entorno denegó escritura en el almacén de certificados de usuario requerido para HTTPS. Por eso, las rutas tienen verificación de compilación y revisión del código; el almacenamiento SQLite sí pasó la comprobación aislada descrita arriba.
-- La base temporal y cualquier artefacto de prueba se retiraron al cerrar la comprobación.
+- Prueba HTTPS de extremo a extremo con un certificado y base central temporales: `GET /health` devolvió estado correcto; petición anónima a cambios devolvió 401; una operación autorizada se aceptó; el reintento idéntico informó que ya estaba aceptada; mismo `OperationId` con payload distinto devolvió 409; un segundo dispositivo consultó una operación y el dispositivo de origen no recibió la suya como cambio remoto.
+- Comprobación de limpieza: servicio temporal detenido, certificado temporal retirado del almacén (ninguna copia restante), base temporal y archivo PFX retirados. No se usaron ni alteraron las bases reales del negocio.
+- La prueba requirió ejecutar el cliente y servidor de prueba fuera del sandbox, pues la pila TLS de Windows no podía adquirir credenciales dentro del sandbox. La verificación terminó correctamente; no queda pendiente de prueba para este ítem.
+
+## T7.1 — Importación inicial y respaldo Android (2026-09-30)
+
+### Origen y resultados
+
+- Se localizó la base Windows en `C:\Users\HP Pavilioh Gaming\AppData\Local\User Name\com.companyname.mauiapp1\Data\miscelanea-ari.db`. El archivo principal conserva el WAL de la aplicación, por lo que la importación usó la SQLite Backup API para copiar la vista comprometida sin detener ni reescribir el original.
+- `dotnet MauiApp1.Coordinator.dll --bootstrap-from <base-Windows> --data-directory "C:\ProgramData\Miscelanea Ari\Coordinator"` creó `miscelanea-ari-central.db` y `Backups\Windows-inicial-20260930-115011.db`. No había destino central previo.
+- Android se respaldó desde el teléfono Samsung SM-S928U conectado por ADB, paquete `com.companyname.mauiapp1`, en `D:\Trabajo\Tesis\Respaldos\Android_SM-S928U_20260930_054912`. Se conservaron juntos `miscelanea-ari.db`, `miscelanea-ari.db-wal`, `miscelanea-ari.db-shm` y `MANIFIESTO.md` con hashes SHA-256. La aplicación estaba cerrada y no se escribieron archivos en el teléfono.
+- `D:\Trabajo\Tesis\Respaldos\IMPORTACION_INICIAL.md` registra rutas, evidencia, conteos y límites de esta preparación.
+
+### Verificación y límites
+
+- `PRAGMA integrity_check` devolvió `ok` para la base Windows de origen, la base central, el respaldo fechado y la base Android respaldada.
+- Los conteos de Windows coinciden en origen, central y respaldo: 1 categoría, 1 producto, 1 compra/1 renglón, 2 movimientos, 1 venta/1 renglón, 1 Administrador y 4 operaciones Outbox. La base Android tiene 1 cuenta local y todavía no tiene datos de negocio ni operaciones.
+- Windows permanece como origen local y también se copia como base central. Android conserva su base y su cuenta independientes; no se reemplazó ni combinó.
+- No se inició el servicio Windows, no se cambió firewall y no se habilitó sincronización. La aplicación de operaciones pendientes y la unión segura de identidades son tareas posteriores de T7.2.
+
+## T7.1 — Instalar el coordinador como servicio Windows (2026-09-30)
+
+### Instalación
+
+- Se publicó `MauiApp1.Coordinator` autocontenido para `win-x64` y se instaló en `C:\Program Files\Miscelanea Ari\Coordinator`.
+- Se registró `MiscelaneaAriCoordinator` como servicio Windows con inicio `Automatic`, ejecutándose como `LocalSystem`, URL HTTPS `https://0.0.0.0:5080` y la base central bajo `C:\ProgramData\Miscelanea Ari\Coordinator`.
+- Se generó un certificado de servidor en `LocalMachine\My`; su huella SHA-256 de 64 caracteres se guardó en `coordinator-certificate-fingerprint.txt` para el emparejamiento futuro.
+- Se creó la regla TCP 5080 vinculada al ejecutable instalado, solo entrada y solo perfil `Private`.
+
+### Verificación y límites
+
+- Estado del servicio: `Running`; configuración SCM: `AUTO_START`. `GET https://127.0.0.1:5080/health` devolvió `{"status":"ok"}`. Se comprobó que la regla está habilitada, es `Private`, usa TCP 5080 y corresponde al ejecutable instalado.
+- La Wi-Fi actual `CLARO_hU5Us7` permanece con perfil `Public`; no se cambió la clasificación de red. El firewall, por diseño, bloquea clientes entrantes por esa red hasta que el usuario confirme que es la red confiable del negocio y cambie su perfil a `Private`. Aún no se ha probado conexión LAN desde Android.
+- El instalador requiere PowerShell 7 o posterior y privilegios de Administrador; `install-coordinator.ps1` ahora verifica la versión antes de comenzar.
+- No se configuró reenvío de puertos ni se expuso el servicio a Internet. La sincronización de negocio sigue pendiente de T7.2/T7.3.
 - No se ha importado la base real ni instalado/expuesto el servicio. La API aún no es consumida por la Outbox MAUI, no aplica operaciones a las tablas de negocio, no valida la sesión/identidad central del usuario y no publica eventos SignalR; esas tareas quedan pendientes según T7.1–T7.3.

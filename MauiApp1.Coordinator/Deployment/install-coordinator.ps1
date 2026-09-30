@@ -9,6 +9,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'Ejecuta este instalador con PowerShell 7 o posterior.'
+}
+
 $serviceName = 'MiscelaneaAriCoordinator'
 $firewallRuleName = 'Miscelanea Ari Coordinator LAN'
 $certificateFriendlyName = 'Miscelanea Ari Coordinator HTTPS'
