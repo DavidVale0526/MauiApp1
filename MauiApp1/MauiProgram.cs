@@ -5,6 +5,7 @@ using MauiApp1.Application.Storage;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Infrastructure.Persistence;
 using Microsoft.Maui.Networking;
+using ZXing.Net.Maui.Controls;
 
 namespace MauiApp1
 {
@@ -15,6 +16,7 @@ namespace MauiApp1
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseBarcodeReader()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+             x:Class="MauiApp1.Presentation.Views.PairingQrScannerPage"
+             Title="Escanear QR">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="16">
+        <Label Text="Apunta la cámara al QR que aparece en Windows" FontSize="20" FontAttributes="Bold" />
+        <zxing:CameraBarcodeReaderView x:Name="CameraView" Grid.Row="1" BarcodesDetected="OnBarcodesDetected" />
+        <VerticalStackLayout Grid.Row="2" Spacing="12">
+            <Label x:Name="StatusLabel" Text="El QR contiene una clave temporal de vinculación." />
+            <Button Text="Cancelar" Clicked="OnCancelClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

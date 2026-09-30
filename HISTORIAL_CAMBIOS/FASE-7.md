@@ -184,3 +184,31 @@
 - La prueba de funcionamiento LAN durante una caída real del ISP queda pendiente de desconectar solo el acceso WAN y observar los dispositivos en el local; no se marca como prueba física.
 - Aplicación MAUI Windows: build correcto, 0 advertencias y 0 errores. Aplicación MAUI Android: build correcto, 0 advertencias y 0 errores.
 - Se instaló la actualización Android con `adb install -r` en el Samsung SM-S928U conectado, usando actualización que preserva los datos de la app. No se ingresaron credenciales ni se modificó la base local. La revisión visual de Inicio y SecureStorage aún debe confirmarse en el teléfono.
+
+## T7.1 — Facilitar vinculación mediante QR temporal (2026-09-30)
+
+### Archivos modificados
+
+- `MauiApp1/MauiApp1.csproj`: incorpora `ZXing.Net.Maui.Controls` para generar QR y leerlos con cámara en Android.
+- `MauiApp1/MauiProgram.cs`: inicializa el lector de códigos.
+- `MauiApp1/Platforms/Android/AndroidManifest.xml`: declara permiso de cámara; Android solicita aprobación al abrir el escáner.
+- `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs`: genera payload versionado con dirección, huella, código de un uso y vencimiento; valida el contenido leído y rellena los campos sin vincular automáticamente.
+- `MauiApp1/Presentation/Views/DevicePairingPage.xaml` y `.xaml.cs`: muestra el QR en Windows e inicia el lector en Android.
+- `MauiApp1/Presentation/Views/PairingQrScannerPage.xaml` y `.xaml.cs`: vista de escaneo con manejo de permiso/lectura y retorno al formulario.
+- `ARCHITECTURE.md`, `D:\Trabajo\Tesis\TASK.md`: documentan la seguridad y el estado de validación.
+
+### Verificación y límites
+
+- Windows y Android compilaron correctamente con 0 advertencias y 0 errores.
+- La actualización firmada se instaló en Samsung SM-S928U con `adb install -r`, preservando los datos existentes, y se abrió la aplicación.
+- Falta que el usuario pruebe la lectura del QR desde la cámara y confirme el mensaje de vinculación. El escaneo físico aún no se da por verificado.
+
+## T7.1 — Verificar reapertura de vinculación en Android 16 (2026-09-30)
+
+### Resultado
+
+- El teléfono cerraba la aplicación al entrar a la pantalla después del despliegue con el lector QR. El registro fatal indicaba que Android intentaba reanudar una raíz de navegación cuyo contenedor ya no estaba presente (`NavigationRootManager_ElementBasedFragment`).
+- Se alineó el proyecto con la versión MAUI administrada por la carga instalada de Visual Studio; se retiró el override temporal a una versión NuGet más nueva que no correspondía a esa carga.
+- Se reconstruyeron Windows y Android. Ambos destinos compilaron sin advertencias ni errores.
+- Se actualizó el Samsung SM-S928U mediante instalación de actualización, sin borrar la base ni los datos de la app. El inicio permaneció abierto; al tocar «Vinculación por red local» la pantalla cargó sin cerrar la app y mostró «Este dispositivo está vinculado».
+- No se generó ni escaneó QR durante esta verificación porque este teléfono ya está vinculado. La lectura de cámara desde otro dispositivo sin vincular queda pendiente.

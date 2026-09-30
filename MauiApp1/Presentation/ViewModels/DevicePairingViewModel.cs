@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using MauiApp1.Application.Authentication;
@@ -12,7 +13,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     private readonly ICoordinatorPairingClient _client;
     private readonly IAuthenticationService _authentication;
     private string _address = string.Empty, _fingerprint = string.Empty, _userName = string.Empty;
-    private string _password = string.Empty, _code = string.Empty, _message = string.Empty, _generatedCode = string.Empty;
+    private string _password = string.Empty, _code = string.Empty, _message = string.Empty, _generatedCode = string.Empty, _generatedQrPayload = string.Empty;
     private bool _busy, _ready, _confirmed, _hasSavedLink;
 
     public DevicePairingViewModel(ICoordinatorPairingClient client, IAuthenticationService authentication)
@@ -31,7 +32,18 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public string Code { get => _code; set => Set(ref _code, value); }
     public string Message { get => _message; private set => Set(ref _message, value); }
     public string GeneratedCode { get => _generatedCode; private set => Set(ref _generatedCode, value); }
+    public string GeneratedQrPayload
+    {
+        get => _generatedQrPayload;
+        private set
+        {
+            if (Set(ref _generatedQrPayload, value))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanShowGeneratedQr)));
+        }
+    }
     public bool CanGenerateCode => OperatingSystem.IsWindows() && _authentication.CurrentUser?.Role == UserRole.Administrator;
+    public bool CanShowGeneratedQr => CanGenerateCode && !string.IsNullOrWhiteSpace(GeneratedQrPayload);
+    public bool CanScanQr => OperatingSystem.IsAndroid() && !_confirmed;
     public bool ShowPairForm => !_confirmed;
     public bool CanEditConnection => _ready && !_hasSavedLink && !IsBusy;
     public bool CanEditAddress => _ready && !_confirmed && !IsBusy;
@@ -71,16 +83,48 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     {
         if (IsBusy || !CanGenerateCode || !_ready) return;
         IsBusy = true;
-        Message = GeneratedCode = string.Empty;
+        Message = GeneratedCode = GeneratedQrPayload = string.Empty;
         try
         {
             var result = await _client.CreateCodeAsync(Address, Fingerprint, UserName, Password);
             Message = result.Message;
             if (result.Succeeded && result.ExpiresAtUtc.HasValue)
+            {
                 GeneratedCode = $"Código: {result.Code}\nVence a las {result.ExpiresAtUtc.Value.ToLocalTime():HH:mm:ss}.\nCrear otro código invalida el anterior.";
+                GeneratedQrPayload = JsonSerializer.Serialize(new PairingQrData(
+                    "miscelanea-ari-pairing", 1, Address.Trim(), Fingerprint.Trim(),
+                    result.Code!, result.ExpiresAtUtc.Value));
+            }
         }
         catch { Message = "No fue posible generar el código. Inténtalo de nuevo."; }
         finally { Password = string.Empty; IsBusy = false; }
+    }
+
+    public bool ApplyScannedQr(string rawValue)
+    {
+        try
+        {
+            var data = JsonSerializer.Deserialize<PairingQrData>(rawValue);
+            if (data is null || data.Type != "miscelanea-ari-pairing" || data.Version != 1 ||
+                string.IsNullOrWhiteSpace(data.Address) || string.IsNullOrWhiteSpace(data.Fingerprint) ||
+                data.Code is not { Length: 8 } || !data.Code.All(char.IsAsciiDigit) ||
+                data.ExpiresAtUtc <= DateTime.UtcNow)
+            {
+                Message = "El QR no es válido o el código ya venció. Genera uno nuevo en Windows.";
+                return false;
+            }
+
+            Address = data.Address;
+            Fingerprint = data.Fingerprint;
+            Code = data.Code;
+            Message = "Datos leídos. Pulsa «Vincular / reintentar» para confirmar este dispositivo.";
+            return true;
+        }
+        catch (JsonException)
+        {
+            Message = "El QR no corresponde a una vinculación de Miscelánea Ari.";
+            return false;
+        }
     }
 
     private async Task PairAsync()
@@ -102,9 +146,12 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     }
     private void RefreshState()
     {
-        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(LinkStatus) })
+        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanShowGeneratedQr), nameof(LinkStatus) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();
         ((Command)PairCommand).ChangeCanExecute();
     }
+
+    private sealed record PairingQrData(string Type, int Version, string Address, string Fingerprint,
+        string Code, DateTime ExpiresAtUtc);
 }

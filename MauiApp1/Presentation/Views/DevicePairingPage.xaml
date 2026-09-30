@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:MauiApp1.Presentation.ViewModels"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="MauiApp1.Presentation.Views.DevicePairingPage"
              x:DataType="vm:DevicePairingViewModel" Title="Vinculación por red local">
     <ScrollView>
@@ -23,10 +24,16 @@
                     <Entry Placeholder="Contraseña del Administrador" Text="{Binding Password}" IsPassword="True" IsEnabled="{Binding CanEditForm}" />
                     <Button Text="Generar código de vinculación" Command="{Binding GenerateCodeCommand}" />
                     <Label Text="{Binding GeneratedCode}" FontSize="20" FontAttributes="Bold" />
+                    <zxing:BarcodeGeneratorView Value="{Binding GeneratedQrPayload}" Format="QrCode"
+                                                HeightRequest="240" WidthRequest="240" HorizontalOptions="Center"
+                                                IsVisible="{Binding CanShowGeneratedQr}" />
+                    <Label Text="Escanea este QR con el teléfono. Incluye la dirección, la huella y el código temporal; vence junto con el código."
+                           IsVisible="{Binding CanShowGeneratedQr}" FontSize="13" />
                 </VerticalStackLayout>
             </Border>
             <VerticalStackLayout IsVisible="{Binding ShowPairForm}" Spacing="12">
                 <Label Text="Vincular este dispositivo" FontAttributes="Bold" />
+                <Button Text="Escanear QR de Windows" Clicked="OnScanQrClicked" IsVisible="{Binding CanScanQr}" />
                 <Entry Placeholder="Código de ocho dígitos" Text="{Binding Code}" Keyboard="Numeric" MaxLength="8" IsEnabled="{Binding CanEditForm}" />
                 <Button Text="Vincular / reintentar" Command="{Binding PairCommand}" />
             </VerticalStackLayout>

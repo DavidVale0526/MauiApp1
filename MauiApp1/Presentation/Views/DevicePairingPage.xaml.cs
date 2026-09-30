@@ -16,4 +16,26 @@ public partial class DevicePairingPage : ContentPage
         await _viewModel.LoadAsync();
     }
     private async void OnBackClicked(object? sender, EventArgs args) => await Navigation.PopModalAsync();
+
+    private async void OnScanQrClicked(object? sender, EventArgs args)
+    {
+#if ANDROID
+        if (!ZXing.Net.Maui.BarcodeScanning.IsSupported)
+        {
+            await DisplayAlertAsync("Cámara no disponible", "Este dispositivo no tiene una cámara compatible para leer el QR.", "Aceptar");
+            return;
+        }
+
+        var permission = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        if (permission != PermissionStatus.Granted)
+            permission = await Permissions.RequestAsync<Permissions.Camera>();
+        if (permission != PermissionStatus.Granted)
+        {
+            await DisplayAlertAsync("Permiso de cámara", "Permite el acceso a la cámara para escanear el QR de vinculación.", "Aceptar");
+            return;
+        }
+
+        await Navigation.PushModalAsync(new PairingQrScannerPage(_viewModel.ApplyScannedQr));
+#endif
+    }
 }
