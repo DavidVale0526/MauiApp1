@@ -18,6 +18,8 @@
                 <VerticalStackLayout Spacing="4">
                     <Label Text="{Binding CoordinatorStatusMessage}" />
                     <Label Text="{Binding InternetStatusMessage}" FontSize="12" />
+                    <Label Text="{Binding SyncStatusMessage}" FontSize="12" />
+                    <Button Text="Revisar conflictos de sincronización" IsVisible="{Binding IsAdministrator}" Clicked="OnReviewConflictsClicked" />
                 </VerticalStackLayout>
             </Border>
             <Border IsVisible="{Binding HasLowStockAlert}" Stroke="OrangeRed" Padding="12">

@@ -11,6 +11,12 @@ public partial class MainPage : ContentPage
         if (Handler?.MauiContext?.Services.GetRequiredService<DevicePairingPage>() is not { } page) return;
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
+    private async void OnReviewConflictsClicked(object? sender, EventArgs args)
+    {
+        if (BindingContext is not MainPageViewModel { IsAdministrator: true } ||
+            Handler?.MauiContext?.Services.GetRequiredService<ConflictReviewPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
     private readonly MainPageViewModel _viewModel;
     private readonly IConnectivity _connectivity;
 
@@ -29,6 +35,7 @@ public partial class MainPage : ContentPage
         _viewModel.RefreshInternetStatus();
         await _viewModel.LoadLowStockAlertsAsync();
         await _viewModel.RefreshCoordinatorStatusAsync();
+        await _viewModel.RefreshOperationSyncAsync();
     }
 
     protected override void OnDisappearing()
@@ -41,6 +48,7 @@ public partial class MainPage : ContentPage
     {
         _viewModel.RefreshInternetStatus();
         await _viewModel.RefreshCoordinatorStatusAsync();
+        await _viewModel.RefreshOperationSyncAsync();
     }
 
     private async void OnCreateCashierAccountClicked(object? sender, EventArgs eventArgs)

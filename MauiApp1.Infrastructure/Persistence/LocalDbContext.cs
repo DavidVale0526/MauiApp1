@@ -37,6 +37,12 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<PaymentEntity> Payments => Set<PaymentEntity>();
 
+    internal DbSet<InventoryDiscrepancyEntity> InventoryDiscrepancies => Set<InventoryDiscrepancyEntity>();
+
+    internal DbSet<DeviceSyncStateEntity> DeviceSyncStates => Set<DeviceSyncStateEntity>();
+
+    internal DbSet<DeviceSyncConflictEntity> DeviceSyncConflicts => Set<DeviceSyncConflictEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DeviceIdentityEntity>(entity =>
@@ -74,6 +80,7 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.ConfirmedAtUtc)
                 .HasConversion(UtcDateTimeConverter)
                 .HasColumnType("INTEGER");
+            entity.Property(item => item.LastError).HasMaxLength(500);
             entity.HasIndex(item => new { item.Status, item.CreatedAtUtc });
             entity.HasIndex(item => item.DeviceId);
         });
@@ -326,6 +333,58 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasForeignKey(item => item.ActorUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.OperationId, item.OccurredAtUtc });
+        });
+
+        modelBuilder.Entity<InventoryDiscrepancyEntity>(entity =>
+        {
+            entity.ToTable("InventoryDiscrepancies", table => table.HasCheckConstraint(
+                "CK_InventoryDiscrepancies_Shortage_Positive", "\"ShortageMilliUnits\" > 0"));
+            entity.HasKey(item => item.DiscrepancyId);
+            entity.Property(item => item.DiscrepancyId).ValueGeneratedNever();
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.Property(item => item.ShortageMilliUnits).IsRequired();
+            entity.Property(item => item.CreatedAtUtc)
+                .HasConversion(UtcDateTimeConverter)
+                .HasColumnType("INTEGER")
+                .IsRequired();
+            entity.Property(item => item.IsResolved).IsRequired();
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.ProductId, item.IsResolved, item.CreatedAtUtc });
+            entity.HasIndex(item => new { item.OperationId, item.ProductId }).IsUnique();
+        });
+
+        modelBuilder.Entity<DeviceSyncStateEntity>(entity =>
+        {
+            entity.ToTable("DeviceSyncStates");
+            entity.HasKey(item => item.DeviceId);
+            entity.Property(item => item.DeviceId).ValueGeneratedNever();
+            entity.Property(item => item.LastSequence).IsRequired();
+            entity.Property(item => item.LastSuccessfulSyncAtUtc).HasConversion(UtcDateTimeConverter).HasColumnType("INTEGER");
+        });
+
+        modelBuilder.Entity<DeviceSyncConflictEntity>(entity =>
+        {
+            entity.ToTable("DeviceSyncConflicts");
+            entity.HasKey(item => item.ConflictId);
+            entity.Property(item => item.ConflictId).ValueGeneratedNever();
+            entity.Property(item => item.CoordinatorSequence).IsRequired();
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.OperationType).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.PayloadJson).IsRequired();
+            entity.Property(item => item.Message).HasMaxLength(500).IsRequired();
+            entity.Property(item => item.CreatedAtUtc).HasConversion(UtcDateTimeConverter).HasColumnType("INTEGER").IsRequired();
+            entity.Property(item => item.IsResolved).IsRequired();
+            entity.HasIndex(item => item.OperationId).IsUnique();
+            entity.HasIndex(item => new { item.IsResolved, item.CoordinatorSequence });
         });
     }
 }

@@ -73,7 +73,11 @@ public sealed class CoordinatorOperationSender(
             if (response.StatusCode == HttpStatusCode.Unauthorized)
                 return new(CoordinatorOperationSendStatus.Unauthorized);
             if (response.StatusCode == HttpStatusCode.Conflict)
-                return new(CoordinatorOperationSendStatus.Conflict);
+            {
+                var conflict = await response.Content.ReadFromJsonAsync<SyncOperationResponse>(cancellationToken)
+                    .ConfigureAwait(false);
+                return new(CoordinatorOperationSendStatus.Conflict, conflict?.Sequence, conflict?.Message);
+            }
             if (response.StatusCode == HttpStatusCode.BadRequest)
                 return new(CoordinatorOperationSendStatus.Rejected);
             if (!response.IsSuccessStatusCode)

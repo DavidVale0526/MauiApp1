@@ -2,6 +2,7 @@ using System.Windows.Input;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Products;
 using MauiApp1.Application.Lan;
+using MauiApp1.Application.Sync;
 using MauiApp1.Domain.Users;
 using Microsoft.Maui.Networking;
 
@@ -13,17 +14,20 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
     private readonly IProductService _productService;
     private readonly ICoordinatorPairingClient _coordinatorClient;
     private readonly IConnectivity _connectivity;
+    private readonly ILocalOperationSyncService _operationSyncService;
     private string _lowStockAlertMessage = string.Empty;
     private string _coordinatorStatusMessage = "Consultando coordinador…";
     private string _internetStatusMessage = string.Empty;
+    private string _syncStatusMessage = "Sincronización pendiente de consulta.";
 
     public MainPageViewModel(IAuthenticationService authenticationService, IProductService productService,
-        ICoordinatorPairingClient coordinatorClient, IConnectivity connectivity)
+        ICoordinatorPairingClient coordinatorClient, IConnectivity connectivity, ILocalOperationSyncService operationSyncService)
     {
         _authenticationService = authenticationService;
         _productService = productService;
         _coordinatorClient = coordinatorClient;
         _connectivity = connectivity;
+        _operationSyncService = operationSyncService;
         SignOutCommand = new Command(_authenticationService.SignOut);
     }
 
@@ -64,6 +68,29 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
     {
         get => _internetStatusMessage;
         private set { if (_internetStatusMessage == value) return; _internetStatusMessage = value; OnPropertyChanged(nameof(InternetStatusMessage)); }
+    }
+
+    public string SyncStatusMessage
+    {
+        get => _syncStatusMessage;
+        private set { if (_syncStatusMessage == value) return; _syncStatusMessage = value; OnPropertyChanged(nameof(SyncStatusMessage)); }
+    }
+
+    public async Task RefreshOperationSyncAsync()
+    {
+        try
+        {
+            var status = await _operationSyncService.SynchronizeAsync();
+            var last = status.LastConfirmedAtUtc is { } date
+                ? date.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
+                : "ninguna todavía";
+            SyncStatusMessage = $"Pendientes de enviar: {status.PendingCount}. Conflictos por revisar: {status.ConflictCount}. Última confirmación: {last}." +
+                (status.LatestConflictMessage is null ? string.Empty : $"\nConflicto más reciente: {status.LatestConflictMessage}");
+        }
+        catch
+        {
+            SyncStatusMessage = "No se pudo actualizar la cola. Las operaciones locales se conservan para reintentar.";
+        }
     }
 
     public void RefreshInternetStatus()

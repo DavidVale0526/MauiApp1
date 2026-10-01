@@ -9,4 +9,14 @@ public sealed record ProductChangedPayload(
     string Unit,
     Guid CategoryId,
     long MinimumStockMilliUnits,
+    bool IsActive,
+    ProductCatalogSnapshot? Expected = null,
+    Guid? ResolutionOfOperationId = null);
+
+public sealed record ProductCatalogSnapshot(
+    string Name,
+    long SalePriceMinorUnits,
+    string Unit,
+    Guid CategoryId,
+    long MinimumStockMilliUnits,
     bool IsActive);

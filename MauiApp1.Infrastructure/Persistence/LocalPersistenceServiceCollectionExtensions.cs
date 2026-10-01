@@ -17,6 +17,7 @@ using MauiApp1.Application.Credit;
 using MauiApp1.Infrastructure.Credit;
 using MauiApp1.Application.Reports;
 using MauiApp1.Infrastructure.Reports;
+using MauiApp1.Infrastructure.Sync;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,9 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddScoped<IOperationOutbox, EfOperationOutbox>();
         services.AddScoped<ILocalUnitOfWork>(provider => provider.GetRequiredService<LocalDbContext>());
         services.AddSingleton<Pbkdf2PasswordHasher>();
+        services.AddSingleton<CoordinatorBusinessOperationApplier>();
+        services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorConflictReviewService, MauiApp1.Infrastructure.Sync.CoordinatorConflictReviewService>();
+        services.AddSingleton<MauiApp1.Application.Sync.ILocalOperationSyncService, MauiApp1.Infrastructure.Lan.LocalOperationSyncService>();
         services.AddSingleton<IAuthenticationService, LocalAuthenticationService>();
         services.AddTransient<ICategoryService, EfCategoryService>();
         services.AddTransient<IProductService, EfProductService>();

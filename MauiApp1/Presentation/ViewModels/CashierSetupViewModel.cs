@@ -8,15 +8,17 @@ namespace MauiApp1.Presentation.ViewModels;
 public sealed class CashierSetupViewModel : INotifyPropertyChanged
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly ICoordinatorCashierAccountClient _coordinatorCashierClient;
     private string _userName = string.Empty;
     private string _password = string.Empty;
     private string _passwordConfirmation = string.Empty;
     private string _errorMessage = string.Empty;
     private bool _isBusy;
 
-    public CashierSetupViewModel(IAuthenticationService authenticationService)
+    public CashierSetupViewModel(IAuthenticationService authenticationService, ICoordinatorCashierAccountClient coordinatorCashierClient)
     {
         _authenticationService = authenticationService;
+        _coordinatorCashierClient = coordinatorCashierClient;
         CreateAccountCommand = new Command(async () => await CreateAccountAsync(), () => !IsBusy);
     }
 
@@ -79,7 +81,9 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         IsBusy = true;
         try
         {
-            var result = await _authenticationService.CreateCashierAccountAsync(UserName, Password);
+            var result = DeviceInfo.Platform == DevicePlatform.Android
+                ? await _coordinatorCashierClient.CreateCashierAsync(UserName, Password)
+                : await _authenticationService.CreateCashierAccountAsync(UserName, Password);
             if (result.Succeeded)
             {
                 AccountCreated?.Invoke(this, EventArgs.Empty);

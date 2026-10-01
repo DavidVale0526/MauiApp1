@@ -32,10 +32,15 @@ namespace MauiApp1
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorAuthenticationClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorCashierAccountClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorChangeClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatedSignInService, MauiApp1.Infrastructure.Authentication.CoordinatedSignInService>();
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorOperationSender, MauiApp1.Infrastructure.Lan.CoordinatorOperationSender>();
             builder.Services.AddTransient<DevicePairingViewModel>();
             builder.Services.AddTransient<DevicePairingPage>();
+            builder.Services.AddTransient<MauiApp1.Presentation.Views.ConflictReviewPage>();
             builder.Services.AddTransient<AccessPage>();
             builder.Services.AddTransient<AccessPageViewModel>();
             builder.Services.AddTransient<MainPage>();
@@ -66,8 +71,14 @@ namespace MauiApp1
             builder.Services.AddTransient<ReportsViewModel>();
             builder.Services.AddTransient<OtherExitPage>();
             builder.Services.AddTransient<OtherExitViewModel>();
-            builder.Services.AddLocalPersistence(Path.Combine(FileSystem.AppDataDirectory,
-                LocalPersistenceServiceCollectionExtensions.DatabaseFileName));
+            var databasePath = Path.Combine(FileSystem.AppDataDirectory,
+                LocalPersistenceServiceCollectionExtensions.DatabaseFileName);
+#if WINDOWS
+            var coordinatorDatabasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Miscelanea Ari", "Coordinator", "miscelanea-ari-central.db");
+            if (File.Exists(coordinatorDatabasePath)) databasePath = coordinatorDatabasePath;
+#endif
+            builder.Services.AddLocalPersistence(databasePath);
 
 #if DEBUG
     		builder.Logging.AddDebug();

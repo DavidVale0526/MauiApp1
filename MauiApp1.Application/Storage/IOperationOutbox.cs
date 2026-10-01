@@ -31,4 +31,6 @@ public interface IOperationOutbox
         Guid operationId,
         DateTime confirmedAtUtc,
         CancellationToken cancellationToken = default);
+
+    Task MarkConflictAsync(Guid operationId, string message, CancellationToken cancellationToken = default);
 }

@@ -14,9 +14,97 @@ namespace MauiApp1.Infrastructure.Lan;
 public sealed class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
-    ILocalDeviceIdentity deviceIdentity) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient
+    ILocalDeviceIdentity deviceIdentity) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
+
+    public async Task<CoordinatorChangesPage?> GetChangesAsync(long afterSequence, int limit = 100, CancellationToken cancellationToken = default)
+    {
+        var link = await ReadLinkAsync();
+        var session = await sessionStorage.ReadAsync();
+        if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow || afterSequence < 0)
+            return null;
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _)) return null;
+        try
+        {
+            using var client = CreatePinnedClient(uri!, fingerprint);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+            client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+            client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
+            using var response = await client.GetAsync($"api/sync/changes?afterSequence={afterSequence}&limit={Math.Clamp(limit, 1, 500)}", cancellationToken);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<CoordinatorChangesPage>(cancellationToken);
+        }
+        catch (HttpRequestException) { return null; }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    public async Task<IReadOnlyList<CoordinatorConflictItem>?> GetConflictsAsync(CancellationToken cancellationToken = default)
+    {
+        var auth = await CreateSessionClientAsync();
+        if (auth is null) return null;
+        using (auth)
+        using (var response = await auth.GetAsync("api/sync/conflicts", cancellationToken))
+        {
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<IReadOnlyList<CoordinatorConflictItem>>(cancellationToken);
+        }
+    }
+
+    public async Task<string?> ResolveConflictAsync(Guid operationId, bool applyIncoming, CancellationToken cancellationToken = default)
+    {
+        var auth = await CreateSessionClientAsync();
+        if (auth is null) return "El coordinador no está disponible o la sesión venció.";
+        using (auth)
+        using (var response = await auth.PostAsJsonAsync("api/sync/conflicts/resolve",
+                   new { operationId, applyIncoming }, cancellationToken))
+        {
+            var result = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+            return response.IsSuccessStatusCode ? null : result?.Message ?? "El coordinador no pudo resolver el conflicto.";
+        }
+    }
+
+    private async Task<HttpClient?> CreateSessionClientAsync()
+    {
+        var link = await ReadLinkAsync();
+        var session = await sessionStorage.ReadAsync();
+        if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow ||
+            !TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _)) return null;
+        var client = CreatePinnedClient(uri!, fingerprint);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+        client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+        client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
+        return client;
+    }
+
+    public async Task<AuthenticationResult> CreateCashierAsync(string userName, string password, CancellationToken cancellationToken = default)
+    {
+        var link = await ReadLinkAsync();
+        var session = await sessionStorage.ReadAsync();
+        if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow ||
+            session.LocalUserId == Guid.Empty || session.CoordinatorUserId == Guid.Empty)
+            return AuthenticationResult.Failure("Conecta este dispositivo al coordinador e inicia sesión central como Administrador para crear cuentas.");
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out var error))
+            return AuthenticationResult.Failure(error ?? "La conexión del coordinador no es válida.");
+        try
+        {
+            using var client = CreatePinnedClient(uri!, fingerprint);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+            client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+            client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
+            using var response = await client.PostAsJsonAsync("api/users/cashiers", new { userName, password }, cancellationToken);
+            if (response.IsSuccessStatusCode) return new AuthenticationResult(true, null, null);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                return AuthenticationResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
+            var errorResult = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+            return AuthenticationResult.Failure(errorResult?.Message ?? "El coordinador no pudo crear la cuenta.");
+        }
+        catch (HttpRequestException) { return AuthenticationResult.Failure("El coordinador no está disponible por LAN. La cuenta no se creó."); }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return AuthenticationResult.Failure("El coordinador no respondió. La cuenta no se creó."); }
+        catch (System.Text.Json.JsonException) { return AuthenticationResult.Failure("La respuesta del coordinador no es válida."); }
+    }
     public async Task<CoordinatorLinkStatus?> GetStatusAsync()
     {
         var link = await ReadLinkAsync();
@@ -294,4 +382,5 @@ public sealed class CoordinatorPairingClient(
     private sealed record PairResponse(bool Success, string Message);
     private sealed record HealthResponse(string Status);
     private sealed record SessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
+    private sealed record ApiMessageResponse(string Message);
 }

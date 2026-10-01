@@ -67,9 +67,16 @@ internal sealed class EfOperationOutbox(LocalDbContext context, ILocalDeviceIden
             throw new ArgumentOutOfRangeException(nameof(maximumCount), "El lote debe contener entre 1 y 1000 operaciones.");
         }
 
+        var earliestConflict = await context.OutboxMessages.AsNoTracking()
+            .Where(item => item.Status == OutboxStatus.Conflict)
+            .Select(item => (DateTime?)item.CreatedAtUtc)
+            .MinAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         return await context.OutboxMessages
             .AsNoTracking()
-            .Where(item => item.Status == OutboxStatus.Pending)
+            .Where(item => item.Status == OutboxStatus.Pending &&
+                (earliestConflict == null || item.CreatedAtUtc < earliestConflict))
             .OrderBy(item => item.CreatedAtUtc)
             .ThenBy(item => item.OperationId)
             .Take(maximumCount)
@@ -90,7 +97,7 @@ internal sealed class EfOperationOutbox(LocalDbContext context, ILocalDeviceIden
         var message = await context.OutboxMessages.FindAsync([operationId], cancellationToken).ConfigureAwait(false)
             ?? throw new KeyNotFoundException("No existe la operación indicada en la cola local.");
 
-        if (message.Status == OutboxStatus.Confirmed)
+        if (message.Status != OutboxStatus.Pending)
         {
             return;
         }
@@ -113,13 +120,25 @@ internal sealed class EfOperationOutbox(LocalDbContext context, ILocalDeviceIden
         var message = await context.OutboxMessages.FindAsync([operationId], cancellationToken).ConfigureAwait(false)
             ?? throw new KeyNotFoundException("No existe la operación indicada en la cola local.");
 
-        if (message.Status == OutboxStatus.Confirmed)
+        if (message.Status != OutboxStatus.Pending)
         {
             return;
         }
 
         message.Status = OutboxStatus.Confirmed;
         message.ConfirmedAtUtc = confirmedAtUtc;
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task MarkConflictAsync(Guid operationId, string message, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            throw new ArgumentException("El conflicto debe describir el motivo.", nameof(message));
+        var outboxMessage = await context.OutboxMessages.FindAsync([operationId], cancellationToken).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException("No existe la operación indicada en la cola local.");
+        if (outboxMessage.Status != OutboxStatus.Pending) return;
+        outboxMessage.Status = OutboxStatus.Conflict;
+        outboxMessage.LastError = message.Length <= 500 ? message : message[..500];
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 }

@@ -122,12 +122,14 @@ internal sealed class EfProductService(
             return ProductOperationResult.Success();
         }
 
+        var expected = new ProductCatalogSnapshot(product.Name, product.SalePriceMinorUnits, product.Unit,
+            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive);
         product.Name = name;
         product.SalePriceMinorUnits = draft.SalePrice.MinorUnits;
         product.Unit = unit;
         product.CategoryId = draft.CategoryId.Value;
         product.MinimumStockMilliUnits = draft.MinimumStock.MilliUnits;
-        await EnqueueAsync(context, actor.Id.Value, "Product.Updated", product, cancellationToken);
+        await EnqueueAsync(context, actor.Id.Value, "Product.Updated", product, cancellationToken, expected);
 
         try
         {
@@ -168,13 +170,16 @@ internal sealed class EfProductService(
             return ProductOperationResult.Success();
         }
 
+        var expected = new ProductCatalogSnapshot(product.Name, product.SalePriceMinorUnits, product.Unit,
+            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive);
         product.IsActive = isActive;
         await EnqueueAsync(
             context,
             actor.Id.Value,
             isActive ? "Product.Reactivated" : "Product.Deactivated",
             product,
-            cancellationToken);
+            cancellationToken,
+            expected);
 
         try
         {
@@ -192,7 +197,8 @@ internal sealed class EfProductService(
         Guid actorUserId,
         string operationType,
         ProductEntity product,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ProductCatalogSnapshot? expected = null)
     {
         var outbox = new EfOperationOutbox(context, deviceIdentity);
         var payload = new ProductChangedPayload(
@@ -203,7 +209,8 @@ internal sealed class EfProductService(
             product.Unit,
             product.CategoryId,
             product.MinimumStockMilliUnits,
-            product.IsActive);
+            product.IsActive,
+            expected);
         await outbox.EnqueueAsync(
             new NewOutboxOperation(
                 Guid.NewGuid(),

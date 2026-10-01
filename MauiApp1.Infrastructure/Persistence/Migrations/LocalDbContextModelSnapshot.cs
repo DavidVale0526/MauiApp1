@@ -150,6 +150,69 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.DeviceSyncStateEntity", b =>
+                {
+                    b.Property<Guid>("DeviceId").HasColumnType("TEXT");
+                    b.Property<long>("LastSequence").HasColumnType("INTEGER");
+                    b.Property<long?>("LastSuccessfulSyncAtUtc").HasColumnType("INTEGER");
+                    b.HasKey("DeviceId");
+                    b.ToTable("DeviceSyncStates", (string)null);
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.DeviceSyncConflictEntity", b =>
+                {
+                    b.Property<Guid>("ConflictId").HasColumnType("TEXT");
+                    b.Property<long>("CoordinatorSequence").HasColumnType("INTEGER");
+                    b.Property<Guid>("OperationId").HasColumnType("TEXT");
+                    b.Property<string>("OperationType").IsRequired().HasMaxLength(120).HasColumnType("TEXT");
+                    b.Property<string>("PayloadJson").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("Message").IsRequired().HasMaxLength(500).HasColumnType("TEXT");
+                    b.Property<long>("CreatedAtUtc").HasColumnType("INTEGER");
+                    b.Property<bool>("IsResolved").HasColumnType("INTEGER");
+                    b.HasKey("ConflictId");
+                    b.HasIndex("OperationId").IsUnique();
+                    b.HasIndex("IsResolved", "CoordinatorSequence");
+                    b.ToTable("DeviceSyncConflicts", (string)null);
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.InventoryDiscrepancyEntity", b =>
+                {
+                    b.Property<Guid>("DiscrepancyId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ShortageMilliUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("DiscrepancyId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OperationId", "ProductId")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId", "IsResolved", "CreatedAtUtc");
+
+                    b.ToTable("InventoryDiscrepancies", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_InventoryDiscrepancies_Shortage_Positive", "\"ShortageMilliUnits\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.OutboxMessageEntity", b =>
                 {
                     b.Property<Guid>("OperationId")
@@ -172,6 +235,10 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.Property<long?>("LastAttemptAtUtc")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationType")
                         .IsRequired()
@@ -472,6 +539,21 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.InventoryMovementEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.InventoryDiscrepancyEntity", b =>
                 {
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
                         .WithMany()

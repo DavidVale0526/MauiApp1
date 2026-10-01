@@ -303,3 +303,22 @@
 - La cola todavía no procesa operaciones automáticamente y las pantallas aún trabajan con SQLite local. La aplicación central duradera y la lectura de los datos compartidos siguen pendientes en los siguientes subpasos; la sincronización funcional no se declara terminada.
 - Se intentó actualizar la app en el Samsung SM-S928U, pero ADB informó que no hay dispositivos conectados. La instalación física, migración de la base existente y pruebas central/offline quedan pendientes; este subpaso no se marca verificado en dispositivo hasta que el usuario conecte el teléfono.
 - Las operaciones del Outbox aún no consumen la sesión central; la atribución/envío sigue en los pasos posteriores de T7.2.
+
+## T7.2.4–T7.2.9 — Cola, aplicación central, recepción y conflictos (2026-10-01)
+
+### Cambios
+
+- `MauiApp1.Infrastructure/Sync/CoordinatorBusinessOperationApplier.cs`: centraliza la aplicación transaccional de las operaciones de compra, venta, inventario, categoría, producto, cliente y pago. Conserva compatibilidad con compras sin snapshot histórico; las ventas sin existencia registran faltante sin producir stock negativo. Las ediciones de catálogo comparan la versión esperada y devuelven conflicto si cambió en otro dispositivo.
+- `MauiApp1.Coordinator/Sync/CoordinatorOperationStore.cs` y `MauiApp1.Coordinator/Program.cs`: guardan el diario y el resultado de negocio en una transacción; distinguen cambios aplicados de conflictos; entregan solo cambios aplicados a clientes; permiten que un Administrador consulte y resuelva conflictos de producto/categoría, dejando un evento de resolución durable.
+- `MauiApp1.Infrastructure/Lan/LocalOperationSyncService.cs`: procesa el Outbox en orden, guarda confirmación solo tras acuse válido, conserva conflictos, descarga cambios con cursor durable, crea proyecciones de actores y presenta conflictos que requieren decisión antes de avanzar el cursor. Cuando MAUI Windows comparte la base central, publica las operaciones Outbox locales al diario central de forma transaccional, dado que el cambio comercial ya está persistido allí.
+- `MauiApp1.Application/Sync`, `MauiApp1.Application/Authentication` y `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: contratos de envío/recepción/revisión y alta de cajeros por LAN con la autoridad del coordinador.
+- `MauiApp1.Infrastructure/Persistence/Entities/DeviceSyncStateEntity.cs`, `DeviceSyncConflictEntity.cs`, `InventoryDiscrepancyEntity.cs`, `MauiApp1.Infrastructure/Persistence/Migrations/20261001160000_InventoryDiscrepancies.cs` y `LocalDbContextModelSnapshot.cs`: cursor por dispositivo, conflictos entrantes y faltantes de inventario.
+- `MauiApp1/Presentation/Views/ConflictReviewPage.cs`, `MainPage.xaml` y `MainPageViewModel.cs`: acceso de Administrador a la revisión de conflictos e indicador de pendientes, conflictos y última sincronización.
+- `MauiApp1.Coordinator/Deployment/SINCRONIZACION_API.md`, `ARCHITECTURE.md` y `TASK.md`: estado del protocolo y trazabilidad del avance.
+
+### Verificación y límites
+
+- El coordinador, la app Windows y la app Android compilaron con cero advertencias y cero errores.
+- Prueba SQLite aislada completada: migración, actualización transaccional de producto, venta que excede existencias con discrepancia registrada, payload legado de compra con snapshots completados y rechazo de cambio concurrente.
+- No se alteraron bases de datos reales. La ventana emergente de `dotnet.exe` observada durante la comprobación provino del cierre inicial del arnés temporal; se corrigió su limpieza y la ejecución posterior terminó en `PASS` sin excepción.
+- La implementación de T7.2 queda registrada; su aceptación de operación en dos equipos (incluidos el teléfono físico, reconexión offline y lectura desde otro cliente) sigue pendiente de instalación y recorrido manual. T7.3 añadirá actualización en vivo con SignalR.

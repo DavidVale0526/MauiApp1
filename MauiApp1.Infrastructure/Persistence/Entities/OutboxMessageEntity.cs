@@ -3,7 +3,8 @@ namespace MauiApp1.Infrastructure.Persistence.Entities;
 internal enum OutboxStatus
 {
     Pending = 0,
-    Confirmed = 1
+    Confirmed = 1,
+    Conflict = 2
 }
 
 internal sealed class OutboxMessageEntity
@@ -27,4 +28,6 @@ internal sealed class OutboxMessageEntity
     public DateTime? LastAttemptAtUtc { get; set; }
 
     public DateTime? ConfirmedAtUtc { get; set; }
+
+    public string? LastError { get; set; }
 }

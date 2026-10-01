@@ -113,13 +113,14 @@ internal sealed class EfCategoryService(
             return CategoryOperationResult.Success();
         }
 
+        var expectedName = category.Name;
         category.Name = cleanName;
         category.NormalizedName = normalizedName;
         await EnqueueAsync(
             context,
             actor.Id.Value,
             "Category.Renamed",
-            JsonSerializer.Serialize(new CategoryChangedPayload(categoryId, cleanName)),
+            JsonSerializer.Serialize(new CategoryChangedPayload(categoryId, cleanName, expectedName)),
             cancellationToken);
 
         try
