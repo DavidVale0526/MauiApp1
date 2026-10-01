@@ -16,7 +16,7 @@
                 <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="8">
                     <Label Text="Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión."
                            HorizontalTextAlignment="Center" />
-                    <Label Text="La cuenta se guarda solo en este dispositivo hasta que se implemente la sincronización LAN."
+                    <Label Text="En un dispositivo vinculado, las credenciales se validan con el coordinador cuando está disponible; si no responde, se permite el acceso local."
                            FontSize="12" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
 
@@ -29,6 +29,8 @@
 
                 <Label Text="{Binding ErrorMessage}" TextColor="Firebrick"
                        IsVisible="{Binding HasError}" />
+                <Label Text="{Binding NoticeMessage}" TextColor="DarkGreen"
+                       IsVisible="{Binding HasNotice}" />
 
                 <Button Text="Crear cuenta de Administrador" Command="{Binding CreateAdministratorCommand}"
                         IsVisible="{Binding IsSetupMode}" />

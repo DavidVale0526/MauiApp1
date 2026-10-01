@@ -4,6 +4,8 @@ internal sealed class UserAccountEntity
 {
     public Guid UserId { get; set; }
 
+    public Guid? CoordinatorUserId { get; set; }
+
     public string UserName { get; set; } = string.Empty;
 
     public string NormalizedUserName { get; set; } = string.Empty;

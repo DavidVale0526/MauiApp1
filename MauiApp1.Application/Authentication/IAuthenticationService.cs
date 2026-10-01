@@ -25,5 +25,14 @@ public interface IAuthenticationService
         string password,
         CancellationToken cancellationToken = default);
 
+    Task<AuthenticationResult> SignInWithCoordinatorUserAsync(
+        Guid coordinatorUserId,
+        string userName,
+        UserRole role,
+        string password,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid?> GetCoordinatorUserIdAsync(Guid localUserId, CancellationToken cancellationToken = default);
+
     void SignOut();
 }

@@ -246,3 +246,60 @@
 - La nueva actualización aún debe ejecutarse desde PowerShell 7 como Administrador. El script conservará un respaldo previo y comprobará el estado del servicio y `/health` antes de anunciar éxito.
 - Ejecución completada correctamente por el usuario el 2026-09-30. Respaldo: `C:\ProgramData\Miscelanea Ari\Coordinator\Backups\PreUpdate-20260930-083716`. Se comprobó `/health` (`ok`) y que `POST /api/devices/unlink` responde 401 sin credenciales, lo que confirma que la ruta está activa y protegida.
 - Se instaló con `adb install -r` la APK actualizada en el Samsung SM-S928U conectado, conservando datos y vínculo para la prueba final del usuario.
+- El 2026-10-01 el usuario confirmó que la desvinculación funcionó correctamente en Android. El registro de tareas separa esta validación de la prueba Windows pendiente; el teléfono queda listo para probar el QR de una nueva vinculación.
+- El 2026-10-01 el usuario probó la lectura de QR en el Samsung SM-S928U y confirmó que la app rellena automáticamente los datos para vincularse con Windows. La revisión visual de Windows queda pendiente.
+- El 2026-10-01 el usuario aclaró que Windows opera solo como coordinador y no está vinculado como cliente. Se registra como no aplicable la prueba de desvinculación de la instalación Windows; no se vinculará artificialmente al host consigo mismo.
+- El 2026-10-01 el usuario aprobó utilizar una memoria USB como medio externo y no usar nube; acordó respaldos diarios, con retención de 30 días y copia adicional antes de actualizaciones. T7.4 implementará y verificará el procedimiento de respaldo/restauración.
+
+## T7.2 — Inicio de sesión central con acceso local de respaldo (2026-10-01)
+
+### Cambios realizados
+
+- `MauiApp1.Application/Authentication/ICoordinatedSignInService.cs`: contratos para el flujo central, estados de coordinador no vinculado/no disponible/rechazo y sesión central.
+- `MauiApp1.Application/Authentication/IAuthenticationService.cs` y `MauiApp1.Infrastructure/Authentication/LocalAuthenticationService.cs`: agregan asociación central-local; tras login central correcto reutilizan la cuenta local que conserva historiales o crean su proyección local, actualizan su rol y guardan un verificador PBKDF2 offline.
+- `MauiApp1.Infrastructure/Persistence/Entities/UserAccountEntity.cs`, `LocalDbContext.cs`, `MauiApp1.Infrastructure/Persistence/Migrations/20261001090000_CoordinatorUserMapping.cs` y `LocalDbContextModelSnapshot.cs`: añaden `CoordinatorUserId` nullable/único sin cambiar identificadores ni historiales existentes.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: solicita sesión a `/api/auth/session` por HTTPS con pin de certificado y distingue rechazo de credenciales de falta de respuesta.
+- `MauiApp1.Infrastructure/Authentication/CoordinatedSignInService.cs` y `MauiApp1/Services/SecureCoordinatorUserSessionStorage.cs`: usan acceso central cuando está disponible; permiten acceso local si no responde el coordinador y mantienen solo sesiones locales-central coincidentes. El token se guarda en SecureStorage y se elimina al desvincular.
+- `MauiApp1/Presentation/ViewModels/AccessPageViewModel.cs` y `Presentation/Views/AccessPage.xaml`: conectan el nuevo flujo y muestran aviso para el acceso local offline.
+- `MauiApp1/MauiProgram.cs`: registra el cliente compartido, almacenamiento seguro y servicio de acceso.
+- `MauiApp1/Presentation/Views/AccessPage.xaml`: actualiza el texto de configuración para explicar el inicio central y el acceso local cuando el coordinador no responde.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: valida explícitamente un token de sesión vacío como respuesta inválida, evitando una excepción inesperada ante una respuesta incompleta del servidor.
+
+### Verificación y límites
+
+- `MauiApp1.Coordinator`, la app Windows y Android compilaron con 0 advertencias y 0 errores.
+- Después de los dos ajustes finales, Windows volvió a compilar correctamente (0 advertencias, 0 errores), y Android también (0 advertencias, 0 errores).
+- La comprobación automatizada temporal sobre SQLite no llegó a ejecutarse: el entorno bloqueó la lectura de `NuGet.Config` del perfil del usuario durante la restauración. No se modificaron bases de datos reales. Por eso, la migración y los flujos central/offline aún requieren una prueba funcional en dispositivos.
+
+## T7.2.2 — Atribución de operaciones Outbox mediante sesión central (2026-10-01)
+
+### Cambios realizados
+
+- `MauiApp1.Application/Sync/ICoordinatorOperationSender.cs`: define el contrato y los resultados explícitos de aceptación, operación ya aceptada, falta de vínculo/sesión, discrepancia de identidad, rechazo y desconexión.
+- `MauiApp1.Infrastructure/Lan/CoordinatorOperationSender.cs`: prepara el envío HTTPS de una operación Outbox con credenciales de dispositivo y sesión de usuario central; verifica que operación, usuario local activo, mapeo local-central y dispositivo sean coherentes. Rechaza el envío si una de esas identidades no coincide.
+- La solicitud envía el ID central asociado en el campo histórico `actorUserId`, pero el coordinador sigue derivando el actor exclusivamente desde `X-User-Session`. El cliente solo considera aceptada la operación si recibe una respuesta válida con secuencia.
+- `MauiApp1/MauiProgram.cs`: registra el remitente para los pasos que procesarán la cola Outbox.
+- `MauiApp1.Coordinator/Deployment/SINCRONIZACION_API.md`: actualiza el estado real de despliegue del servicio Windows.
+- `TASK.md` y `ARCHITECTURE.md`: registran el alcance y diferencian el remitente del worker que procesará y marcará operaciones confirmadas.
+
+### Verificación y límites
+
+- Aplicación Windows y Android compiladas después de los cambios: 0 advertencias y 0 errores en ambos destinos.
+- El coordinador ya deriva el actor de la sesión validada y lo persiste en la tabla del diario; ese servidor fue desplegado en Windows y su API se probó previamente con operaciones durables e idempotentes.
+- Aún no se procesa automáticamente la cola ni se marca una operación confirmada; eso corresponde a los siguientes subpasos de T7.2. Tampoco se instaló ni probó este cliente físicamente en Android en esta sesión.
+
+## T7.2.3 — Resolver cuentas existentes con Windows como origen (2026-10-01)
+
+### Decisión y comportamiento
+
+- Windows y la base que se importó a `C:\ProgramData\Miscelanea Ari\Coordinator\miscelanea-ari-central.db` son la fuente inicial de las cuentas y de los datos del negocio.
+- Después de que el coordinador valida la contraseña, MAUI busca primero una asociación por `CoordinatorUserId`. Si no la hay, puede asociar una cuenta local con el mismo nombre normalizado. Conserva el `UserId` local para no romper referencias históricas; conflicto de identidad o asociación previa diferente se rechaza sin guardar.
+- La asociación de cuenta no copia ni fusiona categorías, productos, ventas, compras, inventario, clientes ni pagos. La base local Android permanece en el dispositivo y sus datos no se incorporan automáticamente a Windows.
+
+### Evidencia y límites
+
+- `Respaldos/IMPORTACION_INICIAL.md` y `Respaldos/Android_SM-S928U_20260930_054912/MANIFIESTO.md`: Windows conserva 1 cuenta y los datos de negocio importados; Android conserva 1 cuenta local y 0 registros de negocio/Outbox. Integridad SQLite verificada `ok` durante la importación.
+- El mapeo seguro ya se implementó en T7.2.1 (`LocalAuthenticationService.SignInWithCoordinatorUserAsync`) y las compilaciones Windows/Android de T7.2.2 pasaron con 0 advertencias y 0 errores; aquí se formaliza y documenta la política para no confundir enlace de identidad con fusión de datos.
+- La cola todavía no procesa operaciones automáticamente y las pantallas aún trabajan con SQLite local. La aplicación central duradera y la lectura de los datos compartidos siguen pendientes en los siguientes subpasos; la sincronización funcional no se declara terminada.
+- Se intentó actualizar la app en el Samsung SM-S928U, pero ADB informó que no hay dispositivos conectados. La instalación física, migración de la base existente y pruebas central/offline quedan pendientes; este subpaso no se marca verificado en dispositivo hasta que el usuario conecte el teléfono.
+- Las operaciones del Outbox aún no consumen la sesión central; la atribución/envío sigue en los pasos posteriores de T7.2.

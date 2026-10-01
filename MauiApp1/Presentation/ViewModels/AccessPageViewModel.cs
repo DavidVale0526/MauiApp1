@@ -9,19 +9,23 @@ namespace MauiApp1.Presentation.ViewModels;
 public sealed class AccessPageViewModel : INotifyPropertyChanged
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly ICoordinatedSignInService _coordinatedSignInService;
     private readonly ILogger<AccessPageViewModel> _logger;
     private string _userName = string.Empty;
     private string _password = string.Empty;
     private string _passwordConfirmation = string.Empty;
     private string _errorMessage = string.Empty;
+    private string _noticeMessage = string.Empty;
     private bool _isSetupMode;
     private bool _isBusy;
 
     public AccessPageViewModel(
         IAuthenticationService authenticationService,
+        ICoordinatedSignInService coordinatedSignInService,
         ILogger<AccessPageViewModel> logger)
     {
         _authenticationService = authenticationService;
+        _coordinatedSignInService = coordinatedSignInService;
         _logger = logger;
         CreateAdministratorCommand = new Command(async () => await CreateAdministratorAsync(), () => !IsBusy);
         SignInCommand = new Command(async () => await SignInAsync(), () => !IsBusy);
@@ -65,6 +69,17 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    public string NoticeMessage
+    {
+        get => _noticeMessage;
+        private set
+        {
+            if (SetProperty(ref _noticeMessage, value)) OnPropertyChanged(nameof(HasNotice));
+        }
+    }
+
+    public bool HasNotice => !string.IsNullOrWhiteSpace(NoticeMessage);
+
     public bool IsSetupMode
     {
         get => _isSetupMode;
@@ -101,6 +116,7 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
         {
             IsSetupMode = !await _authenticationService.HasAdministratorAsync();
             ErrorMessage = string.Empty;
+            NoticeMessage = string.Empty;
         }
         catch (Exception exception)
         {
@@ -117,6 +133,7 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
         }
 
         ErrorMessage = string.Empty;
+        NoticeMessage = string.Empty;
         if (!string.Equals(Password, PasswordConfirmation, StringComparison.Ordinal))
         {
             ErrorMessage = "Las contraseñas no coinciden.";
@@ -135,7 +152,29 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
         }
 
         ErrorMessage = string.Empty;
-        await RunAuthenticationAsync(() => _authenticationService.SignInAsync(UserName, Password));
+        NoticeMessage = string.Empty;
+        IsBusy = true;
+        try
+        {
+            var result = await _coordinatedSignInService.SignInAsync(UserName, Password);
+            if (!result.Authentication.Succeeded)
+            {
+                _logger.LogInformation("El flujo de acceso no autenticó al usuario.");
+                ErrorMessage = result.Authentication.ErrorMessage ?? "No fue posible completar el acceso.";
+                NoticeMessage = result.Notice ?? string.Empty;
+                Password = string.Empty;
+                return;
+            }
+
+            NoticeMessage = result.Notice ?? string.Empty;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Falló el flujo coordinado de inicio de sesión para {UserName}.", UserName);
+            ErrorMessage = "No fue posible completar el acceso. Inténtalo de nuevo.";
+            Password = string.Empty;
+        }
+        finally { IsBusy = false; }
     }
 
     private async Task RunAuthenticationAsync(Func<Task<AuthenticationResult>> operation)

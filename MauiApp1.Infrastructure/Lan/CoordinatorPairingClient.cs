@@ -4,12 +4,17 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using MauiApp1.Application.Lan;
+using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
+using MauiApp1.Application.Sync;
+using MauiApp1.Domain.Users;
 
 namespace MauiApp1.Infrastructure.Lan;
 
-public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, ILocalDeviceIdentity deviceIdentity)
-    : ICoordinatorPairingClient
+public sealed class CoordinatorPairingClient(
+    ICoordinatorLinkStorage storage,
+    ICoordinatorUserSessionStorage sessionStorage,
+    ILocalDeviceIdentity deviceIdentity) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public async Task<CoordinatorLinkStatus?> GetStatusAsync()
@@ -93,7 +98,11 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
                         ? "El coordinador no confirmó la revocación. Las credenciales locales se conservaron; comprueba la conexión y vuelve a intentar."
                         : ErrorFor(response.StatusCode));
 
-                try { await storage.RemoveAsync(); }
+                try
+                {
+                    await sessionStorage.RemoveAsync();
+                    await storage.RemoveAsync();
+                }
                 catch { return new(false, "El coordinador revocó el dispositivo, pero no se pudo borrar la credencial local. Vuelve a intentar con el coordinador disponible."); }
                 return new(true, "Dispositivo desvinculado. Los productos, ventas y demás datos guardados en este dispositivo se conservaron.");
             }
@@ -101,6 +110,49 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
             catch (TaskCanceledException) { return new(false, "El coordinador no respondió a tiempo. No se borró ninguna credencial; vuelve a intentar cuando esté disponible."); }
         }
         finally { _pairingLock.Release(); }
+    }
+
+    public async Task<CoordinatorSignInResult> SignInAsync(
+        string userName, string password, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
+            return new(CoordinatorSignInStatus.Rejected);
+
+        CoordinatorDeviceLink? link;
+        try { link = await ReadLinkAsync(); }
+        catch { return new(CoordinatorSignInStatus.Unavailable); }
+        if (link is null || !link.IsConfirmed)
+            return new(CoordinatorSignInStatus.NotLinked);
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _))
+            return new(CoordinatorSignInStatus.Unavailable);
+
+        try
+        {
+            using var client = CreateClient(uri!, fingerprint);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+            client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+            using var response = await client.PostAsJsonAsync("api/auth/session", new { userName, password }, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                return new(CoordinatorSignInStatus.Rejected);
+            if (!response.IsSuccessStatusCode)
+                return new(CoordinatorSignInStatus.Unavailable);
+
+            var result = await response.Content.ReadFromJsonAsync<SessionResponse>(cancellationToken: cancellationToken);
+            if (result is null || result.UserId == Guid.Empty || string.IsNullOrWhiteSpace(result.UserName) ||
+                result.UserName.Trim().Length > 80 || !Enum.TryParse<UserRole>(result.Role, true, out var role) ||
+                role is not (UserRole.Administrator or UserRole.Cashier) ||
+                string.IsNullOrEmpty(result.SessionToken) || result.SessionToken.Length != 43 || !result.SessionToken.All(character =>
+                    char.IsAsciiLetterOrDigit(character) || character is '-' or '_') ||
+                result.ExpiresAtUtc <= DateTime.UtcNow)
+                return new(CoordinatorSignInStatus.Unavailable);
+
+            return new(CoordinatorSignInStatus.Authenticated, result.UserId, result.UserName, role,
+                result.SessionToken, result.ExpiresAtUtc);
+        }
+        catch (HttpRequestException) { return new(CoordinatorSignInStatus.Unavailable); }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return new(CoordinatorSignInStatus.Unavailable); }
+        catch (System.Text.Json.JsonException) { return new(CoordinatorSignInStatus.Unavailable); }
     }
 
     private async Task<PairingActionResult> PairCoreAsync(string address, string fingerprint, string code)
@@ -198,6 +250,12 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
         return new HttpClient(handler) { BaseAddress = address, Timeout = TimeSpan.FromSeconds(10) };
     }
 
+    internal static HttpClient CreatePinnedClient(Uri address, string fingerprint) => CreateClient(address, fingerprint);
+
+    internal static bool TryValidateStoredConnection(
+        string address, string fingerprint, out Uri? uri, out string normalizedFingerprint) =>
+        TryValidateConnection(address, fingerprint, out uri, out normalizedFingerprint, out _);
+
     private static bool TryValidateConnection(string address, string fingerprint, out Uri? uri,
         out string normalizedFingerprint, out string error)
     {
@@ -235,4 +293,5 @@ public sealed class CoordinatorPairingClient(ICoordinatorLinkStorage storage, IL
     private sealed record CodeResponse(string Code, DateTime ExpiresAtUtc);
     private sealed record PairResponse(bool Success, string Message);
     private sealed record HealthResponse(string Status);
+    private sealed record SessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
 }

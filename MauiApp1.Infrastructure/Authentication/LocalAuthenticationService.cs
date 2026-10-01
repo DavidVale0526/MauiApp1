@@ -179,6 +179,71 @@ internal sealed class LocalAuthenticationService(
         return AuthenticationResult.Success(user);
     }
 
+    public async Task<AuthenticationResult> SignInWithCoordinatorUserAsync(
+        Guid coordinatorUserId,
+        string userName,
+        UserRole role,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        if (coordinatorUserId == Guid.Empty || string.IsNullOrWhiteSpace(userName) ||
+            userName.Trim().Length > MaximumUserNameLength || string.IsNullOrEmpty(password) ||
+            password.Length > MaximumPasswordLength ||
+            role is not (UserRole.Administrator or UserRole.Cashier))
+            return AuthenticationResult.Failure("El coordinador devolvió una cuenta no válida. Inténtalo de nuevo.");
+
+        var normalizedUserName = NormalizeUserName(userName);
+        var (salt, hash) = await Task.Run(() => passwordHasher.Hash(password), cancellationToken);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var mappedAccount = await context.UserAccounts.SingleOrDefaultAsync(
+            account => account.CoordinatorUserId == coordinatorUserId, cancellationToken);
+        var matchingName = await context.UserAccounts.SingleOrDefaultAsync(
+            account => account.NormalizedUserName == normalizedUserName, cancellationToken);
+
+        if (mappedAccount is not null && matchingName is not null && mappedAccount.UserId != matchingName.UserId)
+            return AuthenticationResult.Failure("La cuenta central entra en conflicto con una cuenta local. No se modificaron los datos; solicita ayuda al Administrador.");
+        if (matchingName?.CoordinatorUserId is Guid otherCoordinatorUserId && otherCoordinatorUserId != coordinatorUserId)
+            return AuthenticationResult.Failure("La cuenta local ya está asociada a otra cuenta central. No se modificaron los datos.");
+
+        var account = mappedAccount ?? matchingName;
+        if (account is null)
+        {
+            account = new UserAccountEntity
+            {
+                UserId = Guid.NewGuid(),
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.UserAccounts.Add(account);
+        }
+
+        account.CoordinatorUserId = coordinatorUserId;
+        account.UserName = userName.Trim();
+        account.NormalizedUserName = normalizedUserName;
+        account.PasswordSalt = salt;
+        account.PasswordHash = hash;
+        account.PasswordIterations = Pbkdf2PasswordHasher.Iterations;
+        account.Role = (int)role;
+        account.IsEnabled = true;
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var user = ToAuthenticatedUser(account);
+        SetCurrentUser(user);
+        return AuthenticationResult.Success(user);
+    }
+
+    public async Task<Guid?> GetCoordinatorUserIdAsync(Guid localUserId, CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.UserAccounts.AsNoTracking()
+            .Where(account => account.UserId == localUserId)
+            .Select(account => account.CoordinatorUserId)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public void SignOut() => SetCurrentUser(null);
 
     private static string? ValidateCredentials(string userName, string password)

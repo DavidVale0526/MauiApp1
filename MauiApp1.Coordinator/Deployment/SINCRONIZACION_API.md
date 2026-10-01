@@ -2,7 +2,7 @@
 
 Esta API pertenece al coordinador de Windows y solo funciona por HTTPS. El dispositivo debe estar previamente vinculado. Las rutas de negocio requieren tanto `X-Device-Id: <guid>` y `Authorization: Bearer <clave-del-dispositivo>` como `X-User-Session: <sesión-de-usuario>`. El coordinador compara las credenciales de dispositivo y sesión contra hashes, liga la sesión al dispositivo y confirma que la cuenta central siga habilitada. No se acepta el identificador del dispositivo como prueba de autorización.
 
-**Despliegue local:** al 2026-09-30 el paquete con sesiones está compilado pero aún no actualizado en el servicio Windows de este equipo; allí sigue ejecutándose el binario anterior. Ejecuta `Deployment/update-coordinator.ps1` como Administrador y confirma su verificación `/health` antes de consumir `POST /api/auth/session` o las rutas protegidas por sesión.
+**Despliegue local:** el servicio Windows se actualizó correctamente el 2026-09-30; `/health` respondió `ok`. Las rutas protegidas por sesión ya están desplegadas en el equipo coordinador.
 
 ## Iniciar sesión compartida
 

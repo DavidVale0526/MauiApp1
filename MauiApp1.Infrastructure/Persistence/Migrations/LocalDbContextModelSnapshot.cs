@@ -424,6 +424,9 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", b =>
                 {
+                    b.Property<Guid?>("CoordinatorUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("TEXT");
 
@@ -460,6 +463,9 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId");
 
                     b.HasIndex("NormalizedUserName")
+                        .IsUnique();
+
+                    b.HasIndex("CoordinatorUserId")
                         .IsUnique();
 
                     b.ToTable("UserAccounts", (string)null);

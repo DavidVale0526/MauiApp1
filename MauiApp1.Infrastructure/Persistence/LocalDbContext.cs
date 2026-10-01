@@ -83,9 +83,11 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.ToTable("UserAccounts");
             entity.HasKey(item => item.UserId);
             entity.Property(item => item.UserId).ValueGeneratedNever();
+            entity.Property(item => item.CoordinatorUserId);
             entity.Property(item => item.UserName).HasMaxLength(80).IsRequired();
             entity.Property(item => item.NormalizedUserName).HasMaxLength(80).IsRequired();
             entity.HasIndex(item => item.NormalizedUserName).IsUnique();
+            entity.HasIndex(item => item.CoordinatorUserId).IsUnique();
             entity.Property(item => item.PasswordSalt).IsRequired();
             entity.Property(item => item.PasswordHash).IsRequired();
             entity.Property(item => item.PasswordIterations).IsRequired();

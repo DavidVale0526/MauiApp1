@@ -26,7 +26,14 @@ namespace MauiApp1
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorLinkStorage, MauiApp1.Services.SecureCoordinatorLinkStorage>();
-            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient, MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserSessionStorage, MauiApp1.Services.SecureCoordinatorUserSessionStorage>();
+            builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorAuthenticationClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatedSignInService, MauiApp1.Infrastructure.Authentication.CoordinatedSignInService>();
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorOperationSender, MauiApp1.Infrastructure.Lan.CoordinatorOperationSender>();
             builder.Services.AddTransient<DevicePairingViewModel>();
             builder.Services.AddTransient<DevicePairingPage>();
             builder.Services.AddTransient<AccessPage>();
