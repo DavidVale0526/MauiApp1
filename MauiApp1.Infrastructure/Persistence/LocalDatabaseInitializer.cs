@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MauiApp1.Infrastructure.Persistence;
 
-public sealed class LocalDatabaseInitializer(IDbContextFactory<LocalDbContext> contextFactory)
+public sealed class LocalDatabaseInitializer(
+    IDbContextFactory<LocalDbContext> contextFactory,
+    bool migrationsManagedExternally = false)
     : ILocalDatabaseInitializer, ILocalDeviceIdentity
 {
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
@@ -26,7 +28,16 @@ public sealed class LocalDatabaseInitializer(IDbContextFactory<LocalDbContext> c
             }
 
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-            await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+            if (migrationsManagedExternally)
+            {
+                var pendingMigrations = await context.Database.GetPendingMigrationsAsync(cancellationToken).ConfigureAwait(false);
+                if (pendingMigrations.Any())
+                    throw new InvalidOperationException("La base central necesita actualizarse. Ejecuta el actualizador del coordinador en Windows y vuelve a abrir la aplicación.");
+            }
+            else
+            {
+                await context.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+            }
 
             var identity = await context.DeviceIdentities
                 .SingleOrDefaultAsync(item => item.SingletonKey == DeviceIdentityEntity.SingletonKeyValue, cancellationToken)
@@ -34,6 +45,9 @@ public sealed class LocalDatabaseInitializer(IDbContextFactory<LocalDbContext> c
 
             if (identity is null)
             {
+                if (migrationsManagedExternally)
+                    throw new InvalidOperationException("La base central no tiene una identidad inicializada. Inicia o actualiza el servicio coordinador antes de abrir la aplicación de Windows.");
+
                 context.DeviceIdentities.Add(new DeviceIdentityEntity
                 {
                     DeviceId = Guid.NewGuid(),

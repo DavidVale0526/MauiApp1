@@ -5,17 +5,27 @@ namespace MauiApp1.Presentation.Views;
 public sealed class ConflictReviewPage : ContentPage
 {
     private readonly ICoordinatorConflictReviewService _service;
+    private readonly ILocalOperationSyncService _operationSyncService;
     private readonly VerticalStackLayout _items = new() { Spacing = 14, Padding = new Thickness(16) };
+    private readonly Label _queueStatus = new();
 
-    public ConflictReviewPage(ICoordinatorConflictReviewService service)
+    public ConflictReviewPage(ICoordinatorConflictReviewService service, ILocalOperationSyncService operationSyncService)
     {
         _service = service;
+        _operationSyncService = operationSyncService;
         Title = "Revisión de conflictos";
+        var back = new Button { Text = "← Volver al menú principal", HorizontalOptions = LayoutOptions.Start };
+        back.Clicked += async (_, _) => await Navigation.PopModalAsync();
         var refresh = new Button { Text = "Actualizar conflictos" };
         refresh.Clicked += async (_, _) => await LoadAsync();
+        var retry = new Button { Text = "Reintentar sincronización" };
+        retry.Clicked += async (_, _) => await RetrySyncAsync();
+        _items.Add(back);
         _items.Add(new Label { Text = "Cambios simultáneos", FontSize = 24, FontAttributes = FontAttributes.Bold });
-        _items.Add(new Label { Text = "Elige qué versión conservar. Los registros de las dos operaciones se mantienen." });
+        _items.Add(new Label { Text = "Aquí aparecen cambios simultáneos que el coordinador ya recibió. Las operaciones pendientes de envío se muestran aparte; por sí solas no son conflictos." });
         _items.Add(refresh);
+        _items.Add(retry);
+        _items.Add(_queueStatus);
         Content = new ScrollView { Content = _items };
     }
 
@@ -27,9 +37,20 @@ public sealed class ConflictReviewPage : ContentPage
 
     private async Task LoadAsync()
     {
-        while (_items.Children.Count > 3) _items.Children.RemoveAt(3);
+        while (_items.Children.Count > 6) _items.Children.RemoveAt(6);
+        try
+        {
+            var status = await _operationSyncService.GetStatusAsync();
+            _queueStatus.Text = $"Operaciones pendientes de envío: {status.PendingCount}." +
+                (status.LatestConflictMessage is null ? string.Empty : $"\nDetalle: {status.LatestConflictMessage}");
+        }
+        catch
+        {
+            _queueStatus.Text = "No se pudo consultar la cola local.";
+        }
         IReadOnlyList<CoordinatorConflictItem> conflicts;
         try { conflicts = await _service.GetOpenAsync(); }
+        catch (InvalidOperationException exception) { _items.Add(new Label { Text = exception.Message }); return; }
         catch { _items.Add(new Label { Text = "No se pudieron consultar los conflictos. Comprueba la conexión local." }); return; }
         if (conflicts.Count == 0)
         {
@@ -56,6 +77,16 @@ public sealed class ConflictReviewPage : ContentPage
             }
             _items.Add(new Border { Stroke = Colors.Gray, Padding = 1, Content = card });
         }
+    }
+
+    private async Task RetrySyncAsync()
+    {
+        try { await _operationSyncService.SynchronizeAsync(); }
+        catch
+        {
+            await DisplayAlertAsync("Sincronización", "No se pudo completar el reintento. Las operaciones siguen guardadas en este dispositivo.", "Aceptar");
+        }
+        await LoadAsync();
     }
 
     private async Task ResolveAsync(CoordinatorConflictItem conflict, bool applyIncoming)

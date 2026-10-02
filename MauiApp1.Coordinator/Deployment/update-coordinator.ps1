@@ -2,6 +2,7 @@ param(
     [string] $AppDirectory = "$env:ProgramFiles\Miscelanea Ari\Coordinator",
     [string] $PublishDirectory = (Join-Path $PSScriptRoot '..\bin\publish\win-x64'),
     [string] $DataDirectory = "$env:ProgramData\Miscelanea Ari\Coordinator",
+    [string] $WindowsAppUser,
     [ValidateRange(1024, 65535)] [int] $Port = 5080
 )
 
@@ -23,6 +24,38 @@ $dataDirectory = [IO.Path]::GetFullPath($DataDirectory)
 $serviceExecutable = Join-Path $appDirectory 'MauiApp1.Coordinator.exe'
 $publishExecutable = Join-Path $publishDirectory 'MauiApp1.Coordinator.exe'
 $databasePath = Join-Path $dataDirectory 'miscelanea-ari-central.db'
+$windowsIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+if ([string]::IsNullOrWhiteSpace($WindowsAppUser)) { $WindowsAppUser = $windowsIdentity.Name }
+$windowsAppSid = ([Security.Principal.NTAccount]::new($WindowsAppUser)).Translate(
+    [Security.Principal.SecurityIdentifier])
+
+function Grant-CoordinatorDatabaseAccess {
+    param([string] $DatabaseDirectory, [string] $DatabaseFile, [Security.Principal.SecurityIdentifier] $UserSid)
+
+    # SQLite may write to the database directory and to existing -wal/-shm files.
+    # Grant only the Windows desktop account that runs the MAUI app, not all Users.
+    $directoryAcl = Get-Acl -LiteralPath $DatabaseDirectory
+    $directoryRule = [Security.AccessControl.FileSystemAccessRule]::new(
+        $UserSid,
+        [Security.AccessControl.FileSystemRights]::Modify,
+        [Security.AccessControl.InheritanceFlags]::ObjectInherit,
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Allow)
+    $directoryAcl.SetAccessRule($directoryRule)
+    Set-Acl -LiteralPath $DatabaseDirectory -AclObject $directoryAcl
+
+    foreach ($file in @($DatabaseFile, "$DatabaseFile-wal", "$DatabaseFile-shm")) {
+        if (Test-Path -LiteralPath $file -PathType Leaf) {
+            $fileAcl = Get-Acl -LiteralPath $file
+            $fileRule = [Security.AccessControl.FileSystemAccessRule]::new(
+                $UserSid,
+                [Security.AccessControl.FileSystemRights]::Modify,
+                [Security.AccessControl.AccessControlType]::Allow)
+            $fileAcl.SetAccessRule($fileRule)
+            Set-Acl -LiteralPath $file -AclObject $fileAcl
+        }
+    }
+}
 
 if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
     throw "No se encontró el servicio $serviceName."
@@ -64,6 +97,7 @@ try {
     Stop-Service -Name $serviceName
     (Get-Service -Name $serviceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
     $serviceStopped = $true
+    Grant-CoordinatorDatabaseAccess -DatabaseDirectory $dataDirectory -DatabaseFile $databasePath -UserSid $windowsAppSid
     Copy-Item -Path (Join-Path $publishDirectory '*') -Destination $appDirectory -Recurse -Force
     Start-Service -Name $serviceName
     (Get-Service -Name $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
@@ -78,6 +112,7 @@ try {
     }
     if ($health.status -ne 'ok') { throw 'El coordinador no respondió correctamente en /health.' }
 
+    Write-Output "Permisos de escritura SQLite habilitados para $WindowsAppUser."
     Write-Output "Actualización correcta. Respaldo de base y binarios: $backupRoot"
 }
 catch {

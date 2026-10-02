@@ -322,3 +322,87 @@
 - Prueba SQLite aislada completada: migración, actualización transaccional de producto, venta que excede existencias con discrepancia registrada, payload legado de compra con snapshots completados y rechazo de cambio concurrente.
 - No se alteraron bases de datos reales. La ventana emergente de `dotnet.exe` observada durante la comprobación provino del cierre inicial del arnés temporal; se corrigió su limpieza y la ejecución posterior terminó en `PASS` sin excepción.
 - La implementación de T7.2 queda registrada; su aceptación de operación en dos equipos (incluidos el teléfono físico, reconexión offline y lectura desde otro cliente) sigue pendiente de instalación y recorrido manual. T7.3 añadirá actualización en vivo con SignalR.
+
+### Diagnóstico de la primera prueba LAN (2026-10-01)
+
+- La base central en `C:\ProgramData\Miscelanea Ari\Coordinator\miscelanea-ari-central.db` pasó `PRAGMA integrity_check`, pero `CoordinatorOperations` aún no tenía las columnas `Status` y `ConflictMessage` que agrega el código actual. Esto confirma que el servicio instalado corre una versión anterior; explica «No se pudo actualizar la cola» en Windows y que Android no reciba el catálogo. «Coordinador sin configurar» en la app Windows es normal porque ese equipo aloja el coordinador y no se vincula como cliente.
+- Se preparó la publicación autónoma actualizada en `MauiApp1.Coordinator/bin/publish/win-x64`; incluye ejecutable y runtime requeridos por `update-coordinator.ps1`. El usuario aún debe ejecutar el actualizador desde PowerShell 7 o posterior como Administrador para tomar el respaldo, instalar la publicación y aplicar la migración. La verificación con dos dispositivos queda pendiente hasta esa actualización.
+
+### Corrección de navegación de la revisión de conflictos (2026-10-01)
+
+- `MauiApp1/Presentation/Views/ConflictReviewPage.cs`: añade «← Volver al menú principal» al inicio de la vista modal y conserva ese encabezado al actualizar la lista de conflictos. El botón cierra la vista y regresa al menú desde el que se abrió.
+- Verificación: compilaciones de Windows y Android correctas, sin advertencias ni errores. La pulsación real en el teléfono queda para la comprobación manual de T7.2.
+
+### Corrección del inicio de Windows con la base central (2026-10-01)
+
+- `MauiApp1.Infrastructure/Persistence/LocalDatabaseInitializer.cs`: permite que la aplicación verifique migraciones pendientes cuando las administra un proceso externo, y entrega un mensaje claro si la base central aún no fue actualizada o no tiene identidad inicializada.
+- `MauiApp1.Infrastructure/Persistence/LocalPersistenceServiceCollectionExtensions.cs`: incorpora el indicador para elegir quién administra las migraciones.
+- `MauiApp1/MauiProgram.cs`: cuando Windows detecta la base central del coordinador, evita ejecutar migraciones/escrituras desde la interfaz. Android y bases locales continúan aplicándolas normalmente; el servicio coordinador sigue siendo responsable de migrar la base central.
+- Causa del error reportado: la app Windows intentaba obtener el bloqueo de migraciones SQLite sobre una base central que debe administrar el servicio. El esquema instalado también estaba desactualizado, por lo que debe ejecutarse `update-coordinator.ps1` antes de abrir con una versión que requiera la última migración.
+- Verificación: compilaciones de Windows, Android y Coordinador correctas, sin advertencias ni errores. Falta confirmar el arranque en el Windows del usuario después de actualizar el servicio coordinador.
+
+### Diagnóstico visible de operaciones pendientes (2026-10-01)
+
+- `MauiApp1.Infrastructure/Lan/LocalOperationSyncService.cs`: cuando el coordinador no acepta una operación y esta debe reintentarse, conserva un motivo legible en la cola local y lo incluye en el estado de sincronización.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: presenta ese texto como detalle de sincronización; ya no lo etiqueta erróneamente como un conflicto.
+- Esto permite distinguir una operación no enviada (pendiente) de un conflicto real. La vista «Revisión de conflictos» correctamente puede estar vacía aunque haya operaciones pendientes.
+- Verificación: compilaciones de Android y Windows correctas, sin advertencias ni errores. Falta instalar la nueva app Android y revisar el detalle que muestre al reintentar las operaciones pendientes.
+
+### Reintento manual y diagnóstico de autorización (2026-10-01)
+
+- `MauiApp1/Presentation/Views/MainPage.xaml` y `MainPage.xaml.cs`: añade el botón «Sincronizar ahora», con estado visible mientras se ejecuta.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: impide reintentos simultáneos y aclara en Windows que el equipo anfitrión no necesita vincularse como cliente.
+- `MauiApp1/Presentation/Views/ConflictReviewPage.cs`: explica la diferencia entre conflictos recibidos y operaciones pendientes, muestra el total pendiente y permite reintentar.
+- `MauiApp1.Infrastructure/Sync/CoordinatorConflictReviewService.cs`: una consulta remota fallida ya no aparece falsamente como lista vacía.
+- `MauiApp1.Coordinator/Program.cs`, `MauiApp1.Infrastructure/Lan/CoordinatorOperationSender.cs` y `MauiApp1.Infrastructure/Lan/LocalOperationSyncService.cs`: devuelve y presenta el motivo específico cuando el coordinador rechaza el dispositivo o su sesión.
+- Verificación: compilaciones de Android, Windows y Coordinador correctas, sin advertencias ni errores. Publicación autónoma del Coordinador preparada en `MauiApp1.Coordinator/bin/publish/win-x64`. La prueba en ambos dispositivos queda pendiente de instalar la app Android/Windows y actualizar el servicio.
+
+### Limpieza de sesión compartida al cerrar sesión (2026-10-01)
+
+- `MauiApp1.Application/Authentication/ICoordinatedSignInService.cs` y `MauiApp1.Infrastructure/Authentication/CoordinatedSignInService.cs`: el cierre de sesión elimina también el token de sesión compartida almacenado en forma segura.
+- `MauiApp1.Infrastructure/Lan/CoordinatorOperationSender.cs`: al recibir HTTP 401 invalida el token compartido local para evitar reintentos con una credencial rechazada.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: el botón «Cerrar sesión» usa ahora el cierre coordinado.
+- Causa observada: el usuario salía de la sesión local, pero el token central vencido seguía almacenado. Al volver a iniciar sesión sin una sesión central nueva, el sincronizador enviaba el token anterior y seguía recibiendo 401.
+- Verificación: compilación Android correcta sin advertencias ni errores; Windows compilado en `bin/BuildVerify` con 0 advertencias y 0 errores porque la app en ejecución bloqueaba la carpeta normal. La instalación y la sincronización entre dispositivos quedan pendientes.
+
+### Manejo claro del límite de intentos al iniciar sesión (2026-10-02)
+
+- `MauiApp1.Coordinator/Program.cs`: el limitador por IP devuelve HTTP 429, el texto de espera y `Retry-After: 60` cuando supera diez solicitudes por minuto.
+- `MauiApp1.Application/Authentication/ICoordinatedSignInService.cs` y `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: representan el bloqueo temporal por separado y conservan el mensaje HTTP del coordinador.
+- `MauiApp1.Infrastructure/Authentication/CoordinatedSignInService.cs`: no permite que un bloqueo temporal de acceso se confunda con un inicio local exitoso.
+- Causa probable del síntoma observado: después de varios reintentos, el limitador puede responder temporalmente; el código anterior trataba esa respuesta como coordinador no disponible y permitía acceso local sin sesión compartida. La causa final se confirmará con el mensaje de acceso nuevo o con la siguiente sincronización.
+- Verificación: compilación Android, Windows aislado y Coordinador correctas, todas sin advertencias ni errores. Publicación actualizada del Coordinador preparada en `MauiApp1.Coordinator/bin/publish/win-x64`; pruebas reales en Android/Windows aún pendientes.
+
+### Mostrar el resultado del acceso central en el menú (2026-10-02)
+
+- `MauiApp1.Application/Authentication/ICoordinatedSignInService.cs` y `MauiApp1.Infrastructure/Authentication/CoordinatedSignInService.cs`: conservan el resultado del último acceso central/local y distinguen sesión activa, acceso local, falta de vinculación y rechazo temporal.
+- `MauiApp1/Presentation/ViewModels/MainPageViewModel.cs`: muestra ese resultado en el estado de sincronización para que el acceso local de respaldo no parezca una sesión central válida.
+- Motivo: la captura mostraba una cola pendiente con ausencia de sesión compartida, pero no exponía si el inicio de sesión había sido local o central.
+- Verificación: compilaciones Android y Windows correctas, sin advertencias ni errores. La prueba con la nueva app aún está pendiente.
+
+### Verificar persistencia y diagnóstico de sesión para el envío (2026-10-02)
+
+- `MauiApp1.Infrastructure/Authentication/CoordinatedSignInService.cs`: vuelve a leer y compara la sesión segura inmediatamente después de guardarla; no informa sesión central activa si el almacenamiento no la conserva.
+- `MauiApp1.Infrastructure/Lan/CoordinatorOperationSender.cs`: distingue sesión ausente, vencida o con datos/token inválidos; actualiza el estado visible si el coordinador rechaza la sesión.
+- `MauiApp1.Infrastructure/Lan/LocalOperationSyncService.cs`: usa el motivo específico para las operaciones pendientes.
+- Verificación: compilaciones Android y Windows correctas, 0 advertencias y 0 errores. La prueba física de lectura/escritura de SecureStorage y el reintento LAN quedan pendientes de instalar la nueva app Android.
+
+### Corrección y autoverificación de sesión central (2026-10-02)
+
+- `MauiApp1.Coordinator/Pairing/CoordinatorPairingStore.cs`: valida la sesión buscando primero la huella del token, compara los GUID de dispositivo/usuario como GUID y confirma que la cuenta correspondiente siga habilitada. Evita que una diferencia de formato de GUID en SQLite invalide una sesión correcta.
+- `MauiApp1.Coordinator/Program.cs`: después de crear una sesión, el coordinador intenta validarla antes de responder éxito; si no puede, registra el diagnóstico y devuelve un error explícito en vez de entregar una sesión que luego será rechazada.
+- `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`: muestra el mensaje JSON del coordinador cuando el inicio de sesión central falla, para que un acceso local de respaldo no parezca sincronizado.
+- Verificación: Coordinador Release y app MAUI Windows compilados con 0 advertencias y 0 errores. La compilación Android quedó impedida en este entorno porque el sandbox bloquea la lectura de `C:\Users\HP Pavilioh Gaming\AppData\Local\Android\Sdk`; la dependencia compartida de sincronización sí compiló con el Coordinador. Se actualizaron los ensamblados Release de la publicación autónoma ya preparada en `MauiApp1.Coordinator/bin/publish/win-x64`; la restauración/publicación completa no pudo leer el `NuGet.Config` del perfil de usuario. La sesión real y el envío de las tres operaciones aún requieren instalar los binarios actualizados y probar en el teléfono.
+
+### Diagnóstico del cambio de categoría desde Windows (2026-10-02)
+
+- `MauiApp1.Infrastructure/Categories/EfCategoryService.cs`: el registro de renombrado y guardado de la operación Outbox ahora queda dentro del mismo manejo de errores. Se registra la excepción completa y, en Debug, la pantalla muestra su mensaje interno para distinguir permisos, bloqueo de SQLite, restricción de datos u otro fallo; Release conserva un mensaje general.
+- Motivo: la captura mostraba que Android ya sincroniza hacia Windows, pero al renombrar en Windows aparecía el mensaje genérico del ViewModel. El diagnóstico apunta a una excepción durante la preparación/guardado local que el servicio no estaba capturando. Aún no se declara corregido el guardado hasta identificar el detalle real en Windows.
+- Verificación: app MAUI Windows Debug y Coordinador Release compilaron con 0 advertencias y 0 errores. La reproducción contra la instalación del usuario queda pendiente de abrir la versión actualizada de Windows y repetir el mismo cambio; si falla, el mensaje Debug ahora debe mostrar la causa concreta.
+
+### Permisos de escritura para SQLite en Windows (2026-10-02)
+
+- Evidencia: la app podía leer la base central, pero SQLite devolvía error 8 al editar una categoría. El archivo principal no tenía atributo de solo lectura; los auxiliares `miscelanea-ari-central.db-wal` y `-shm`, creados bajo el servicio, solo daban lectura al grupo Usuarios. SQLite necesita escribir en ellos y crear/reemplazar esos archivos.
+- `MauiApp1.Coordinator/Deployment/update-coordinator.ps1` y `install-coordinator.ps1`: conceden permiso `Modify` a la cuenta de Windows de la interfaz MAUI (por defecto, la cuenta que ejecuta PowerShell; se puede indicar `-WindowsAppUser`). Se aplica a la carpeta de datos con herencia para archivos futuros y a la base/WAL/SHM existentes, sin conceder escritura a todos los usuarios.
+- `MauiApp1.Coordinator/Deployment/SINCRONIZACION_API.md`: documenta el permiso necesario y el parámetro de cuenta.
+- Verificación: ambos scripts pasan el analizador de PowerShell sin errores; una comprobación ACL aislada confirmó escritura para archivos SQLite existentes y herencia de permiso para un futuro WAL. El servicio real aún debe actualizarse y el renombrado repetirse en Windows para confirmar el arreglo en la instalación del usuario.

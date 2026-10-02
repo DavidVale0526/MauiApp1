@@ -12,7 +12,8 @@ public sealed class CoordinatorOperationSender(
     ICoordinatorLinkStorage linkStorage,
     ICoordinatorUserSessionStorage sessionStorage,
     IAuthenticationService authenticationService,
-    ILocalDeviceIdentity deviceIdentity) : ICoordinatorOperationSender
+    ILocalDeviceIdentity deviceIdentity,
+    ICoordinatedSignInService coordinatedSignInService) : ICoordinatorOperationSender
 {
     public async Task<CoordinatorOperationSendResult> SendAsync(
         OutboxOperation operation,
@@ -30,10 +31,14 @@ public sealed class CoordinatorOperationSender(
 
         var session = await sessionStorage.ReadAsync().ConfigureAwait(false);
         var currentUser = authenticationService.CurrentUser;
-        if (session is null || session.LocalUserId == Guid.Empty || session.CoordinatorUserId == Guid.Empty ||
-            session.ExpiresAtUtc <= DateTime.UtcNow || session.SessionToken.Length != 43 ||
-            !session.SessionToken.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
-            return new(CoordinatorOperationSendStatus.SessionUnavailable);
+        if (session is null)
+            return SessionUnavailable("No se encontró una sesión compartida en el almacenamiento seguro de este teléfono. Cierra sesión e inicia sesión nuevamente.");
+        if (session.LocalUserId == Guid.Empty || session.CoordinatorUserId == Guid.Empty)
+            return SessionUnavailable("La sesión guardada no contiene la identidad de usuario requerida. Cierra sesión e inicia sesión nuevamente.");
+        if (session.ExpiresAtUtc <= DateTime.UtcNow)
+            return SessionUnavailable("La sesión compartida ya venció. Cierra sesión e inicia sesión nuevamente.");
+        if (session.SessionToken.Length != 43 || !session.SessionToken.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+            return SessionUnavailable("El token guardado de la sesión compartida tiene un formato inválido. Cierra sesión e inicia sesión nuevamente.");
 
         var currentLocalUserId = currentUser?.Id.Value;
         var mappedCoordinatorUserId = await authenticationService
@@ -71,7 +76,13 @@ public sealed class CoordinatorOperationSender(
             }, cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
-                return new(CoordinatorOperationSendStatus.Unauthorized);
+            {
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken).ConfigureAwait(false);
+                try { await sessionStorage.RemoveAsync().ConfigureAwait(false); } catch { }
+                var message = error?.Message ?? "El coordinador rechazó la sesión compartida. Cierra sesión e inicia sesión nuevamente.";
+                coordinatedSignInService.ReportSessionProblem(message);
+                return new(CoordinatorOperationSendStatus.Unauthorized, Message: message);
+            }
             if (response.StatusCode == HttpStatusCode.Conflict)
             {
                 var conflict = await response.Content.ReadFromJsonAsync<SyncOperationResponse>(cancellationToken)
@@ -99,4 +110,11 @@ public sealed class CoordinatorOperationSender(
     }
 
     private sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);
+    private sealed record ApiMessageResponse(string Message);
+
+    private CoordinatorOperationSendResult SessionUnavailable(string message)
+    {
+        coordinatedSignInService.ReportSessionProblem(message);
+        return new(CoordinatorOperationSendStatus.SessionUnavailable, Message: message);
+    }
 }

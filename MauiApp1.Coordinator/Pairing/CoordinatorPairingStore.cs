@@ -87,21 +87,41 @@ internal sealed class CoordinatorPairingStore(string databasePath)
         var now = DateTime.UtcNow.Ticks;
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT s.TokenHash, s.UserId
-            FROM CoordinatorUserSessions AS s
-            INNER JOIN UserAccounts AS u ON u.UserId = s.UserId
-            WHERE s.DeviceId = $device AND s.ExpiresAtUtc > $now AND s.RevokedAtUtc IS NULL AND u.IsEnabled = 1;
-            """;
-        command.Parameters.AddWithValue("$device", deviceId.ToString("D"));
-        command.Parameters.AddWithValue("$now", now);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        Guid sessionUserId;
+        await using (var command = connection.CreateCommand())
         {
-            if (reader[0] is byte[] expectedHash && CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash))
-                return Guid.TryParse(reader.GetString(1), out var userId) ? userId : null;
+            // Look up the session by its hash first. Comparing SQLite's textual GUID
+            // representations in a JOIN can fail when one database contains a different
+            // but valid GUID format (for example, upper-case or compact form).
+            command.CommandText = """
+                SELECT TokenHash, DeviceId, UserId, ExpiresAtUtc, RevokedAtUtc
+                FROM CoordinatorUserSessions
+                WHERE TokenHash = $hash
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue("$hash", suppliedHash);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken) ||
+                reader[0] is not byte[] expectedHash ||
+                !CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash) ||
+                !Guid.TryParse(reader.GetString(1), out var sessionDeviceId) || sessionDeviceId != deviceId ||
+                !Guid.TryParse(reader.GetString(2), out sessionUserId) ||
+                reader.GetInt64(3) <= now || reader[4] is not DBNull)
+                return null;
         }
+
+        // Read enabled user IDs and compare parsed GUIDs instead of relying on SQLite
+        // string equality. The account table is intentionally small (Admin/Cashier
+        // accounts), and this preserves session checks across valid GUID text formats.
+        await using var userCommand = connection.CreateCommand();
+        userCommand.CommandText = "SELECT UserId, IsEnabled FROM UserAccounts;";
+        await using var userReader = await userCommand.ExecuteReaderAsync(cancellationToken);
+        while (await userReader.ReadAsync(cancellationToken))
+        {
+            if (Guid.TryParse(userReader.GetString(0), out var storedUserId) && storedUserId == sessionUserId)
+                return userReader.GetInt64(1) == 1 ? sessionUserId : null;
+        }
+
         return null;
     }
 

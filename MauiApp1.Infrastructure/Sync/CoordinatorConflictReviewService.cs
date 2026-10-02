@@ -32,7 +32,10 @@ internal sealed class CoordinatorConflictReviewService(
         await connection.OpenAsync(ct);
         if (!await HasJournalAsync(connection, ct))
         {
-            var remote = (await remoteClient.GetConflictsAsync(ct) ?? []).ToList();
+            var remoteConflicts = await remoteClient.GetConflictsAsync(ct);
+            if (remoteConflicts is null)
+                throw new InvalidOperationException("No se pudieron consultar los conflictos del coordinador. Comprueba la vinculación, la sesión del usuario y la conexión LAN.");
+            var remote = remoteConflicts.ToList();
             var localRows = await context.DeviceSyncConflicts.AsNoTracking().Where(item => !item.IsResolved)
                 .OrderBy(item => item.CoordinatorSequence).ToListAsync(ct);
             foreach (var row in localRows)

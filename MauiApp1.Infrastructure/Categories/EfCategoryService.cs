@@ -6,13 +6,15 @@ using MauiApp1.Domain.Identifiers;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Categories;
 
 internal sealed class EfCategoryService(
     IDbContextFactory<LocalDbContext> contextFactory,
     ILocalDeviceIdentity deviceIdentity,
-    IAuthenticationService authenticationService) : ICategoryService
+    IAuthenticationService authenticationService,
+    ILogger<EfCategoryService> logger) : ICategoryService
 {
     public async Task<IReadOnlyList<CategorySummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -116,21 +118,38 @@ internal sealed class EfCategoryService(
         var expectedName = category.Name;
         category.Name = cleanName;
         category.NormalizedName = normalizedName;
-        await EnqueueAsync(
-            context,
-            actor.Id.Value,
-            "Category.Renamed",
-            JsonSerializer.Serialize(new CategoryChangedPayload(categoryId, cleanName, expectedName)),
-            cancellationToken);
 
         try
         {
+            await EnqueueAsync(
+                context,
+                actor.Id.Value,
+                "Category.Renamed",
+                JsonSerializer.Serialize(new CategoryChangedPayload(categoryId, cleanName, expectedName)),
+                cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
             return CategoryOperationResult.Success();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception)
         {
+#if DEBUG
+            logger.LogError(exception, "No se pudo persistir el cambio de nombre de la categoría {CategoryId}.", categoryId);
+            return CategoryOperationResult.Failure(
+                $"No se pudo cambiar el nombre. Detalle de base de datos: {exception.GetBaseException().Message}");
+#else
+            logger.LogWarning(exception, "No se pudo persistir el cambio de nombre de la categoría {CategoryId}.", categoryId);
             return CategoryOperationResult.Failure("No se pudo cambiar el nombre. Comprueba si ya existe otra categoría con ese nombre.");
+#endif
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Falló la preparación o el guardado del cambio de nombre de la categoría {CategoryId}.", categoryId);
+#if DEBUG
+            return CategoryOperationResult.Failure(
+                $"No se pudo guardar la categoría. Detalle: {exception.GetBaseException().Message}");
+#else
+            return CategoryOperationResult.Failure("No se pudo guardar la categoría. Inténtalo de nuevo.");
+#endif
         }
     }
 

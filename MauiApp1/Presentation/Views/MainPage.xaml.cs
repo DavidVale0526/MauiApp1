@@ -17,6 +17,9 @@ public partial class MainPage : ContentPage
             Handler?.MauiContext?.Services.GetRequiredService<ConflictReviewPage>() is not { } page) return;
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
+
+    private async void OnSynchronizeClicked(object? sender, EventArgs args) =>
+        await _viewModel.RefreshOperationSyncAsync();
     private readonly MainPageViewModel _viewModel;
     private readonly IConnectivity _connectivity;
 

@@ -82,16 +82,27 @@ internal static class Program
         }
 
         builder.Services.AddSignalR();
-        builder.Services.AddRateLimiter(options => options.AddPolicy("device-pairing", context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 10,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0,
-                    AutoReplenishment = true
-                })));
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.AddPolicy("device-pairing", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.HttpContext.Response.Headers.RetryAfter = "60";
+                await context.HttpContext.Response.WriteAsJsonAsync(
+                    new ApiMessageResponse("Se hicieron demasiados intentos de acceso en poco tiempo. Espera un minuto y vuelve a intentarlo."),
+                    cancellationToken);
+            };
+        });
 
         var configuredDataDirectory = builder.Configuration["Coordinator:DataDirectory"];
         var dataDirectory = !string.IsNullOrWhiteSpace(configuredDataDirectory)
@@ -150,6 +161,18 @@ internal static class Program
                     .TrimEnd('=').Replace('+', '-').Replace('/', '_');
                 var expiresAtUtc = await pairingStore.CreateUserSessionAsync(
                     deviceId.Value, authentication.User.Id.Value, sessionToken, cancellationToken);
+                var validatedUserId = await pairingStore.GetSessionUserIdAsync(
+                    deviceId.Value, sessionToken, cancellationToken);
+                if (validatedUserId != authentication.User.Id.Value)
+                {
+                    app.Logger.LogError(
+                        "A coordinator user session was created but failed its immediate validation for device {DeviceId}.",
+                        deviceId.Value);
+                    return Results.Json(
+                        new ApiMessageResponse("El coordinador no pudo verificar la sesión recién creada. No se inició una sesión compartida; revisa la base central del coordinador."),
+                        statusCode: StatusCodes.Status500InternalServerError);
+                }
+
                 return Results.Ok(new CreateUserSessionResponse(sessionToken, authentication.User.Id.Value,
                     authentication.User.UserName, authentication.User.Role.ToString(), expiresAtUtc));
             }
@@ -253,9 +276,13 @@ internal static class Program
             if (!httpContext.Request.IsHttps)
                 return Results.Problem("La sincronización requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
             var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
-            if (deviceId is null) return Results.Unauthorized();
+            if (deviceId is null)
+                return Results.Json(new ApiMessageResponse("El teléfono ya no está autorizado. Vuelve a vincular este dispositivo con el coordinador de Windows."),
+                    statusCode: StatusCodes.Status401Unauthorized);
             var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
-            if (userId is null) return Results.Unauthorized();
+            if (userId is null)
+                return Results.Json(new ApiMessageResponse("La sesión compartida venció o ya no es válida. Cierra sesión en el teléfono e inicia sesión otra vez con el coordinador disponible."),
+                    statusCode: StatusCodes.Status401Unauthorized);
             var stored = await operationStore.StoreAsync(request, deviceId.Value, userId.Value,
                 businessOperationApplier, cancellationToken);
             if (!stored.Accepted)

@@ -16,7 +16,7 @@ public interface ICoordinatorOperationSender
 public sealed record CoordinatorOperationSendResult(
     CoordinatorOperationSendStatus Status,
     long? Sequence = null,
-    string? ConflictMessage = null);
+    string? Message = null);
 
 public enum CoordinatorOperationSendStatus
 {

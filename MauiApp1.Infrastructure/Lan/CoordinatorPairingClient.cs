@@ -220,10 +220,20 @@ public sealed class CoordinatorPairingClient(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
             client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
             using var response = await client.PostAsJsonAsync("api/auth/session", new { userName, password }, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken: cancellationToken);
+                return new(CoordinatorSignInStatus.RetryLater,
+                    Message: error?.Message ?? "Se hicieron demasiados intentos. Espera un minuto y vuelve a iniciar sesión.");
+            }
             if (response.StatusCode == HttpStatusCode.Unauthorized)
                 return new(CoordinatorSignInStatus.Rejected);
             if (!response.IsSuccessStatusCode)
-                return new(CoordinatorSignInStatus.Unavailable);
+            {
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken: cancellationToken);
+                return new(CoordinatorSignInStatus.Unavailable,
+                    Message: error?.Message ?? $"El coordinador respondió con el error HTTP {(int)response.StatusCode}. Se usó el acceso local; no se creó una sesión compartida.");
+            }
 
             var result = await response.Content.ReadFromJsonAsync<SessionResponse>(cancellationToken: cancellationToken);
             if (result is null || result.UserId == Guid.Empty || string.IsNullOrWhiteSpace(result.UserName) ||

@@ -73,12 +73,17 @@ namespace MauiApp1
             builder.Services.AddTransient<OtherExitViewModel>();
             var databasePath = Path.Combine(FileSystem.AppDataDirectory,
                 LocalPersistenceServiceCollectionExtensions.DatabaseFileName);
+            var migrationsManagedExternally = false;
 #if WINDOWS
             var coordinatorDatabasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "Miscelanea Ari", "Coordinator", "miscelanea-ari-central.db");
-            if (File.Exists(coordinatorDatabasePath)) databasePath = coordinatorDatabasePath;
+            if (File.Exists(coordinatorDatabasePath))
+            {
+                databasePath = coordinatorDatabasePath;
+                migrationsManagedExternally = true;
+            }
 #endif
-            builder.Services.AddLocalPersistence(databasePath);
+            builder.Services.AddLocalPersistence(databasePath, migrationsManagedExternally);
 
 #if DEBUG
     		builder.Logging.AddDebug();

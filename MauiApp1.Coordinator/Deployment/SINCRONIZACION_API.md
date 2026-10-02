@@ -4,6 +4,10 @@ Esta API pertenece al coordinador de Windows y solo funciona por HTTPS. El dispo
 
 **Despliegue local:** el servicio Windows se actualizó correctamente el 2026-09-30; `/health` respondió `ok`. Las rutas protegidas por sesión ya están desplegadas en el equipo coordinador.
 
+### Escrituras SQLite desde la aplicación Windows
+
+La interfaz MAUI de Windows consulta y registra cambios directamente en la base central del coordinador. Al instalar o actualizar el servicio, los scripts conceden permiso `Modify` únicamente a la cuenta de Windows indicada por `-WindowsAppUser` (por defecto, la cuenta que ejecuta PowerShell). El permiso cubre la carpeta de datos y los archivos SQLite `-wal` y `-shm`; los archivos auxiliares necesitan escritura aunque la base principal permita lectura. Si la aplicación se ejecuta con otra cuenta de Windows, pasa esa cuenta explícitamente al instalador o actualizador. No se otorgan permisos de escritura a todos los usuarios del equipo.
+
 ## Iniciar sesión compartida
 
 `POST /api/auth/session`

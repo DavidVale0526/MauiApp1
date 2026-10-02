@@ -3,6 +3,7 @@ param(
     [string] $AppDirectory,
 
     [string] $DataDirectory = "$env:ProgramData\Miscelanea Ari\Coordinator",
+    [string] $WindowsAppUser,
 
     [ValidateRange(1024, 65535)]
     [int] $Port = 5080
@@ -20,6 +21,9 @@ $executablePath = [System.IO.Path]::GetFullPath((Join-Path $AppDirectory 'MauiAp
 $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$applicationUser = if ([string]::IsNullOrWhiteSpace($WindowsAppUser)) { $identity.Name } else { $WindowsAppUser }
+$applicationUserSid = ([Security.Principal.NTAccount]::new($applicationUser)).Translate(
+    [Security.Principal.SecurityIdentifier])
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Ejecuta este script desde PowerShell como Administrador.'
@@ -53,6 +57,28 @@ $certificate = New-SelfSignedCertificate `
 try {
     $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($certificate.RawData))
     New-Item -ItemType Directory -Path $DataDirectory -Force | Out-Null
+    $directoryAcl = Get-Acl -LiteralPath $DataDirectory
+    $directoryRule = [Security.AccessControl.FileSystemAccessRule]::new(
+        $applicationUserSid,
+        [Security.AccessControl.FileSystemRights]::Modify,
+        [Security.AccessControl.InheritanceFlags]::ObjectInherit,
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Allow)
+    $directoryAcl.SetAccessRule($directoryRule)
+    Set-Acl -LiteralPath $DataDirectory -AclObject $directoryAcl
+
+    foreach ($file in @($centralDatabasePath, "$centralDatabasePath-wal", "$centralDatabasePath-shm")) {
+        if (Test-Path -LiteralPath $file -PathType Leaf) {
+            $fileAcl = Get-Acl -LiteralPath $file
+            $fileRule = [Security.AccessControl.FileSystemAccessRule]::new(
+                $applicationUserSid,
+                [Security.AccessControl.FileSystemRights]::Modify,
+                [Security.AccessControl.AccessControlType]::Allow)
+            $fileAcl.SetAccessRule($fileRule)
+            Set-Acl -LiteralPath $file -AclObject $fileAcl
+        }
+    }
+
     Set-Content -LiteralPath (Join-Path $DataDirectory 'coordinator-certificate-fingerprint.txt') `
         -Value $fingerprint -Encoding ascii
 
@@ -79,6 +105,7 @@ try {
 
     Start-Service -Name $serviceName
     Write-Output "Servicio iniciado. Puerto LAN privado: $Port"
+    Write-Output "Permisos de escritura SQLite habilitados para $applicationUser."
     Write-Output "Huella SHA-256 del certificado para vinculación: $fingerprint"
     Write-Output "Huella guardada en: $(Join-Path $DataDirectory 'coordinator-certificate-fingerprint.txt')"
 }

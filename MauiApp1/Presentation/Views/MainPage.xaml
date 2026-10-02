@@ -19,6 +19,8 @@
                     <Label Text="{Binding CoordinatorStatusMessage}" />
                     <Label Text="{Binding InternetStatusMessage}" FontSize="12" />
                     <Label Text="{Binding SyncStatusMessage}" FontSize="12" />
+                    <Button Text="{Binding SyncButtonText}" IsEnabled="{Binding CanSynchronize}"
+                            Clicked="OnSynchronizeClicked" />
                     <Button Text="Revisar conflictos de sincronización" IsVisible="{Binding IsAdministrator}" Clicked="OnReviewConflictsClicked" />
                 </VerticalStackLayout>
             </Border>

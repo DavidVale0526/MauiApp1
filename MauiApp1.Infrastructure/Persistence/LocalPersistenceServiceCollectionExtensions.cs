@@ -28,13 +28,15 @@ public static class LocalPersistenceServiceCollectionExtensions
 {
     public const string DatabaseFileName = "miscelanea-ari.db";
 
-    public static IServiceCollection AddLocalPersistence(this IServiceCollection services, string databasePath)
+    public static IServiceCollection AddLocalPersistence(
+        this IServiceCollection services, string databasePath, bool migrationsManagedExternally = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
         var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
         services.AddDbContextFactory<LocalDbContext>(options => options.UseSqlite(connectionString));
-        services.AddSingleton<LocalDatabaseInitializer>();
+        services.AddSingleton(provider => new LocalDatabaseInitializer(
+            provider.GetRequiredService<IDbContextFactory<LocalDbContext>>(), migrationsManagedExternally));
         services.AddSingleton<ILocalDatabaseInitializer>(provider => provider.GetRequiredService<LocalDatabaseInitializer>());
         services.AddSingleton<ILocalDeviceIdentity>(provider => provider.GetRequiredService<LocalDatabaseInitializer>());
         services.AddScoped<IOperationOutbox, EfOperationOutbox>();

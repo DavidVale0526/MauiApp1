@@ -11,6 +11,7 @@ namespace MauiApp1.Presentation.ViewModels;
 public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly ICoordinatedSignInService _coordinatedSignInService;
     private readonly IProductService _productService;
     private readonly ICoordinatorPairingClient _coordinatorClient;
     private readonly IConnectivity _connectivity;
@@ -19,16 +20,19 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
     private string _coordinatorStatusMessage = "Consultando coordinador…";
     private string _internetStatusMessage = string.Empty;
     private string _syncStatusMessage = "Sincronización pendiente de consulta.";
+    private bool _canSynchronize = true;
+    private string _syncButtonText = "Sincronizar ahora";
 
-    public MainPageViewModel(IAuthenticationService authenticationService, IProductService productService,
+    public MainPageViewModel(IAuthenticationService authenticationService, ICoordinatedSignInService coordinatedSignInService, IProductService productService,
         ICoordinatorPairingClient coordinatorClient, IConnectivity connectivity, ILocalOperationSyncService operationSyncService)
     {
         _authenticationService = authenticationService;
+        _coordinatedSignInService = coordinatedSignInService;
         _productService = productService;
         _coordinatorClient = coordinatorClient;
         _connectivity = connectivity;
         _operationSyncService = operationSyncService;
-        SignOutCommand = new Command(_authenticationService.SignOut);
+        SignOutCommand = new Command(async () => await _coordinatedSignInService.SignOutAsync());
     }
 
     public string Title => "Miscelánea Ari";
@@ -76,8 +80,23 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
         private set { if (_syncStatusMessage == value) return; _syncStatusMessage = value; OnPropertyChanged(nameof(SyncStatusMessage)); }
     }
 
+    public bool CanSynchronize
+    {
+        get => _canSynchronize;
+        private set { if (_canSynchronize == value) return; _canSynchronize = value; OnPropertyChanged(nameof(CanSynchronize)); }
+    }
+
+    public string SyncButtonText
+    {
+        get => _syncButtonText;
+        private set { if (_syncButtonText == value) return; _syncButtonText = value; OnPropertyChanged(nameof(SyncButtonText)); }
+    }
+
     public async Task RefreshOperationSyncAsync()
     {
+        if (!CanSynchronize) return;
+        CanSynchronize = false;
+        SyncButtonText = "Sincronizando…";
         try
         {
             var status = await _operationSyncService.SynchronizeAsync();
@@ -85,11 +104,17 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
                 ? date.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
                 : "ninguna todavía";
             SyncStatusMessage = $"Pendientes de enviar: {status.PendingCount}. Conflictos por revisar: {status.ConflictCount}. Última confirmación: {last}." +
-                (status.LatestConflictMessage is null ? string.Empty : $"\nConflicto más reciente: {status.LatestConflictMessage}");
+                (status.LatestConflictMessage is null ? string.Empty : $"\nDetalle de sincronización: {status.LatestConflictMessage}") +
+                (_coordinatedSignInService.LastSignInStatus is { Length: > 0 } signInStatus ? $"\nEstado del acceso central: {signInStatus}" : string.Empty);
         }
         catch
         {
             SyncStatusMessage = "No se pudo actualizar la cola. Las operaciones locales se conservan para reintentar.";
+        }
+        finally
+        {
+            SyncButtonText = "Sincronizar ahora";
+            CanSynchronize = true;
         }
     }
 
@@ -118,11 +143,19 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
         try
         {
             var status = await _coordinatorClient.CheckAvailabilityAsync();
+#if WINDOWS
+            CoordinatorStatusMessage = status.IsAvailable
+                ? "Coordinador disponible en esta PC. Este equipo no necesita vincularse como cliente."
+                : status.IsConfigured
+                    ? "El coordinador no responde en la red local. El trabajo guardado se conserva para reintentar."
+                    : "El coordinador no está configurado o no responde en esta PC.";
+#else
             CoordinatorStatusMessage = !status.IsConfigured
                 ? "Coordinador sin configurar en este dispositivo. El trabajo local sigue disponible."
                 : status.IsAvailable
                     ? status.IsConfirmed ? "Coordinador disponible en la red local." : "Coordinador disponible; vinculación pendiente."
                     : "Coordinador no responde. Puedes seguir trabajando localmente; se reintentará al volver a Inicio.";
+#endif
         }
         catch
         {

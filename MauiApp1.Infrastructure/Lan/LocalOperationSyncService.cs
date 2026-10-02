@@ -58,7 +58,25 @@ internal sealed class LocalOperationSyncService(
                 }
                 if (result.Status == CoordinatorOperationSendStatus.Conflict)
                     await outbox.MarkConflictAsync(operation.OperationId,
-                        result.ConflictMessage ?? "El coordinador detectó un cambio simultáneo. Se requiere revisión del Administrador.", cancellationToken);
+                        result.Message ?? "El coordinador detectó un cambio simultáneo. Se requiere revisión del Administrador.", cancellationToken);
+                else
+                {
+                    var pendingOperation = await context.OutboxMessages.FindAsync([operation.OperationId], cancellationToken);
+                    if (pendingOperation is not null)
+                    {
+                        pendingOperation.LastError = result.Status switch
+                        {
+                            CoordinatorOperationSendStatus.NotLinked => "Este dispositivo ya no está vinculado al coordinador.",
+                            CoordinatorOperationSendStatus.SessionUnavailable => result.Message ?? "La sesión compartida no está disponible o venció. Cierra sesión e inicia sesión de nuevo con el coordinador disponible.",
+                            CoordinatorOperationSendStatus.IdentityMismatch => "La cuenta o identidad del dispositivo no coincide con la vinculación actual.",
+                            CoordinatorOperationSendStatus.Unauthorized => result.Message ?? "El coordinador rechazó la autorización. Vuelve a iniciar sesión en el dispositivo; si persiste, revisa la vinculación del teléfono.",
+                            CoordinatorOperationSendStatus.Rejected => "El coordinador rechazó la operación. Actualiza el coordinador y vuelve a intentar.",
+                            CoordinatorOperationSendStatus.Unavailable => "El coordinador no pudo confirmar la operación. Revisa su actualización y conexión LAN.",
+                            _ => "La operación sigue pendiente y se volverá a intentar."
+                        };
+                        await context.SaveChangesAsync(cancellationToken);
+                    }
+                }
                 break;
             }
             await ApplyIncomingChangesAsync(cancellationToken);
@@ -83,9 +101,12 @@ internal sealed class LocalOperationSyncService(
         if (lastInbound > lastConfirmed) lastConfirmed = lastInbound;
         var outboxMessage = await context.OutboxMessages.AsNoTracking().Where(item => item.Status == OutboxStatus.Conflict)
             .OrderByDescending(item => item.CreatedAtUtc).Select(item => item.LastError).FirstOrDefaultAsync(cancellationToken);
+        var pendingMessage = await context.OutboxMessages.AsNoTracking()
+            .Where(item => item.Status == OutboxStatus.Pending && item.LastError != null)
+            .OrderByDescending(item => item.LastAttemptAtUtc).Select(item => item.LastError).FirstOrDefaultAsync(cancellationToken);
         var inboundMessage = await context.DeviceSyncConflicts.AsNoTracking().Where(item => !item.IsResolved)
             .OrderByDescending(item => item.CoordinatorSequence).Select(item => item.Message).FirstOrDefaultAsync(cancellationToken);
-        return new LocalOperationSyncStatus(pending, conflicts, lastConfirmed, inboundMessage ?? outboxMessage);
+        return new LocalOperationSyncStatus(pending, conflicts, lastConfirmed, inboundMessage ?? outboxMessage ?? pendingMessage);
     }
 
     private async Task ApplyIncomingChangesAsync(CancellationToken cancellationToken)

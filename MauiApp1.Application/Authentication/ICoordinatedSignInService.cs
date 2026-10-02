@@ -4,7 +4,10 @@ namespace MauiApp1.Application.Authentication;
 
 public interface ICoordinatedSignInService
 {
+    string? LastSignInStatus { get; }
+    void ReportSessionProblem(string message);
     Task<CoordinatedSignInResult> SignInAsync(string userName, string password, CancellationToken cancellationToken = default);
+    Task SignOutAsync();
 }
 
 public sealed record CoordinatedSignInResult(AuthenticationResult Authentication, string? Notice = null);
@@ -15,12 +18,14 @@ public sealed record CoordinatorSignInResult(
     string UserName = "",
     UserRole Role = UserRole.Cashier,
     string SessionToken = "",
-    DateTime ExpiresAtUtc = default);
+    DateTime ExpiresAtUtc = default,
+    string? Message = null);
 
 public enum CoordinatorSignInStatus
 {
     NotLinked,
     Unavailable,
+    RetryLater,
     Rejected,
     Authenticated
 }
