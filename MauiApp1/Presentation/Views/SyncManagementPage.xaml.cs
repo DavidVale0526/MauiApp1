@@ -93,8 +93,12 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 
-    private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args) =>
+    private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args)
+    {
+        try { await _operationSyncService.SynchronizeAsync(); }
+        catch { }
         await RefreshStatusAsync();
+    }
 
     private void OnRealtimeStateChanged(CoordinatorRealtimeState state) =>
         MainThread.BeginInvokeOnMainThread(() => RealtimeStatusLabel.Text = GetRealtimeStatusMessage(state));

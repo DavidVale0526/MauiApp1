@@ -1,5 +1,6 @@
 using MauiApp1.Presentation.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Networking;
 using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
@@ -14,29 +15,52 @@ public partial class MainPage : CoordinatorRefreshPage
 
     private readonly MainPageViewModel _viewModel;
     private readonly ICoordinatorRealtimeClient _realtimeClient;
+    private readonly IConnectivity _connectivity;
+    private readonly ILocalOperationSyncService _operationSyncService;
 
     public MainPage(MainPageViewModel viewModel, ICoordinatorRealtimeClient realtimeClient,
+        IConnectivity connectivity, ILocalOperationSyncService operationSyncService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _realtimeClient = realtimeClient;
+        _connectivity = connectivity;
+        _operationSyncService = operationSyncService;
         BindingContext = viewModel;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _connectivity.ConnectivityChanged += OnConnectivityChanged;
         await _viewModel.LoadLowStockAlertsAsync();
+        await TrySynchronizeInBackgroundAsync();
         await _realtimeClient.StartAsync();
     }
 
     protected override void OnDisappearing()
     {
+        _connectivity.ConnectivityChanged -= OnConnectivityChanged;
         base.OnDisappearing();
     }
 
     protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.LoadLowStockAlertsAsync();
+
+    private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args) =>
+        await TrySynchronizeInBackgroundAsync();
+
+    private async Task TrySynchronizeInBackgroundAsync()
+    {
+        try
+        {
+            await _operationSyncService.SynchronizeAsync();
+        }
+        catch
+        {
+            // Operations remain in the durable Outbox and can be retried later.
+        }
+    }
 
     private async void OnCreateCashierAccountClicked(object? sender, EventArgs eventArgs)
     {
