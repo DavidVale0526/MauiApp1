@@ -4,41 +4,210 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.AccessPage"
              x:DataType="viewModels:AccessPageViewModel"
-             Title="Acceso">
-    <ScrollView>
-        <Grid Padding="24" RowDefinitions="*,Auto,*">
-            <VerticalStackLayout Grid.Row="1" Spacing="16" MaximumWidthRequest="440"
-                                 HorizontalOptions="Center" VerticalOptions="Center">
-                <Label Text="Miscelánea Ari" FontSize="30" FontAttributes="Bold"
+             Title="Acceso"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F4F7FB">
+    <ScrollView VerticalScrollBarVisibility="Never">
+        <Grid Padding="22,24" RowDefinitions="*,Auto,*">
+            <VerticalStackLayout x:Name="CardContainer"
+                                 Grid.Row="1"
+                                 Spacing="18"
+                                 MaximumWidthRequest="480"
+                                 HorizontalOptions="Center"
+                                 VerticalOptions="Center">
+                <Border x:Name="LoginCard"
+                        HorizontalOptions="Fill"
+                        BackgroundColor="White"
+                        Stroke="#E3EAF2"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 18"
+                        Padding="0">
+                    <Grid RowDefinitions="Auto,1,Auto">
+                        <VerticalStackLayout Grid.Row="0"
+                                             Padding="24,26,24,22"
+                                             Spacing="12"
+                                             HorizontalOptions="Center">
+                            <Border WidthRequest="46"
+                                    HeightRequest="46"
+                                    BackgroundColor="#0D1B2A"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 12"
+                                    HorizontalOptions="Center">
+                                <Border WidthRequest="16"
+                                        HeightRequest="16"
+                                        Stroke="#FFFFFF"
+                                        StrokeThickness="1.4"
+                                        StrokeShape="RoundRectangle 4"
+                                        HorizontalOptions="Center"
+                                        VerticalOptions="Center" />
+                            </Border>
+                            <Label Text="Miscelánea Ari"
+                                   FontSize="22"
+                                   FontAttributes="Bold"
+                                   TextColor="#111D31"
+                                   HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding Title}"
+                                   IsVisible="{Binding IsSetupMode}"
+                                   FontSize="15"
+                                   TextColor="#52657D"
+                                   HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+
+                        <BoxView Grid.Row="1" Color="#EDF1F5" HeightRequest="1" />
+
+                        <VerticalStackLayout Grid.Row="2" Padding="24" Spacing="16">
+                            <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="8">
+                                <Label Text="Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión."
+                                       FontSize="13"
+                                       TextColor="#52657D"
+                                       LineBreakMode="WordWrap" />
+                                <Label Text="Si el dispositivo está vinculado, las credenciales se validan con el coordinador cuando está disponible."
+                                       FontSize="12"
+                                       TextColor="#718198"
+                                       LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="NOMBRE DE USUARIO"
+                                       FontSize="10"
+                                       FontAttributes="Bold"
+                                       CharacterSpacing="0.6"
+                                       TextColor="#61738A" />
+                                <Border BackgroundColor="White"
+                                        Stroke="#DCE5EF"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 8"
+                                        Padding="12,0"
+                                        HeightRequest="48">
+                                    <Grid ColumnDefinitions="*">
+                                        <Entry x:Name="UserNameEntry"
+                                               Placeholder="Nombre de usuario"
+                                               PlaceholderColor="#9AA9BA"
+                                               TextColor="#172438"
+                                               FontSize="14"
+                                               HorizontalTextAlignment="Start"
+                                               HorizontalOptions="Fill"
+                                               Text="{Binding UserName}"
+                                               ReturnType="Next"
+                                               ClearButtonVisibility="WhileEditing"
+                                               SemanticProperties.Description="Nombre de usuario" />
+                                    </Grid>
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="CONTRASEÑA"
+                                       FontSize="10"
+                                       FontAttributes="Bold"
+                                       CharacterSpacing="0.6"
+                                       TextColor="#61738A" />
+                                <Border BackgroundColor="White"
+                                        Stroke="#DCE5EF"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 8"
+                                        Padding="12,0"
+                                        HeightRequest="48">
+                                    <Grid ColumnDefinitions="*,40">
+                                        <Entry x:Name="PrimaryPasswordEntry"
+                                               Placeholder="Contraseña"
+                                               PlaceholderColor="#9AA9BA"
+                                               TextColor="#172438"
+                                               FontSize="14"
+                                               HorizontalTextAlignment="Start"
+                                               HorizontalOptions="Fill"
+                                               Text="{Binding Password}"
+                                               IsPassword="True"
+                                               ReturnType="Go"
+                                               SemanticProperties.Description="Contraseña" />
+                                        <Button x:Name="PasswordVisibilityButton"
+                                                Grid.Column="1"
+                                                ImageSource="eye_off.svg"
+                                                Clicked="OnTogglePasswordVisibility"
+                                                BackgroundColor="Transparent"
+                                                Padding="8,0"
+                                                HeightRequest="40"
+                                                MinimumHeightRequest="40"
+                                                MinimumWidthRequest="40"
+                                                SemanticProperties.Description="Mostrar u ocultar contraseña" />
+                                    </Grid>
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="6">
+                                <Label Text="CONFIRMAR CONTRASEÑA"
+                                       FontSize="10"
+                                       FontAttributes="Bold"
+                                       CharacterSpacing="0.6"
+                                       TextColor="#61738A" />
+                                <Border BackgroundColor="White"
+                                        Stroke="#DCE5EF"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 8"
+                                        Padding="12,0"
+                                        HeightRequest="48">
+                                    <Grid ColumnDefinitions="*">
+                                        <Entry x:Name="ConfirmationPasswordEntry"
+                                               Placeholder="Confirma la contraseña"
+                                               PlaceholderColor="#9AA9BA"
+                                               TextColor="#172438"
+                                               FontSize="14"
+                                               HorizontalTextAlignment="Start"
+                                               HorizontalOptions="Fill"
+                                               Text="{Binding PasswordConfirmation}"
+                                               IsPassword="True"
+                                               ReturnType="Go"
+                                               SemanticProperties.Description="Confirmación de contraseña" />
+                                    </Grid>
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <Label Text="{Binding ErrorMessage}"
+                                   TextColor="#B42318"
+                                   FontSize="13"
+                                   IsVisible="{Binding HasError}"
+                                   LineBreakMode="WordWrap" />
+                            <Label Text="{Binding NoticeMessage}"
+                                   TextColor="#18794E"
+                                   FontSize="13"
+                                   IsVisible="{Binding HasNotice}"
+                                   LineBreakMode="WordWrap" />
+
+                            <Button Text="Crear cuenta de Administrador"
+                                    Command="{Binding CreateAdministratorCommand}"
+                                    IsVisible="{Binding IsSetupMode}"
+                                    BackgroundColor="#0D1B2A"
+                                    TextColor="White"
+                                    FontSize="15"
+                                    FontAttributes="Bold"
+                                    CornerRadius="8"
+                                    HeightRequest="48"
+                                    Padding="16,10" />
+                            <Button Text="Iniciar sesión   →"
+                                    Command="{Binding SignInCommand}"
+                                    IsVisible="{Binding IsLoginMode}"
+                                    BackgroundColor="#0D1B2A"
+                                    TextColor="White"
+                                    FontSize="15"
+                                    FontAttributes="Bold"
+                                    CornerRadius="8"
+                                    HeightRequest="48"
+                                    Padding="16,10" />
+
+                            <VerticalStackLayout IsVisible="{Binding IsBusy}" Spacing="5" HorizontalOptions="Center">
+                                <ActivityIndicator IsRunning="{Binding IsBusy}" Color="#0D1B2A" />
+                                <Label Text="Validando acceso…"
+                                       FontSize="12"
+                                       TextColor="#61738A"
+                                       HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <Label Text="© Miscelánea Ari · Todos los derechos reservados"
+                       FontSize="11"
+                       TextColor="#8A9AAF"
                        HorizontalTextAlignment="Center" />
-                <Label Text="{Binding Title}" FontSize="20" HorizontalTextAlignment="Center" />
-
-                <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="8">
-                    <Label Text="Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión."
-                           HorizontalTextAlignment="Center" />
-                    <Label Text="En un dispositivo vinculado, las credenciales se validan con el coordinador cuando está disponible; si no responde, se permite el acceso local."
-                           FontSize="12" HorizontalTextAlignment="Center" />
-                </VerticalStackLayout>
-
-                <Entry Placeholder="Nombre de usuario" Text="{Binding UserName}" ReturnType="Next" />
-                <Entry Placeholder="Contraseña (mínimo 15 caracteres)" Text="{Binding Password}" IsPassword="True"
-                       ReturnType="Next" />
-                <Entry Placeholder="Confirma la contraseña" Text="{Binding PasswordConfirmation}"
-                       IsPassword="True" IsVisible="{Binding IsSetupMode}"
-                       ReturnType="Go" />
-
-                <Label Text="{Binding ErrorMessage}" TextColor="Firebrick"
-                       IsVisible="{Binding HasError}" />
-                <Label Text="{Binding NoticeMessage}" TextColor="DarkGreen"
-                       IsVisible="{Binding HasNotice}" />
-
-                <Button Text="Crear cuenta de Administrador" Command="{Binding CreateAdministratorCommand}"
-                        IsVisible="{Binding IsSetupMode}" />
-                <Button Text="Iniciar sesión" Command="{Binding SignInCommand}"
-                        IsVisible="{Binding IsLoginMode}" />
-                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-                <Label Text="Validando acceso…" FontSize="12" HorizontalTextAlignment="Center"
-                       IsVisible="{Binding IsBusy}" />
             </VerticalStackLayout>
         </Grid>
     </ScrollView>
