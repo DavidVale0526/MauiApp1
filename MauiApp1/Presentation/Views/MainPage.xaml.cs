@@ -1,10 +1,11 @@
 using MauiApp1.Presentation.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Networking;
+using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class MainPage : ContentPage
+public partial class MainPage : CoordinatorRefreshPage
 {
     private async void OnDevicePairingClicked(object? sender, EventArgs args)
     {
@@ -22,12 +23,15 @@ public partial class MainPage : ContentPage
         await _viewModel.RefreshOperationSyncAsync();
     private readonly MainPageViewModel _viewModel;
     private readonly IConnectivity _connectivity;
+    private readonly ICoordinatorRealtimeClient _realtimeClient;
 
-    public MainPage(MainPageViewModel viewModel, IConnectivity connectivity)
+    public MainPage(MainPageViewModel viewModel, IConnectivity connectivity,
+        ICoordinatorRealtimeClient realtimeClient, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _connectivity = connectivity;
+        _realtimeClient = realtimeClient;
         BindingContext = viewModel;
     }
 
@@ -35,17 +39,26 @@ public partial class MainPage : ContentPage
     {
         base.OnAppearing();
         _connectivity.ConnectivityChanged += OnConnectivityChanged;
+        _realtimeClient.StateChanged += OnRealtimeStateChanged;
+        _viewModel.SetRealtimeState(_realtimeClient.State);
         _viewModel.RefreshInternetStatus();
         await _viewModel.LoadLowStockAlertsAsync();
         await _viewModel.RefreshCoordinatorStatusAsync();
         await _viewModel.RefreshOperationSyncAsync();
+        await _realtimeClient.StartAsync();
     }
 
     protected override void OnDisappearing()
     {
         _connectivity.ConnectivityChanged -= OnConnectivityChanged;
+        _realtimeClient.StateChanged -= OnRealtimeStateChanged;
         base.OnDisappearing();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.RefreshAfterCoordinatorChangesAsync();
+
+    private void OnRealtimeStateChanged(CoordinatorRealtimeState state) =>
+        MainThread.BeginInvokeOnMainThread(() => _viewModel.SetRealtimeState(state));
 
     private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args)
     {

@@ -151,6 +151,13 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         await RefreshCustomersAsync();
     }
 
+    public async Task RefreshAfterCoordinatorChangesAsync()
+    {
+        if (_pendingSale is not null || IsBusy) return;
+        await RefreshProductsAsync();
+        await RefreshCustomersAsync();
+    }
+
     private async Task RefreshCustomersAsync()
     {
         try

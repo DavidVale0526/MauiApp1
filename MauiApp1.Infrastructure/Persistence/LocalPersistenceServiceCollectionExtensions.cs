@@ -16,6 +16,7 @@ using MauiApp1.Infrastructure.Customers;
 using MauiApp1.Application.Credit;
 using MauiApp1.Infrastructure.Credit;
 using MauiApp1.Application.Reports;
+using MauiApp1.Application.Sync;
 using MauiApp1.Infrastructure.Reports;
 using MauiApp1.Infrastructure.Sync;
 using Microsoft.Data.Sqlite;
@@ -33,6 +34,7 @@ public static class LocalPersistenceServiceCollectionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
+        services.AddSingleton<ILocalDataChangeNotifier, LocalDataChangeNotifier>();
         var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
         services.AddDbContextFactory<LocalDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton(provider => new LocalDatabaseInitializer(

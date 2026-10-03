@@ -25,6 +25,10 @@ namespace MauiApp1
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorRealtimeClient, MauiApp1.Infrastructure.Lan.CoordinatorRealtimeClient>();
+            builder.Services.AddSingleton<MauiApp1.Infrastructure.Sync.LocalCoordinatorDatabaseChangeMonitor>();
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Sync.LocalCoordinatorDatabaseChangeMonitor>());
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorLinkStorage, MauiApp1.Services.SecureCoordinatorLinkStorage>();
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserSessionStorage, MauiApp1.Services.SecureCoordinatorUserSessionStorage>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
@@ -94,6 +98,9 @@ namespace MauiApp1
                 .InitializeAsync()
                 .GetAwaiter()
                 .GetResult();
+#if WINDOWS
+            app.Services.GetRequiredService<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>().Start();
+#endif
 
             return app;
         }

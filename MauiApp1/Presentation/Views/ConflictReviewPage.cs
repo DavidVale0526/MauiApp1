@@ -2,14 +2,15 @@ using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
 
-public sealed class ConflictReviewPage : ContentPage
+public sealed class ConflictReviewPage : CoordinatorRefreshPage
 {
     private readonly ICoordinatorConflictReviewService _service;
     private readonly ILocalOperationSyncService _operationSyncService;
     private readonly VerticalStackLayout _items = new() { Spacing = 14, Padding = new Thickness(16) };
     private readonly Label _queueStatus = new();
 
-    public ConflictReviewPage(ICoordinatorConflictReviewService service, ILocalOperationSyncService operationSyncService)
+    public ConflictReviewPage(ICoordinatorConflictReviewService service, ILocalOperationSyncService operationSyncService,
+        ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         _service = service;
         _operationSyncService = operationSyncService;
@@ -34,6 +35,8 @@ public sealed class ConflictReviewPage : ContentPage
         base.OnAppearing();
         await LoadAsync();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() => LoadAsync();
 
     private async Task LoadAsync()
     {

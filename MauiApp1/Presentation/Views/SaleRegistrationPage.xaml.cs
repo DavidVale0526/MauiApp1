@@ -1,14 +1,16 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Sync;
 using MauiApp1.Application.Sales;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class SaleRegistrationPage : ContentPage
+public partial class SaleRegistrationPage : CoordinatorRefreshPage
 {
     private readonly SaleRegistrationViewModel _viewModel;
     private readonly ISaleService _saleService;
 
-    public SaleRegistrationPage(SaleRegistrationViewModel viewModel, ISaleService saleService)
+    public SaleRegistrationPage(SaleRegistrationViewModel viewModel, ISaleService saleService,
+        ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -21,6 +23,8 @@ public partial class SaleRegistrationPage : ContentPage
         base.OnAppearing();
         await _viewModel.LoadAsync();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.RefreshAfterCoordinatorChangesAsync();
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 

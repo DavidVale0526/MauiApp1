@@ -21,7 +21,8 @@ internal sealed class LocalOperationSyncService(
     ILocalDeviceIdentity deviceIdentity,
     ICoordinatorChangeClient changeClient,
     CoordinatorBusinessOperationApplier businessApplier,
-    Pbkdf2PasswordHasher passwordHasher) : ILocalOperationSyncService
+    Pbkdf2PasswordHasher passwordHasher,
+    ILocalDataChangeNotifier changeNotifier) : ILocalOperationSyncService
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -79,7 +80,8 @@ internal sealed class LocalOperationSyncService(
                 }
                 break;
             }
-            await ApplyIncomingChangesAsync(cancellationToken);
+            if (await ApplyIncomingChangesAsync(cancellationToken))
+                changeNotifier.NotifyDataChanged();
         }
         finally
         {
@@ -109,16 +111,17 @@ internal sealed class LocalOperationSyncService(
         return new LocalOperationSyncStatus(pending, conflicts, lastConfirmed, inboundMessage ?? outboxMessage ?? pendingMessage);
     }
 
-    private async Task ApplyIncomingChangesAsync(CancellationToken cancellationToken)
+    private async Task<bool> ApplyIncomingChangesAsync(CancellationToken cancellationToken)
     {
         var deviceId = await deviceIdentity.GetDeviceIdAsync(cancellationToken);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var state = await context.DeviceSyncStates.SingleOrDefaultAsync(item => item.DeviceId == deviceId, cancellationToken);
         var afterSequence = state?.LastSequence ?? 0;
         var page = await changeClient.GetChangesAsync(afterSequence, 100, cancellationToken);
-        if (page is null || page.Changes.Count == 0) return;
+        if (page is null || page.Changes.Count == 0) return false;
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var appliedChanges = false;
         state ??= new DeviceSyncStateEntity { DeviceId = deviceId, LastSequence = afterSequence };
         if (context.Entry(state).State == EntityState.Detached) context.DeviceSyncStates.Add(state);
         foreach (var change in page.Changes.OrderBy(item => item.Sequence))
@@ -137,15 +140,17 @@ internal sealed class LocalOperationSyncService(
                         Message = error.Length <= 500 ? error : error[..500], CreatedAtUtc = DateTime.UtcNow, IsResolved = false });
                 await context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return;
+                return appliedChanges;
             }
             if (change.OperationType is "Product.Resolved" or "Category.Resolved")
                 await ApplyResolutionMetadataAsync(context, change.PayloadJson, cancellationToken);
             state.LastSequence = change.Sequence;
             state.LastSuccessfulSyncAtUtc = DateTime.UtcNow;
             await context.SaveChangesAsync(cancellationToken);
+            appliedChanges = true;
         }
         await transaction.CommitAsync(cancellationToken);
+        return appliedChanges;
     }
 
     private static async Task PublishLocalCoordinatorOperationsAsync(

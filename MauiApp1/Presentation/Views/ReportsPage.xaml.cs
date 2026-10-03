@@ -1,14 +1,19 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class ReportsPage : ContentPage
+public partial class ReportsPage : CoordinatorRefreshPage
 {
-    public ReportsPage(ReportsViewModel viewModel)
+    private readonly ReportsViewModel _viewModel;
+
+    public ReportsPage(ReportsViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
-        BindingContext = viewModel;
+        BindingContext = _viewModel = viewModel;
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.LoadAsync();
 
     protected override async void OnAppearing()
     {

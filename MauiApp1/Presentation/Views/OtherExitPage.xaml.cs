@@ -1,12 +1,13 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class OtherExitPage : ContentPage
+public partial class OtherExitPage : CoordinatorRefreshPage
 {
     private readonly OtherExitViewModel _viewModel;
 
-    public OtherExitPage(OtherExitViewModel viewModel)
+    public OtherExitPage(OtherExitViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -18,6 +19,9 @@ public partial class OtherExitPage : ContentPage
         base.OnAppearing();
         await _viewModel.LoadAsync();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() =>
+        _viewModel.CanEdit ? _viewModel.LoadAsync() : Task.CompletedTask;
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 

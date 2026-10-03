@@ -89,6 +89,14 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task RefreshAfterCoordinatorChangesAsync()
+    {
+        if (_pendingPurchase is not null || IsBusy) return;
+        var selectedProductId = SelectedProduct?.Id;
+        await LoadAsync();
+        SelectedProduct = Products.FirstOrDefault(item => item.Id == selectedProductId) ?? Products.FirstOrDefault();
+    }
+
     public void RemoveLine(PurchaseCartLine? line)
     {
         if (CanEditLines && line is not null)

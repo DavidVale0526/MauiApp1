@@ -1,14 +1,22 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Sync;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class PaymentManagementPage : ContentPage
+public partial class PaymentManagementPage : CoordinatorRefreshPage
 {
-    public PaymentManagementPage(PaymentManagementViewModel viewModel)
+    private readonly PaymentManagementViewModel _viewModel;
+
+    public PaymentManagementPage(PaymentManagementViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
-        BindingContext = viewModel;
+        BindingContext = _viewModel = viewModel;
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() =>
+        string.IsNullOrWhiteSpace(_viewModel.AmountInput) && _viewModel.CanEditPayment
+            ? _viewModel.LoadAsync()
+            : Task.CompletedTask;
 
     protected override async void OnAppearing()
     {

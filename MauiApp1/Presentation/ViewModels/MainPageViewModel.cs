@@ -16,15 +16,18 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
     private readonly ICoordinatorPairingClient _coordinatorClient;
     private readonly IConnectivity _connectivity;
     private readonly ILocalOperationSyncService _operationSyncService;
+    private readonly ICoordinatorRealtimeClient _realtimeClient;
     private string _lowStockAlertMessage = string.Empty;
     private string _coordinatorStatusMessage = "Consultando coordinador…";
     private string _internetStatusMessage = string.Empty;
     private string _syncStatusMessage = "Sincronización pendiente de consulta.";
     private bool _canSynchronize = true;
     private string _syncButtonText = "Sincronizar ahora";
+    private string _realtimeStatusMessage = "Actualización en vivo pendiente de conexión.";
 
     public MainPageViewModel(IAuthenticationService authenticationService, ICoordinatedSignInService coordinatedSignInService, IProductService productService,
-        ICoordinatorPairingClient coordinatorClient, IConnectivity connectivity, ILocalOperationSyncService operationSyncService)
+        ICoordinatorPairingClient coordinatorClient, IConnectivity connectivity, ILocalOperationSyncService operationSyncService,
+        ICoordinatorRealtimeClient realtimeClient)
     {
         _authenticationService = authenticationService;
         _coordinatedSignInService = coordinatedSignInService;
@@ -32,7 +35,12 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
         _coordinatorClient = coordinatorClient;
         _connectivity = connectivity;
         _operationSyncService = operationSyncService;
-        SignOutCommand = new Command(async () => await _coordinatedSignInService.SignOutAsync());
+        _realtimeClient = realtimeClient;
+        SignOutCommand = new Command(async () =>
+        {
+            await _realtimeClient.StopAsync();
+            await _coordinatedSignInService.SignOutAsync();
+        });
     }
 
     public string Title => "Miscelánea Ari";
@@ -92,6 +100,36 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
         private set { if (_syncButtonText == value) return; _syncButtonText = value; OnPropertyChanged(nameof(SyncButtonText)); }
     }
 
+    public string RealtimeStatusMessage
+    {
+        get => _realtimeStatusMessage;
+        private set { if (_realtimeStatusMessage == value) return; _realtimeStatusMessage = value; OnPropertyChanged(nameof(RealtimeStatusMessage)); }
+    }
+
+    public void SetRealtimeState(CoordinatorRealtimeState state)
+    {
+#if WINDOWS
+        RealtimeStatusMessage = "Actualización en vivo lista; esta PC usa la base central del coordinador.";
+#else
+        RealtimeStatusMessage = state switch
+        {
+            CoordinatorRealtimeState.Connected => "Actualización en vivo conectada al coordinador.",
+            CoordinatorRealtimeState.Connecting => "Conectando avisos en vivo al coordinador…",
+            CoordinatorRealtimeState.Reconnecting => "Avisos en vivo desconectados; intentando reconectar…",
+            CoordinatorRealtimeState.Disconnected => "Avisos en vivo no disponibles; puedes sincronizar manualmente.",
+            CoordinatorRealtimeState.SessionUnavailable => "La sesión central no está disponible; inicia sesión de nuevo para recibir avisos en vivo.",
+            _ => "Avisos en vivo disponibles al vincular e iniciar sesión con el coordinador."
+        };
+#endif
+    }
+
+    public async Task RefreshAfterCoordinatorChangesAsync()
+    {
+        await LoadLowStockAlertsAsync();
+        var status = await _operationSyncService.GetStatusAsync();
+        UpdateSyncStatus(status);
+    }
+
     public async Task RefreshOperationSyncAsync()
     {
         if (!CanSynchronize) return;
@@ -100,12 +138,7 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
         try
         {
             var status = await _operationSyncService.SynchronizeAsync();
-            var last = status.LastConfirmedAtUtc is { } date
-                ? date.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
-                : "ninguna todavía";
-            SyncStatusMessage = $"Pendientes de enviar: {status.PendingCount}. Conflictos por revisar: {status.ConflictCount}. Última confirmación: {last}." +
-                (status.LatestConflictMessage is null ? string.Empty : $"\nDetalle de sincronización: {status.LatestConflictMessage}") +
-                (_coordinatedSignInService.LastSignInStatus is { Length: > 0 } signInStatus ? $"\nEstado del acceso central: {signInStatus}" : string.Empty);
+            UpdateSyncStatus(status);
         }
         catch
         {
@@ -116,6 +149,16 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
             SyncButtonText = "Sincronizar ahora";
             CanSynchronize = true;
         }
+    }
+
+    private void UpdateSyncStatus(LocalOperationSyncStatus status)
+    {
+        var last = status.LastConfirmedAtUtc is { } date
+            ? date.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
+            : "ninguna todavía";
+        SyncStatusMessage = $"Pendientes de enviar: {status.PendingCount}. Conflictos por revisar: {status.ConflictCount}. Última confirmación: {last}." +
+            (status.LatestConflictMessage is null ? string.Empty : $"\nDetalle de sincronización: {status.LatestConflictMessage}") +
+            (_coordinatedSignInService.LastSignInStatus is { Length: > 0 } signInStatus ? $"\nEstado del acceso central: {signInStatus}" : string.Empty);
     }
 
     public void RefreshInternetStatus()

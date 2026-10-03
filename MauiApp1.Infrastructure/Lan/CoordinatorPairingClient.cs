@@ -335,8 +335,14 @@ public sealed class CoordinatorPairingClient(
 
     private static HttpClient CreateClient(Uri address, string fingerprint)
     {
+        return new HttpClient(CreatePinnedHandler(fingerprint))
+            { BaseAddress = address, Timeout = TimeSpan.FromSeconds(10) };
+    }
+
+    internal static HttpClientHandler CreatePinnedHandler(string fingerprint)
+    {
         var expectedHash = Convert.FromHexString(fingerprint);
-        var handler = new HttpClientHandler
+        return new HttpClientHandler
         {
             AllowAutoRedirect = false,
             UseProxy = false,
@@ -345,7 +351,6 @@ public sealed class CoordinatorPairingClient(
                 DateTime.UtcNow <= certificate.NotAfter.ToUniversalTime() &&
                 CryptographicOperations.FixedTimeEquals(certificate.GetCertHash(HashAlgorithmName.SHA256), expectedHash)
         };
-        return new HttpClient(handler) { BaseAddress = address, Timeout = TimeSpan.FromSeconds(10) };
     }
 
     internal static HttpClient CreatePinnedClient(Uri address, string fingerprint) => CreateClient(address, fingerprint);

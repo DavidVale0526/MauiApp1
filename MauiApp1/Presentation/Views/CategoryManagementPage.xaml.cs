@@ -1,13 +1,14 @@
 using MauiApp1.Application.Categories;
+using MauiApp1.Application.Sync;
 using MauiApp1.Presentation.ViewModels;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class CategoryManagementPage : ContentPage
+public partial class CategoryManagementPage : CoordinatorRefreshPage
 {
     private readonly CategoryManagementViewModel _viewModel;
 
-    public CategoryManagementPage(CategoryManagementViewModel viewModel)
+    public CategoryManagementPage(CategoryManagementViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -19,6 +20,9 @@ public partial class CategoryManagementPage : ContentPage
         base.OnAppearing();
         await _viewModel.LoadAsync();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() =>
+        _viewModel.IsEditing ? Task.CompletedTask : _viewModel.LoadAsync();
 
     private void OnEditClicked(object? sender, EventArgs eventArgs)
     {

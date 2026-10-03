@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              xmlns:products="clr-namespace:MauiApp1.Application.Products;assembly=MauiApp1.Application"
              x:Class="MauiApp1.Presentation.Views.StockConsultationPage"
@@ -49,4 +50,4 @@
             </CollectionView>
         </RefreshView>
     </Grid>
-</ContentPage>
+</views:CoordinatorRefreshPage>

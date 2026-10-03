@@ -114,6 +114,16 @@ internal static class Program
         Directory.CreateDirectory(dataDirectory);
         var centralDatabasePath = Path.Combine(dataDirectory, "miscelanea-ari-central.db");
         builder.Services.AddLocalPersistence(centralDatabasePath);
+        builder.Services.AddSingleton<CoordinatorConnectionRegistry>();
+        builder.Services.AddSingleton(_ => new CoordinatorPairingStore(centralDatabasePath));
+        builder.Services.AddSingleton(serviceProvider => new CoordinatorChangeBroadcaster(
+            centralDatabasePath,
+            serviceProvider.GetRequiredService<CoordinatorConnectionRegistry>(),
+            serviceProvider.GetRequiredService<CoordinatorPairingStore>(),
+            serviceProvider.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<CoordinatorChangesHub>>(),
+            serviceProvider.GetRequiredService<ILogger<CoordinatorChangeBroadcaster>>()));
+        builder.Services.AddHostedService(serviceProvider =>
+            serviceProvider.GetRequiredService<CoordinatorChangeBroadcaster>());
 
         var app = builder.Build();
 
@@ -124,7 +134,7 @@ internal static class Program
         }
 
         await app.Services.GetRequiredService<ILocalDatabaseInitializer>().InitializeAsync();
-        var pairingStore = new CoordinatorPairingStore(centralDatabasePath);
+        var pairingStore = app.Services.GetRequiredService<CoordinatorPairingStore>();
         await pairingStore.InitializeAsync();
         var operationStore = new CoordinatorOperationStore(centralDatabasePath);
         var businessOperationApplier = new CoordinatorBusinessOperationApplier();
@@ -132,6 +142,7 @@ internal static class Program
 
         // This liveness endpoint exposes no account, inventory, or transaction data.
         app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
+        app.MapHub<CoordinatorChangesHub>("/hubs/changes");
 
         app.UseRateLimiter();
         app.MapPost("/api/auth/session", async (

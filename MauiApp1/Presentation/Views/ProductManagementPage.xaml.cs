@@ -1,13 +1,14 @@
 using MauiApp1.Application.Products;
+using MauiApp1.Application.Sync;
 using MauiApp1.Presentation.ViewModels;
 
 namespace MauiApp1.Presentation.Views;
 
-public partial class ProductManagementPage : ContentPage
+public partial class ProductManagementPage : CoordinatorRefreshPage
 {
     private readonly ProductManagementViewModel _viewModel;
 
-    public ProductManagementPage(ProductManagementViewModel viewModel)
+    public ProductManagementPage(ProductManagementViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -19,6 +20,9 @@ public partial class ProductManagementPage : ContentPage
         base.OnAppearing();
         await _viewModel.LoadAsync();
     }
+
+    protected override Task RefreshAfterCoordinatorChangesAsync() =>
+        _viewModel.IsEditing ? Task.CompletedTask : _viewModel.LoadAsync();
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 
