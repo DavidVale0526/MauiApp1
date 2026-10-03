@@ -15,7 +15,7 @@ public sealed class ConflictReviewPage : CoordinatorRefreshPage
         _service = service;
         _operationSyncService = operationSyncService;
         Title = "Revisión de conflictos";
-        var back = new Button { Text = "← Volver al menú principal", HorizontalOptions = LayoutOptions.Start };
+        var back = new Button { Text = "← Volver a sincronización", HorizontalOptions = LayoutOptions.Start };
         back.Clicked += async (_, _) => await Navigation.PopModalAsync();
         var refresh = new Button { Text = "Actualizar conflictos" };
         refresh.Clicked += async (_, _) => await LoadAsync();

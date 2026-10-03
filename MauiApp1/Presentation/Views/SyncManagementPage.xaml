@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
+             x:Class="MauiApp1.Presentation.Views.SyncManagementPage"
+             Title="Sincronización y conexión">
+    <Grid Padding="24">
+        <ScrollView>
+            <VerticalStackLayout Spacing="14" MaximumWidthRequest="720" HorizontalOptions="Center">
+                <Button Text="← Volver al menú principal" Clicked="OnBackClicked" HorizontalOptions="Start" />
+                <Label Text="Sincronización y conexión" FontSize="26" FontAttributes="Bold" />
+                <Label Text="Consulta el estado de la red, sincroniza los cambios pendientes y administra la conexión con los dispositivos del negocio." />
+                <Border Padding="14" Stroke="Gray">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Estado del coordinador" FontAttributes="Bold" />
+                        <Label x:Name="CoordinatorStatusLabel" Text="Consultando coordinador…" />
+                        <Label x:Name="NetworkStatusLabel" />
+                        <Label x:Name="RealtimeStatusLabel" />
+                        <Label x:Name="SyncStatusLabel" />
+                    </VerticalStackLayout>
+                </Border>
+                <Button x:Name="SynchronizeButton" Text="Sincronizar ahora" Clicked="OnSynchronizeClicked" />
+                <Button Text="Actualizar estado" Clicked="OnRefreshClicked" />
+                <Button x:Name="ReviewConflictsButton" Text="Revisar conflictos" Clicked="OnReviewConflictsClicked" />
+                <Button Text="Vincular o desvincular dispositivo" Clicked="OnDevicePairingClicked" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</views:CoordinatorRefreshPage>

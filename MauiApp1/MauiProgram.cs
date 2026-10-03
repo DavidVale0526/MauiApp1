@@ -44,6 +44,7 @@ namespace MauiApp1
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorOperationSender, MauiApp1.Infrastructure.Lan.CoordinatorOperationSender>();
             builder.Services.AddTransient<DevicePairingViewModel>();
             builder.Services.AddTransient<DevicePairingPage>();
+            builder.Services.AddTransient<SyncManagementPage>();
             builder.Services.AddTransient<MauiApp1.Presentation.Views.ConflictReviewPage>();
             builder.Services.AddTransient<AccessPage>();
             builder.Services.AddTransient<AccessPageViewModel>();

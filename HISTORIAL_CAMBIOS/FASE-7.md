@@ -409,6 +409,8 @@
 
 ### T7.3 Avisos de cambios en vivo con SignalR (2026-10-03)
 
+- Mejora de navegación solicitada: se agruparon el estado de conexión, la cola pendiente, sincronización manual, revisión de conflictos y vinculación en `MauiApp1/Presentation/Views/SyncManagementPage.xaml(.cs)`. El inicio conserva un único botón para abrir esa pantalla, sin mostrar detalles de sincronización; la revisión de conflictos vuelve a la pantalla de sincronización.
+
 - `MauiApp1.Coordinator/Sync/CoordinatorChangesHub.cs`: agrega el hub HTTPS `/hubs/changes`, valida el vínculo del dispositivo y la sesión del usuario en cada conexión, y mantiene un registro temporal de clientes conectados.
 - `MauiApp1.Coordinator/Program.cs`: registra el hub y un publicador que consulta el diario central cada 400 ms. Solo anuncia operaciones con estado confirmado y revalida la autorización antes de enviar cada aviso; un fallo temporal de envío deja el aviso pendiente para reintento.
 - `MauiApp1.Application/Sync/ICoordinatorRealtimeClient.cs` y `MauiApp1.Infrastructure/Lan/CoordinatorRealtimeClient.cs`: implementan el cliente SignalR con transporte HTTPS Long Polling y el mismo pin SHA-256 del certificado usado por la vinculación. Los avisos solo indican qué cambió; el cliente usa la consulta durable por cursor para descargar y aplicar los datos.

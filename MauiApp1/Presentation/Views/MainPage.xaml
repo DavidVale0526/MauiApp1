@@ -15,17 +15,7 @@
             <Label Text="{Binding CurrentUserName}" FontSize="22" FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
             <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
-            <Border Padding="10" Stroke="Gray">
-                <VerticalStackLayout Spacing="4">
-                    <Label Text="{Binding CoordinatorStatusMessage}" />
-                    <Label Text="{Binding InternetStatusMessage}" FontSize="12" />
-                    <Label Text="{Binding SyncStatusMessage}" FontSize="12" />
-                    <Label Text="{Binding RealtimeStatusMessage}" FontSize="12" />
-                    <Button Text="{Binding SyncButtonText}" IsEnabled="{Binding CanSynchronize}"
-                            Clicked="OnSynchronizeClicked" />
-                    <Button Text="Revisar conflictos de sincronización" IsVisible="{Binding IsAdministrator}" Clicked="OnReviewConflictsClicked" />
-                </VerticalStackLayout>
-            </Border>
+            <Button Text="Sincronización y conexión" Clicked="OnSynchronizationClicked" />
             <Border IsVisible="{Binding HasLowStockAlert}" Stroke="OrangeRed" Padding="12">
                 <Label Text="{Binding LowStockAlertMessage}" TextColor="OrangeRed" />
             </Border>
@@ -43,7 +33,6 @@
             <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
             <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
                     Clicked="OnCreateCashierAccountClicked" />
-            <Button Text="Vinculación por red local" Clicked="OnDevicePairingClicked" />
             <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />
         </VerticalStackLayout>
         </ScrollView>
