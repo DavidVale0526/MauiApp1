@@ -25,4 +25,13 @@ public partial class InventoryMovementHistoryPage : CoordinatorRefreshPage
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 
     private async void OnRefreshClicked(object? sender, EventArgs eventArgs) => await _viewModel.LoadAsync();
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        var isWide = Width >= 900;
+        PageLayout.Padding = isWide ? new Thickness(32, 28) : new Thickness(16, 20);
+        TableHeader.IsVisible = isWide;
+        MovementsCollection.ItemTemplate = (DataTemplate)Resources[
+            isWide ? "MovementDesktopTemplate" : "MovementMobileTemplate"];
+    }
 }

@@ -12,12 +12,12 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 4 | Catálogo y productos (`ProductManagementPage`) | Inventario / catálogo | Adaptada; pendiente de revisión |
 | 5 | Consulta de existencias (`StockConsultationPage`) | Inventario | Adaptada; pendiente de revisión |
 | 6 | Categorías (`CategoryManagementPage`) | Catálogo | Adaptada; pendiente de revisión |
-| 7 | Historial de ventas (`SaleHistoryPage`) | Ventas / historial | Pendiente |
-| 8 | Comprobante de venta (`SaleTicketPage`) | Ticket / factura | Pendiente |
-| 9 | Registro de compras (`PurchaseRegistrationPage`) | Entrada de mercancía | Pendiente |
-| 10 | Historial de compras (`PurchaseHistoryPage`) | Historial de compras | Pendiente |
-| 11 | Historial de movimientos (`InventoryMovementHistoryPage`) | Movimientos de inventario | Pendiente |
-| 12 | Salida de inventario (`OtherExitPage`) | Salidas / mermas | Pendiente |
+| 7 | Historial de ventas (`SaleHistoryPage`) | Ventas / historial | Adaptada; pendiente de revisión |
+| 8 | Comprobante de venta (`SaleTicketPage`) | Ticket / factura | Adaptada; pendiente de revisión |
+| 9 | Registro de compras (`PurchaseRegistrationPage`) | Entrada de mercancía | Adaptada; pendiente de revisión |
+| 10 | Historial de compras (`PurchaseHistoryPage`) | Historial de compras | Adaptada; pendiente de revisión |
+| 11 | Historial de movimientos (`InventoryMovementHistoryPage`) | Movimientos de inventario | Adaptada; pendiente de revisión |
+| 12 | Salida de inventario (`OtherExitPage`) | Salidas / mermas | Adaptada; pendiente de revisión |
 | 13 | Clientes y crédito (`CustomerManagementPage`) | Clientes | Pendiente |
 | 14 | Pagos (`PaymentManagementPage`) | Pagos / saldos | Pendiente |
 | 15 | Reportes (`ReportsPage`) | Reportes | Pendiente |
@@ -30,6 +30,8 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 ## Notas
 
 - `StockConsultationPage` se registra por separado del catálogo porque es una pantalla independiente en la aplicación.
+- Para `InventoryMovementHistoryPage` se revisó el diseño de escritorio `movimientos de invetario` en Figma; no hay una vista específica equivalente en `moviles`. Se adaptó el listado de datos existentes y se omitieron indicadores, filtros y exportación que la aplicación aún no ofrece.
+- Para `OtherExitPage` se revisó en `interfaces` el formulario modal `agregar una nueva salida`; no hay un diseño equivalente en `moviles`. Se adaptó el formulario actual y se mantuvieron solo los motivos, campos y confirmación que ya están implementados.
 - No encontré una pantalla móvil dedicada al catálogo en la página `moviles` de Figma; esa vista se adapta al teléfono con el mismo contenido disponible y una disposición de una columna.
 - Los diseños muestran campos, cifras, filtros y acciones que algunas vistas actuales no tienen. No se agregan a la aplicación durante esta adaptación visual.
 - `CoordinatorRefreshPage` es una clase base, no una pantalla visible, por lo que no se marca como vista.

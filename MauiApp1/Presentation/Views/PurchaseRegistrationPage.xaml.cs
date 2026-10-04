@@ -53,4 +53,42 @@ public partial class PurchaseRegistrationPage : CoordinatorRefreshPage
 
         await _viewModel.RecordPendingAsync();
     }
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        var isWide = Width >= 900;
+        PageLayout.Padding = isWide ? new Thickness(32, 28) : new Thickness(16, 20);
+
+        ContentLayout.ColumnDefinitions.Clear();
+        ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        if (isWide)
+        {
+            ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        }
+
+        ContentLayout.RowDefinitions.Clear();
+        ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        if (isWide)
+        {
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        }
+        else
+        {
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        }
+
+        Grid.SetRow(HeaderArea, 0);
+        Grid.SetColumn(HeaderArea, 0);
+        Grid.SetColumnSpan(HeaderArea, isWide ? 2 : 1);
+        Grid.SetRow(AddProductCard, 1);
+        Grid.SetColumn(AddProductCard, 0);
+        Grid.SetRow(PurchaseSummaryCard, isWide ? 1 : 2);
+        Grid.SetColumn(PurchaseSummaryCard, isWide ? 1 : 0);
+        Grid.SetRow(FeedbackArea, isWide ? 2 : 3);
+        Grid.SetColumn(FeedbackArea, 0);
+        Grid.SetColumnSpan(FeedbackArea, isWide ? 2 : 1);
+    }
 }

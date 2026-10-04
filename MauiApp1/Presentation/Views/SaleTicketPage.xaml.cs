@@ -12,4 +12,12 @@ public partial class SaleTicketPage : ContentPage
     }
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopAsync();
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        if (sender is Grid layout)
+        {
+            layout.Padding = Width >= 900 ? new Thickness(32, 28) : new Thickness(16, 20);
+        }
+    }
 }

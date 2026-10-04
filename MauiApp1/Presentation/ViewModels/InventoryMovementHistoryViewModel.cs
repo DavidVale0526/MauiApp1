@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using MauiApp1.Application.Inventory;
 using MauiApp1.Domain.Inventory;
+using Microsoft.Maui.Graphics;
 
 namespace MauiApp1.Presentation.ViewModels;
 
@@ -70,6 +71,26 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
         InventoryMovementType.OtherExit => "Otra salida",
         _ => "Movimiento"
     };
+
+    public Color TypeBackgroundColor => Movement.Type switch
+    {
+        InventoryMovementType.PurchaseEntry => Color.FromArgb("#E8F5EE"),
+        InventoryMovementType.SaleExit => Color.FromArgb("#EAF1FF"),
+        InventoryMovementType.OtherExit => Color.FromArgb("#FFF3E6"),
+        _ => Color.FromArgb("#EEF1F5")
+    };
+
+    public Color TypeTextColor => Movement.Type switch
+    {
+        InventoryMovementType.PurchaseEntry => Color.FromArgb("#18794E"),
+        InventoryMovementType.SaleExit => Color.FromArgb("#315CB8"),
+        InventoryMovementType.OtherExit => Color.FromArgb("#A85B00"),
+        _ => Color.FromArgb("#52657D")
+    };
+
+    public Color QuantityTextColor => Movement.Type == InventoryMovementType.PurchaseEntry
+        ? Color.FromArgb("#18794E")
+        : Color.FromArgb("#B42318");
 
     public string ProductText => Movement.ProductName;
 

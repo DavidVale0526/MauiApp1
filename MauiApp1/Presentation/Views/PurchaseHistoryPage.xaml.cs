@@ -25,4 +25,12 @@ public partial class PurchaseHistoryPage : CoordinatorRefreshPage
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
 
     private async void OnRefreshClicked(object? sender, EventArgs eventArgs) => await _viewModel.LoadAsync();
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        if (sender is Grid pageLayout)
+        {
+            pageLayout.Padding = Width >= 900 ? new Thickness(32, 28) : new Thickness(16, 20);
+        }
+    }
 }

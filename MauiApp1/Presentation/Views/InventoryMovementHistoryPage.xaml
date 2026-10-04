@@ -5,42 +5,105 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.InventoryMovementHistoryPage"
              x:DataType="viewModels:InventoryMovementHistoryViewModel"
-             Title="Movimientos de inventario">
-    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
-        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-        <Label Grid.Row="1" Text="Movimientos de inventario" FontSize="28" FontAttributes="Bold" />
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-            <Label Grid.Column="0" Text="Entradas y salidas, de la más reciente a la más antigua." VerticalOptions="Center" />
-            <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked" />
-        </Grid>
-        <Grid Grid.Row="3">
-            <CollectionView ItemsSource="{Binding Movements}">
-                <CollectionView.EmptyView>
-                    <Label Text="Aún no hay movimientos registrados." HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
-                </CollectionView.EmptyView>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:InventoryMovementHistoryCard">
-                        <Border Padding="16" Margin="0,0,0,12" Stroke="#808080" StrokeThickness="1">
-                            <VerticalStackLayout Spacing="6">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Grid.Column="0" Text="{Binding TypeText}" FontSize="18" FontAttributes="Bold" />
-                                    <Label Grid.Column="1" Text="{Binding DateText}" HorizontalTextAlignment="End" />
-                                </Grid>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Grid.Column="0" Text="{Binding ProductText}" FontAttributes="Bold" />
-                                    <Label Grid.Column="1" Text="{Binding QuantityText}" HorizontalTextAlignment="End" />
-                                </Grid>
-                                <Label Text="{Binding ReasonText}" />
-                                <Label Text="{Binding ReferenceText}" FontSize="12" Opacity="0.75" />
-                            </VerticalStackLayout>
+             Title="Movimientos de inventario" BackgroundColor="#F7F9FB">
+    <views:CoordinatorRefreshPage.Resources>
+        <DataTemplate x:Key="MovementDesktopTemplate" x:DataType="viewModels:InventoryMovementHistoryCard">
+            <Grid Padding="14,12" ColumnDefinitions="1.1*,1.5*,2*,1.1*,2*" ColumnSpacing="14">
+                <Border Padding="9,5" BackgroundColor="{Binding TypeBackgroundColor}" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 12" VerticalOptions="Center" HorizontalOptions="Start">
+                    <Label Text="{Binding TypeText}" FontSize="12" FontAttributes="Bold"
+                           TextColor="{Binding TypeTextColor}" />
+                </Border>
+                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                    <Label Text="{Binding DateText}" FontSize="13" TextColor="#34445A" />
+                    <Label Text="{Binding ReferenceText}" FontSize="11" TextColor="#8291A5" />
+                </VerticalStackLayout>
+                <Label Grid.Column="2" Text="{Binding ProductText}" FontSize="14" FontAttributes="Bold"
+                       TextColor="#111D31" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                <Label Grid.Column="3" Text="{Binding QuantityText}" FontSize="14" FontAttributes="Bold"
+                       TextColor="{Binding QuantityTextColor}" VerticalOptions="Center" />
+                <Label Grid.Column="4" Text="{Binding ReasonText}" FontSize="13" TextColor="#61738A"
+                       VerticalOptions="Center" LineBreakMode="WordWrap" />
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:Key="MovementMobileTemplate" x:DataType="viewModels:InventoryMovementHistoryCard">
+            <Border Padding="16" Margin="0,0,0,10" BackgroundColor="White"
+                    Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 15">
+                <VerticalStackLayout Spacing="11">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="{Binding ProductText}" FontSize="16" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="{Binding DateText}" FontSize="12" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <Border Grid.Column="1" Padding="9,5" BackgroundColor="{Binding TypeBackgroundColor}"
+                                StrokeThickness="0" StrokeShape="RoundRectangle 12" VerticalOptions="Start">
+                            <Label Text="{Binding TypeText}" FontSize="11" FontAttributes="Bold"
+                                   TextColor="{Binding TypeTextColor}" />
                         </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center" InputTransparent="True" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                               HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Label Text="Cantidad" FontSize="12" TextColor="#8291A5" />
+                        <Label Grid.Column="1" Text="{Binding QuantityText}" FontSize="15" FontAttributes="Bold"
+                               TextColor="{Binding QuantityTextColor}" HorizontalTextAlignment="End" />
+                    </Grid>
+                    <Label Text="{Binding ReasonText}" FontSize="13" TextColor="#34445A" LineBreakMode="WordWrap" />
+                    <Label Text="{Binding ReferenceText}" FontSize="11" TextColor="#8291A5" />
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+    </views:CoordinatorRefreshPage.Resources>
+
+    <Grid x:Name="PageLayout" Padding="16,20" RowDefinitions="Auto,*" RowSpacing="20"
+          SizeChanged="OnPageSizeChanged">
+        <Grid x:Name="ContentHost" Grid.RowSpan="2" MaximumWidthRequest="1280" HorizontalOptions="Center"
+              RowDefinitions="Auto,*" RowSpacing="20">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
+                        TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3" VerticalOptions="Center">
+                        <Label Text="Movimientos de inventario" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Entradas y salidas, de la más reciente a la más antigua."
+                               FontSize="14" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked"
+                            BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="11"
+                            Padding="18,12" VerticalOptions="Center" />
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="10">
+                <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+                <Border x:Name="HistoryCard" Grid.Row="1" Padding="0" BackgroundColor="White"
+                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid x:Name="TableHeader" Padding="14,12" ColumnDefinitions="1.1*,1.5*,2*,1.1*,2*"
+                              ColumnSpacing="14" BackgroundColor="#F7F9FB">
+                            <Label Text="TIPO" FontSize="11" FontAttributes="Bold" TextColor="#61738A" />
+                            <Label Grid.Column="1" Text="FECHA / REFERENCIA" FontSize="11" FontAttributes="Bold" TextColor="#61738A" />
+                            <Label Grid.Column="2" Text="PRODUCTO" FontSize="11" FontAttributes="Bold" TextColor="#61738A" />
+                            <Label Grid.Column="3" Text="CANTIDAD" FontSize="11" FontAttributes="Bold" TextColor="#61738A" />
+                            <Label Grid.Column="4" Text="MOTIVO" FontSize="11" FontAttributes="Bold" TextColor="#61738A" />
+                        </Grid>
+                        <Grid Grid.Row="1">
+                            <CollectionView x:Name="MovementsCollection" ItemsSource="{Binding Movements}" SelectionMode="None">
+                                <CollectionView.EmptyView>
+                                    <Border Padding="24" BackgroundColor="White" StrokeThickness="0" VerticalOptions="Start">
+                                        <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                                            <Label Text="Aún no hay movimientos registrados." FontSize="17"
+                                                   FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
+                                            <Label Text="Las entradas y salidas confirmadas aparecerán aquí."
+                                                   FontSize="14" TextColor="#61738A" HorizontalTextAlignment="Center" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                               HorizontalOptions="Center" VerticalOptions="Center" Color="#0D1B2A" />
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>

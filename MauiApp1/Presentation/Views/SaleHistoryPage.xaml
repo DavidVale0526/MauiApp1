@@ -5,43 +5,81 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.SaleHistoryPage"
              x:DataType="viewModels:SaleHistoryViewModel"
-             Title="Historial de ventas">
-    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
-        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-        <Label Grid.Row="1" Text="Historial de ventas" FontSize="28" FontAttributes="Bold" />
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-            <Label Grid.Column="0" Text="Ventas confirmadas, de la más reciente a la más antigua." VerticalOptions="Center" />
-            <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked" />
-        </Grid>
-        <Grid Grid.Row="3">
-            <CollectionView ItemsSource="{Binding Sales}">
-                <CollectionView.EmptyView>
-                    <Label Text="Aún no hay ventas registradas." HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
-                </CollectionView.EmptyView>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:SaleHistoryCard">
-                        <Border Padding="16" Margin="0,0,0,12" Stroke="#808080" StrokeThickness="1">
-                            <VerticalStackLayout Spacing="7">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Grid.Column="0" Text="{Binding DateText}" FontSize="18" FontAttributes="Bold" />
-                                    <Label Grid.Column="1" Text="{Binding ReferenceText}" HorizontalTextAlignment="End" />
-                                </Grid>
-                                <Label Text="{Binding ActorText}" FontSize="13" />
-                                <Label Text="{Binding SaleTypeText}" FontAttributes="Bold" />
-                                <Label Text="{Binding CustomerText}" />
-                                <Label Text="{Binding DueText}" />
-                                <Label Text="{Binding LinesText}" LineBreakMode="WordWrap" />
-                                <Label Text="{Binding TotalText}" FontSize="18" FontAttributes="Bold" HorizontalTextAlignment="End" />
-                                <Button Text="Ver ticket" HorizontalOptions="End" Clicked="OnViewTicketClicked" />
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center" InputTransparent="True" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                               HorizontalOptions="Center" VerticalOptions="Center" />
+             Title="Historial de ventas"
+             BackgroundColor="#F7F9FB">
+    <Grid Padding="16,20" RowDefinitions="Auto,*" RowSpacing="20" SizeChanged="OnPageSizeChanged">
+        <Grid x:Name="ContentHost" Grid.RowSpan="2" MaximumWidthRequest="1160" HorizontalOptions="Center"
+              RowDefinitions="Auto,*" RowSpacing="20">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
+                        TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3" VerticalOptions="Center">
+                        <Label Text="Historial de ventas" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Ventas confirmadas, de la más reciente a la más antigua."
+                               FontSize="14" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked"
+                            BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="11"
+                            Padding="18,12" VerticalOptions="Center" />
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="10">
+                <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+                <Grid Grid.Row="1">
+                    <CollectionView ItemsSource="{Binding Sales}" SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <Border Padding="24" BackgroundColor="White" Stroke="#E3EAF2"
+                                    StrokeShape="RoundRectangle 16" VerticalOptions="Start">
+                                <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                                    <Label Text="Aún no hay ventas registradas." FontSize="17"
+                                           FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
+                                    <Label Text="Las ventas confirmadas aparecerán aquí."
+                                           FontSize="14" TextColor="#61738A" HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:SaleHistoryCard">
+                                <Border Padding="18" Margin="0,0,0,12" BackgroundColor="White"
+                                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                                    <VerticalStackLayout Spacing="12">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Label Text="{Binding DateText}" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                                                <Label Text="{Binding ReferenceText}" FontSize="12" TextColor="#61738A" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="{Binding SaleTypeText}" FontSize="13"
+                                                   FontAttributes="Bold" TextColor="#0D1B2A" BackgroundColor="#E8EEF5"
+                                                   Padding="10,6" VerticalOptions="Start" HorizontalTextAlignment="Center" />
+                                        </Grid>
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="{Binding ActorText}" FontSize="13" TextColor="#61738A" />
+                                            <Label Text="{Binding CustomerText}" FontSize="14" TextColor="#34445A" />
+                                            <Label Text="{Binding DueText}" FontSize="13" TextColor="#61738A" />
+                                        </VerticalStackLayout>
+                                        <Border Padding="12" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
+                                                StrokeShape="RoundRectangle 10">
+                                            <Label Text="{Binding LinesText}" FontSize="13" TextColor="#34445A"
+                                                   LineBreakMode="WordWrap" />
+                                        </Border>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <Button Grid.Column="1" Text="Ver ticket" Clicked="OnViewTicketClicked"
+                                                    BackgroundColor="#E8EEF5" TextColor="#0D1B2A"
+                                                    CornerRadius="10" Padding="18,10" />
+                                            <Label Grid.Column="0" Text="{Binding TotalText}" FontSize="19"
+                                                   FontAttributes="Bold" TextColor="#111D31" VerticalOptions="Center" />
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                       HorizontalOptions="Center" VerticalOptions="Center" Color="#0D1B2A" />
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>

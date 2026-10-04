@@ -5,40 +5,85 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.OtherExitPage"
              x:DataType="viewModels:OtherExitViewModel"
-             Title="Salida de inventario">
+             Title="Salida de inventario" BackgroundColor="#F7F9FB">
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="16">
-            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-            <Label Text="Registrar salida de inventario" FontSize="28" FontAttributes="Bold" />
-            <Label Text="Registra productos que salen por un motivo distinto a una venta." />
+        <Grid x:Name="PageLayout" Padding="16,20" SizeChanged="OnPageSizeChanged">
+            <VerticalStackLayout x:Name="ContentHost" MaximumWidthRequest="920" HorizontalOptions="Center"
+                                 Spacing="18">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
+                            TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                        <Label Text="Salida de inventario" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Registra productos que salen por un motivo distinto a una venta."
+                               FontSize="14" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Grid>
 
-            <Label Text="Producto" />
-            <Picker Title="Selecciona un producto activo"
-                    ItemsSource="{Binding Products}"
-                    ItemDisplayBinding="{Binding Name}"
-                    SelectedItem="{Binding SelectedProduct}"
-                    IsEnabled="{Binding CanEdit}" />
-            <Label Text="{Binding AvailableStockText}" />
+                <Border Padding="22" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 18">
+                    <VerticalStackLayout Spacing="18">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="Registrar salida" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="La cantidad se descontará de las existencias al confirmar."
+                                       FontSize="13" TextColor="#61738A" />
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" Padding="10,6" BackgroundColor="#FFF3E6" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 20" VerticalOptions="Start">
+                                <Label Text="BAJA DE INVENTARIO" FontSize="10" FontAttributes="Bold" TextColor="#A85B00" />
+                            </Border>
+                        </Grid>
 
-            <Label Text="Cantidad" />
-            <Entry Placeholder="Cantidad a retirar" Keyboard="Numeric"
-                   Text="{Binding QuantityInput}" IsEnabled="{Binding CanEdit}" />
+                        <Grid x:Name="SelectionGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto"
+                              ColumnSpacing="14" RowSpacing="14">
+                            <VerticalStackLayout x:Name="ProductField" Grid.Row="0" Spacing="7">
+                                <Label Text="Producto" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                                <Picker Title="Selecciona un producto activo" ItemsSource="{Binding Products}"
+                                        ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedProduct}"
+                                        IsEnabled="{Binding CanEdit}" TextColor="#111D31" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout x:Name="ReasonField" Grid.Row="1" Spacing="7">
+                                <Label Text="Motivo de la baja" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                                <Picker Title="Selecciona el motivo" ItemsSource="{Binding ReasonOptions}"
+                                        ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedReason}"
+                                        IsEnabled="{Binding CanEdit}" TextColor="#111D31" />
+                            </VerticalStackLayout>
+                        </Grid>
 
-            <Label Text="Motivo" />
-            <Picker Title="Selecciona el motivo"
-                    ItemsSource="{Binding ReasonOptions}"
-                    ItemDisplayBinding="{Binding Name}"
-                    SelectedItem="{Binding SelectedReason}"
-                    IsEnabled="{Binding CanEdit}" />
-            <Entry Placeholder="Describe la otra causa"
-                   Text="{Binding OtherReasonDetail}"
-                   IsVisible="{Binding IsOtherReason}"
-                   IsEnabled="{Binding CanEdit}" />
+                        <Grid x:Name="StockQuantityGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto"
+                              ColumnSpacing="14" RowSpacing="14">
+                            <Border x:Name="StockCard" Grid.Row="0" Padding="16" BackgroundColor="#F7F9FB"
+                                    Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 13">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="Existencia disponible" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                                    <Label Text="{Binding AvailableStockText}" FontSize="17" FontAttributes="Bold" TextColor="#111D31" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <VerticalStackLayout x:Name="QuantityField" Grid.Row="1" Spacing="7">
+                                <Label Text="Cantidad a retirar" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                                <Entry Placeholder="Ej. 1.000" Keyboard="Numeric" Text="{Binding QuantityInput}"
+                                       IsEnabled="{Binding CanEdit}" HeightRequest="52"
+                                       BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
+                            </VerticalStackLayout>
+                        </Grid>
 
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
-            <Button Text="{Binding SubmitButtonText}" Clicked="OnReviewClicked"
-                    IsEnabled="{Binding CanEdit}" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-        </VerticalStackLayout>
+                        <VerticalStackLayout x:Name="OtherReasonField" IsVisible="{Binding IsOtherReason}" Spacing="7">
+                            <Label Text="Describe la otra causa" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Escribe el motivo de la salida" Text="{Binding OtherReasonDetail}"
+                                   IsEnabled="{Binding CanEdit}" HeightRequest="52"
+                                   BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
+                        </VerticalStackLayout>
+
+                        <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+                        <Button Text="{Binding SubmitButtonText}" Clicked="OnReviewClicked"
+                                IsEnabled="{Binding CanEdit}" BackgroundColor="#0D1B2A"
+                                TextColor="White" CornerRadius="11" Padding="18,14" />
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                           HorizontalOptions="Center" Color="#0D1B2A" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
     </ScrollView>
 </views:CoordinatorRefreshPage>

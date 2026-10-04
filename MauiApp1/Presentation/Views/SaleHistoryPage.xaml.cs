@@ -35,4 +35,13 @@ public partial class SaleHistoryPage : CoordinatorRefreshPage
 
         await Navigation.PushAsync(new SaleTicketPage(card.Sale));
     }
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        var isWide = Width >= 900;
+        if (sender is Grid pageLayout)
+        {
+            pageLayout.Padding = isWide ? new Thickness(32, 28) : new Thickness(16, 20);
+        }
+    }
 }
