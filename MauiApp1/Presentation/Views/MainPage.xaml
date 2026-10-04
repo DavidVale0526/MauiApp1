@@ -5,36 +5,171 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.MainPage"
              x:DataType="viewModels:MainPageViewModel"
-             Title="{Binding Title}">
-    <Grid Padding="24">
-        <ScrollView>
-        <VerticalStackLayout Spacing="16" VerticalOptions="Start" HorizontalOptions="Center">
-            <Label Text="{Binding Title}" FontSize="28" FontAttributes="Bold"
-                   HorizontalTextAlignment="Center" />
-            <Label Text="Sesión iniciada como" FontSize="16" HorizontalTextAlignment="Center" />
-            <Label Text="{Binding CurrentUserName}" FontSize="22" FontAttributes="Bold"
-                   HorizontalTextAlignment="Center" />
-            <Label Text="{Binding CurrentRole}" FontSize="16" HorizontalTextAlignment="Center" />
-            <Button Text="Sincronización y conexión" Clicked="OnSynchronizationClicked" />
-            <Border IsVisible="{Binding HasLowStockAlert}" Stroke="OrangeRed" Padding="12">
-                <Label Text="{Binding LowStockAlertMessage}" TextColor="OrangeRed" />
-            </Border>
-            <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" />
-            <Button Text="Administrar productos" Clicked="OnManageProductsClicked" />
-            <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" />
-            <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" />
-            <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" />
-            <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" />
-            <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" />
-            <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" />
-            <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" />
-            <Button Text="Registrar pagos y consultar saldos" Clicked="OnPaymentsClicked" />
-            <Button Text="Reportes" Clicked="OnReportsClicked" />
-            <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" />
-            <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
-                    Clicked="OnCreateCashierAccountClicked" />
-            <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}" />
-        </VerticalStackLayout>
+             Title="{Binding Title}"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="DashboardCardStyle" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="Stroke" Value="#E3EAF2" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+        <Style x:Key="DashboardButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#0D1B2A" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style x:Key="DashboardSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#F1F5F9" />
+            <Setter Property="TextColor" Value="#26384C" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style x:Key="SidebarButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#1B3047" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalOptions" Value="Fill" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+    </ContentPage.Resources>
+    <Grid x:Name="RootLayout"
+          ColumnDefinitions="0,*"
+          BackgroundColor="#F7F9FB"
+          SizeChanged="OnRootLayoutSizeChanged">
+        <Border x:Name="Sidebar"
+                Grid.Column="0"
+                IsVisible="False"
+                BackgroundColor="#0D1B2A"
+                StrokeThickness="0"
+                Padding="22,28">
+            <Grid RowDefinitions="Auto,Auto,*,Auto">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Miscelánea Ari" FontSize="20" FontAttributes="Bold" TextColor="White" />
+                    <Label Text="GESTIÓN DEL NEGOCIO" FontSize="10" CharacterSpacing="1" TextColor="#A9B8C9" />
+                </VerticalStackLayout>
+
+                <Label Grid.Row="1" Text="MENÚ PRINCIPAL" Margin="0,34,0,12" FontSize="10"
+                       FontAttributes="Bold" CharacterSpacing="1" TextColor="#93A4B8" />
+
+                <VerticalStackLayout Grid.Row="2" Spacing="8">
+                    <Button Text="Punto de venta" Clicked="OnRegisterSaleClicked" Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Productos y categorías" Clicked="OnManageProductsClicked" Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Existencias" Clicked="OnConsultStockClicked" Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Compras" Clicked="OnRegisterPurchaseClicked" Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Movimientos" Clicked="OnInventoryMovementHistoryClicked" Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Reportes" Clicked="OnReportsClicked" Style="{StaticResource SidebarButtonStyle}" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Row="3" Spacing="8">
+                    <Button Text="Sincronización y conexión" Clicked="OnSynchronizationClicked"
+                            Style="{StaticResource SidebarButtonStyle}" />
+                    <Button Text="Cerrar sesión" Command="{Binding SignOutCommand}"
+                            Style="{StaticResource SidebarButtonStyle}" />
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+
+        <ScrollView Grid.Column="1" VerticalScrollBarVisibility="Never">
+            <VerticalStackLayout x:Name="DashboardContent"
+                                 Padding="18,24"
+                                 Spacing="22"
+                                 HorizontalOptions="Center"
+                                 MaximumWidthRequest="1440">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*">
+                    <Label Text="Panel principal" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Grid.Row="1" Text="Resumen y accesos de Miscelánea Ari" FontSize="14" TextColor="#61738A" />
+                </Grid>
+
+                <Border BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14" Padding="18">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="Sesión iniciada como" FontSize="13" TextColor="#61738A" />
+                        <Label Grid.Row="1" Text="{Binding CurrentUserName}" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding CurrentRole}" FontSize="14"
+                               TextColor="#52657D" VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+
+                <Border IsVisible="{Binding HasLowStockAlert}"
+                        BackgroundColor="#FFF8F3" Stroke="#F0A35E" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12" Padding="16">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Atención: existencias bajas" FontSize="16" FontAttributes="Bold" TextColor="#A3440B" />
+                        <Label Text="{Binding LowStockAlertMessage}" FontSize="13" TextColor="#873B13" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border BackgroundColor="#0D1B2A" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="18">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="Acceso rápido" FontSize="17" FontAttributes="Bold" TextColor="White" />
+                        <Label Grid.Row="1" Text="Continúa con la operación del negocio" FontSize="12" TextColor="#C7D2DF" />
+                        <Button Grid.Column="1" Grid.RowSpan="2" Text="Registrar venta  →" Clicked="OnRegisterSaleClicked"
+                                BackgroundColor="#FFFFFF" TextColor="#0D1B2A" FontAttributes="Bold"
+                                CornerRadius="9" Padding="16,10" VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+
+                <Label Text="Operaciones" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
+
+                <Grid x:Name="MenuCardsGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="16">
+                    <Border x:Name="SalesCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Ventas" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Registra ventas y consulta su historial." FontSize="12" TextColor="#718198" />
+                            <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" Style="{StaticResource DashboardButtonStyle}" />
+                            <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border x:Name="InventoryCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Catálogo e inventario" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Administra productos y revisa existencias." FontSize="12" TextColor="#718198" />
+                            <Button Text="Administrar productos" Clicked="OnManageProductsClicked" Style="{StaticResource DashboardButtonStyle}" />
+                            <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border x:Name="PurchasesCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Compras y movimientos" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Registra entradas y consulta el historial." FontSize="12" TextColor="#718198" />
+                            <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" Style="{StaticResource DashboardButtonStyle}" />
+                            <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border x:Name="OtherCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Clientes y seguimiento" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Consulta clientes, pagos e información del negocio." FontSize="12" TextColor="#718198" />
+                            <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" Style="{StaticResource DashboardButtonStyle}" />
+                            <Button Text="Registrar pagos y consultar saldos" Clicked="OnPaymentsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Reportes" Clicked="OnReportsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
+                                    Clicked="OnCreateCashierAccountClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="BottomActionsGrid" ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <Button Text="Sincronización y conexión" Clicked="OnSynchronizationClicked"
+                            BackgroundColor="#E8EDF3" TextColor="#26384C" CornerRadius="9" Padding="14,12" />
+                    <Button Grid.Column="1" Text="Cerrar sesión" Command="{Binding SignOutCommand}"
+                            BackgroundColor="#E8EDF3" TextColor="#26384C" CornerRadius="9" Padding="14,12" />
+                </Grid>
+            </VerticalStackLayout>
         </ScrollView>
     </Grid>
 </views:CoordinatorRefreshPage>

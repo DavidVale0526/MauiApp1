@@ -7,6 +7,31 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class MainPage : CoordinatorRefreshPage
 {
+    private void OnRootLayoutSizeChanged(object? sender, EventArgs args)
+    {
+        var useDesktopLayout = RootLayout.Width >= 950;
+        RootLayout.ColumnDefinitions[0].Width = new GridLength(useDesktopLayout ? 250 : 0);
+        Sidebar.IsVisible = useDesktopLayout;
+        BottomActionsGrid.IsVisible = !useDesktopLayout;
+        DashboardContent.Padding = useDesktopLayout
+            ? new Thickness(36, 30)
+            : new Thickness(16, 24);
+
+        MenuCardsGrid.ColumnDefinitions.Clear();
+        MenuCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        if (useDesktopLayout)
+        {
+            MenuCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+
+        var cards = new Border[] { SalesCard, InventoryCard, PurchasesCard, OtherCard };
+        for (var index = 0; index < cards.Length; index++)
+        {
+            Grid.SetColumn(cards[index], useDesktopLayout ? index % 2 : 0);
+            Grid.SetRow(cards[index], useDesktopLayout ? index / 2 : index);
+        }
+    }
+
     private async void OnSynchronizationClicked(object? sender, EventArgs args)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<SyncManagementPage>() is not { } page) return;

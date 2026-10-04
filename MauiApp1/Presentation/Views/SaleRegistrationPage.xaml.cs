@@ -6,6 +6,24 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class SaleRegistrationPage : CoordinatorRefreshPage
 {
+    private void OnSaleLayoutSizeChanged(object? sender, EventArgs args)
+    {
+        var useDesktopLayout = SaleLayout.Width >= 920;
+        ContentPanels.ColumnDefinitions.Clear();
+        ContentPanels.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        if (useDesktopLayout)
+        {
+            ContentPanels.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+
+        Grid.SetColumn(ProductPanel, 0);
+        Grid.SetRow(ProductPanel, 0);
+        Grid.SetColumn(CartPanel, useDesktopLayout ? 1 : 0);
+        Grid.SetRow(CartPanel, useDesktopLayout ? 0 : 1);
+        CartCollection.HeightRequest = useDesktopLayout ? 560 : 300;
+        SaleLayout.Padding = useDesktopLayout ? new Thickness(32, 28) : new Thickness(16, 20);
+    }
+
     private readonly SaleRegistrationViewModel _viewModel;
     private readonly ISaleService _saleService;
 
