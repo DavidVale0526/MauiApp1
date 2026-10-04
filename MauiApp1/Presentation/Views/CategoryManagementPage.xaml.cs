@@ -51,4 +51,51 @@ public partial class CategoryManagementPage : CoordinatorRefreshPage
     }
 
     private async void OnCloseClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        var isWide = Width >= 900;
+        PageLayout.Padding = isWide ? new Thickness(32, 28) : new Thickness(16, 20);
+        ContentLayout.ColumnDefinitions.Clear();
+        ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        if (isWide)
+        {
+            ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        }
+        ContentLayout.RowDefinitions.Clear();
+        if (isWide)
+        {
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        }
+        else
+        {
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        }
+        Grid.SetColumn(FormCard, 0);
+        Grid.SetRow(FormCard, 0);
+        FormFields.ColumnDefinitions.Clear();
+        FormFields.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        if (isWide)
+        {
+            FormFields.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        }
+        FormFields.RowDefinitions.Clear();
+        FormFields.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        if (!isWide)
+        {
+            FormFields.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        }
+        Grid.SetColumn(CategoryNameEntry, 0);
+        Grid.SetRow(CategoryNameEntry, 0);
+        Grid.SetColumn(FormActions, isWide ? 1 : 0);
+        Grid.SetRow(FormActions, isWide ? 0 : 1);
+        FormActions.HorizontalOptions = isWide ? LayoutOptions.End : LayoutOptions.Start;
+        if (ContentLayout.Children.Count > 1)
+        {
+            var list = (View)ContentLayout.Children[1];
+            Grid.SetColumn(list, isWide ? 1 : 0);
+            Grid.SetRow(list, isWide ? 0 : 1);
+        }
+    }
 }

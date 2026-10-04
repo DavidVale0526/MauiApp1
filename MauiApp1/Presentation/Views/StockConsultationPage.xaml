@@ -6,48 +6,110 @@
              xmlns:products="clr-namespace:MauiApp1.Application.Products;assembly=MauiApp1.Application"
              x:Class="MauiApp1.Presentation.Views.StockConsultationPage"
              x:DataType="viewModels:StockConsultationViewModel"
-             Title="Consulta de existencias">
-    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-            <Button Grid.Column="0" Text="← Volver" Clicked="OnBackClicked"
-                    Padding="12,6" VerticalOptions="Center" />
-            <Label Grid.Column="1" Text="Consulta de existencias" FontSize="26" FontAttributes="Bold"
-                   VerticalOptions="Center" />
-        </Grid>
+             Title="Consulta de existencias"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="StockSurfaceStyle" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="Stroke" Value="#E3EAF2" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+        <Style x:Key="StockSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#EEF2F7" />
+            <Setter Property="TextColor" Value="#26384C" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="13,8" />
+        </Style>
+    </ContentPage.Resources>
 
-        <VerticalStackLayout Grid.Row="1" Spacing="4">
-            <Label Text="Información guardada localmente. Desliza hacia abajo para volver a consultar."
-                   FontSize="12" />
-            <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
+    <Grid x:Name="RootLayout" Padding="18,22" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="14"
+          HorizontalOptions="Center" MaximumWidthRequest="1440" SizeChanged="OnRootLayoutSizeChanged">
+        <VerticalStackLayout Grid.Row="0" Spacing="12">
+            <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start"
+                    Style="{StaticResource StockSecondaryButtonStyle}" />
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <Label Text="Consulta de existencias" FontSize="29" FontAttributes="Bold" TextColor="#111D31" />
+                <Label Grid.Row="1" Text="Revisa el inventario disponible y sus niveles mínimos." FontSize="14" TextColor="#61738A" />
+                <Border Grid.Column="1" Grid.RowSpan="2" BackgroundColor="#EAF0F7" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 20" Padding="12,6" VerticalOptions="Center">
+                    <Label Text="INVENTARIO" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#52657D" />
+                </Border>
+            </Grid>
         </VerticalStackLayout>
 
-        <Border Grid.Row="2" Stroke="OrangeRed" Padding="10" IsVisible="{Binding HasLowStockAlert}">
-            <Label Text="{Binding LowStockAlertMessage}" TextColor="OrangeRed" />
+        <Border Grid.Row="1" Style="{StaticResource StockSurfaceStyle}" Padding="14,11">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <Label Text="i" FontSize="16" FontAttributes="Bold" TextColor="#52657D" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="Los datos se consultan en este dispositivo. Desliza la lista hacia abajo para actualizar."
+                       FontSize="12" TextColor="#61738A" VerticalOptions="Center" />
+            </Grid>
         </Border>
 
-        <RefreshView Grid.Row="3" IsRefreshing="{Binding IsRefreshing}"
-                     Command="{Binding RefreshCommand}">
-            <CollectionView ItemsSource="{Binding Products}" SelectionMode="None">
-                <CollectionView.EmptyView>
-                    <Label Text="Todavía no hay productos registrados."
-                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
-                </CollectionView.EmptyView>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="products:ProductSummary">
-                        <Grid Padding="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                            <Label Grid.Row="0" Grid.Column="0" Text="{Binding Name}"
-                                   FontSize="18" FontAttributes="Bold" />
-                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding StatusText}"
-                                   VerticalOptions="Center" />
-                            <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding CategoryName, StringFormat='Categoría: {0}'}" />
-                            <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding SalePriceText}" />
-                            <Label Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding StockText}"
-                                   FontAttributes="Bold" />
-                            <Label Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding MinimumStockText}" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </RefreshView>
+        <Border Grid.Row="2" IsVisible="{Binding HasLowStockAlert}"
+                BackgroundColor="#FFF8F3" Stroke="#F0A35E" StrokeThickness="1"
+                StrokeShape="RoundRectangle 12" Padding="16">
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Atención: existencias bajas" FontSize="15" FontAttributes="Bold" TextColor="#A3440B" />
+                <Label Text="{Binding LowStockAlertMessage}" FontSize="13" TextColor="#873B13" />
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="3" RowDefinitions="Auto,Auto,*" RowSpacing="8">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                <Label Text="Inventario registrado" FontSize="19" FontAttributes="Bold" TextColor="#111D31" VerticalOptions="Center" />
+                <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#0D1B2A" />
+            </Grid>
+            <Label Grid.Row="1" Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="13" />
+
+            <RefreshView Grid.Row="2" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}" RefreshColor="#0D1B2A">
+                <CollectionView ItemsSource="{Binding Products}" SelectionMode="None" VerticalScrollBarVisibility="Default">
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource StockSurfaceStyle}" Margin="0,6">
+                            <VerticalStackLayout Spacing="5" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="Todavía no hay productos registrados." FontSize="15" FontAttributes="Bold"
+                                       TextColor="#52657D" HorizontalTextAlignment="Center" />
+                                <Label Text="Los productos aparecerán aquí cuando se registren en el catálogo."
+                                       FontSize="12" TextColor="#718198" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="products:ProductSummary">
+                            <Border Style="{StaticResource StockSurfaceStyle}" Margin="0,0,0,9">
+                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="9">
+                                    <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="3">
+                                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#111D31" />
+                                        <Label Text="{Binding CategoryName, StringFormat='Categoría: {0}'}" FontSize="12" TextColor="#61738A" />
+                                    </VerticalStackLayout>
+                                    <Border Grid.Row="0" Grid.Column="1" BackgroundColor="#EEF2F7" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 16" Padding="10,4" VerticalOptions="Start">
+                                        <Label Text="{Binding StatusText}" FontSize="10" FontAttributes="Bold" TextColor="#52657D" />
+                                    </Border>
+
+                                    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="*,*" ColumnSpacing="10">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="EXISTENCIA ACTUAL" FontSize="9" FontAttributes="Bold" CharacterSpacing="0.3" TextColor="#8795A7" />
+                                            <Label Text="{Binding StockText}" FontSize="15" FontAttributes="Bold" TextColor="#172438" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Label Text="EXISTENCIA MÍNIMA" FontSize="9" FontAttributes="Bold" CharacterSpacing="0.3" TextColor="#8795A7" />
+                                            <Label Text="{Binding MinimumStockText}" FontSize="13" TextColor="#26384C" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+
+                                    <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label Text="{Binding SalePriceText}" FontSize="12" TextColor="#52657D" VerticalOptions="Center" />
+                                        <Label Grid.Column="1" Text="Lectura local" FontSize="10" TextColor="#8795A7" VerticalOptions="Center" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </RefreshView>
+        </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>

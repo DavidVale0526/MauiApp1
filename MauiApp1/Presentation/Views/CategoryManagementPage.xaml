@@ -6,46 +6,77 @@
              xmlns:categories="clr-namespace:MauiApp1.Application.Categories;assembly=MauiApp1.Application"
              x:Class="MauiApp1.Presentation.Views.CategoryManagementPage"
              x:DataType="viewModels:CategoryManagementViewModel"
-             Title="Categorías">
-    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-            <Button Grid.Column="0" Text="← Volver" Clicked="OnCloseClicked"
-                    Padding="12,6" VerticalOptions="Center" />
-            <Label Grid.Column="1" Text="Categorías" FontSize="26" FontAttributes="Bold"
-                   VerticalOptions="Center" />
+             Title="Categorías"
+             BackgroundColor="#F7F9FB">
+    <Grid x:Name="PageLayout" Padding="20" RowDefinitions="Auto,*" RowSpacing="20" SizeChanged="OnPageSizeChanged">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+            <Button Text="← Volver" Clicked="OnCloseClicked"
+                    BackgroundColor="#E8EEF5" TextColor="#0D1B2A"
+                    CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+            <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                <Label Text="Categorías" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                <Label Text="Organiza los productos por categoría" FontSize="14" TextColor="#61738A" />
+            </VerticalStackLayout>
         </Grid>
-        <VerticalStackLayout Grid.Row="1" Spacing="8">
-            <Entry Placeholder="Nombre de la categoría" Text="{Binding CategoryName}"
-                   ReturnType="Go" />
-            <HorizontalStackLayout Spacing="8">
-                <Button Text="{Binding SaveButtonText}" Command="{Binding SaveCommand}"
-                        HorizontalOptions="Fill" />
-                <Button Text="Cancelar" Command="{Binding CancelEditCommand}"
-                        IsVisible="{Binding IsEditing}" />
-            </HorizontalStackLayout>
-            <Label Text="El nombre es obligatorio y único. Se ignoran mayúsculas y espacios al comparar."
-                   FontSize="12" />
-            <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
-        </VerticalStackLayout>
-        <ActivityIndicator Grid.Row="2" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                           HorizontalOptions="Center" />
-        <CollectionView Grid.Row="3" ItemsSource="{Binding Categories}"
-                        SelectionMode="None">
-            <CollectionView.EmptyView>
-                <Label Text="Todavía no hay categorías. Escribe un nombre para crear la primera."
-                       HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
-            </CollectionView.EmptyView>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="categories:CategorySummary">
-                    <Grid Padding="8" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                        <Label Grid.Column="0" Text="{Binding Name}" VerticalOptions="Center" />
-                        <Button Grid.Column="1" Text="Editar" Clicked="OnEditClicked"
-                                Padding="12,6" />
-                        <Button Grid.Column="2" Text="Eliminar" Clicked="OnDeleteClicked"
-                                Padding="12,6" />
+
+        <Grid Grid.Row="1" x:Name="ContentLayout" ColumnDefinitions="*" RowDefinitions="Auto,*" RowSpacing="18">
+            <Border x:Name="FormCard" Grid.Row="0" Padding="20" BackgroundColor="White"
+                    Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="3">
+                        <Label Text="Nueva categoría" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Escribe el nombre que aparecerá en el catálogo." FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                    <Grid x:Name="FormFields" ColumnDefinitions="*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                        <Entry x:Name="CategoryNameEntry" Grid.Row="0" Placeholder="Nombre de la categoría"
+                               Text="{Binding CategoryName}" ReturnType="Go" ClearButtonVisibility="WhileEditing"
+                               BackgroundColor="#FFFFFF" TextColor="#111D31" PlaceholderColor="#8291A5"
+                               HeightRequest="54" />
+                        <HorizontalStackLayout x:Name="FormActions" Grid.Row="1" Spacing="10">
+                            <Button Text="{Binding SaveButtonText}" Command="{Binding SaveCommand}"
+                                    BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="11"
+                                    Padding="22,12" />
+                            <Button Text="Cancelar" Command="{Binding CancelEditCommand}"
+                                    IsVisible="{Binding IsEditing}" BackgroundColor="#E8EEF5"
+                                    TextColor="#0D1B2A" CornerRadius="11" Padding="20,12" />
+                        </HorizontalStackLayout>
                     </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                    <Label Text="El nombre es obligatorio y único. Se ignoran mayúsculas y espacios al comparar."
+                           FontSize="12" TextColor="#61738A" />
+                    <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="13" />
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                       HorizontalOptions="Start" Color="#0D1B2A" />
+                </VerticalStackLayout>
+            </Border>
+
+            <VerticalStackLayout Grid.Row="1" Spacing="12">
+                <Label Text="Categorías registradas" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                <CollectionView ItemsSource="{Binding Categories}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeShape="RoundRectangle 14">
+                            <Label Text="Todavía no hay categorías. Escribe un nombre para crear la primera."
+                                   HorizontalTextAlignment="Center" TextColor="#61738A" />
+                        </Border>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="categories:CategorySummary">
+                            <Border Margin="0,0,0,10" Padding="16" BackgroundColor="White"
+                                    Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 14">
+                                <Grid x:Name="CategoryRow" ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto" ColumnSpacing="10" RowSpacing="10">
+                                    <Label Text="{Binding Name}" FontSize="16"
+                                           TextColor="#111D31" VerticalOptions="Center" />
+                                    <Button Grid.Column="1" Text="Editar" Clicked="OnEditClicked"
+                                            BackgroundColor="#E8EEF5" TextColor="#0D1B2A"
+                                            CornerRadius="10" Padding="16,9" />
+                                    <Button Grid.Column="2" Text="Eliminar" Clicked="OnDeleteClicked"
+                                            BackgroundColor="#FDECEC" TextColor="#B42318"
+                                            CornerRadius="10" Padding="16,9" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>

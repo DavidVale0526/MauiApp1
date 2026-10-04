@@ -10,8 +10,8 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 2 | Menú principal (`MainPage`) | Panel principal / Dashboard | Adaptada; el usuario indicó continuar |
 | 3 | Registro de venta (`SaleRegistrationPage`) | Punto de venta | Adaptada; el usuario indicó continuar |
 | 4 | Catálogo y productos (`ProductManagementPage`) | Inventario / catálogo | Adaptada; pendiente de revisión |
-| 5 | Consulta de existencias (`StockConsultationPage`) | Inventario | Pendiente |
-| 6 | Categorías (`CategoryManagementPage`) | Catálogo | Pendiente |
+| 5 | Consulta de existencias (`StockConsultationPage`) | Inventario | Adaptada; pendiente de revisión |
+| 6 | Categorías (`CategoryManagementPage`) | Catálogo | Adaptada; pendiente de revisión |
 | 7 | Historial de ventas (`SaleHistoryPage`) | Ventas / historial | Pendiente |
 | 8 | Comprobante de venta (`SaleTicketPage`) | Ticket / factura | Pendiente |
 | 9 | Registro de compras (`PurchaseRegistrationPage`) | Entrada de mercancía | Pendiente |
