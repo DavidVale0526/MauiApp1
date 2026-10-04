@@ -6,6 +6,40 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class ProductManagementPage : CoordinatorRefreshPage
 {
+    private void OnPageContentSizeChanged(object? sender, EventArgs args)
+    {
+        var useDesktopLayout = PageContent.Width >= 920;
+        ProductFormGrid.ColumnDefinitions.Clear();
+        ProductFormGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        if (useDesktopLayout)
+        {
+            ProductFormGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        }
+
+        ProductFormGrid.RowDefinitions.Clear();
+        var rowCount = useDesktopLayout ? 3 : 5;
+        for (var row = 0; row < rowCount; row++)
+        {
+            ProductFormGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+
+        Grid.SetColumn(NameField, 0);
+        Grid.SetColumnSpan(NameField, useDesktopLayout ? 2 : 1);
+        Grid.SetRow(PriceField, useDesktopLayout ? 1 : 1);
+        Grid.SetColumn(PriceField, 0);
+        Grid.SetRow(UnitField, useDesktopLayout ? 1 : 2);
+        Grid.SetColumn(UnitField, useDesktopLayout ? 1 : 0);
+        Grid.SetRow(CategoryField, useDesktopLayout ? 2 : 3);
+        Grid.SetColumn(CategoryField, 0);
+        Grid.SetRow(MinimumStockField, useDesktopLayout ? 2 : 4);
+        Grid.SetColumn(MinimumStockField, useDesktopLayout ? 1 : 0);
+
+        PageContent.Padding = useDesktopLayout
+            ? new Thickness(32, 28)
+            : new Thickness(16, 20);
+        ProductsCollection.HeightRequest = useDesktopLayout ? 620 : 460;
+    }
+
     private readonly ProductManagementViewModel _viewModel;
 
     public ProductManagementPage(ProductManagementViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
