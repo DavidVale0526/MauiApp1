@@ -4,24 +4,60 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.CashierSetupPage"
              x:DataType="viewModels:CashierSetupViewModel"
-             Title="Crear cuenta de Cajero">
+             Title="Crear cuenta de Cajero" BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#0D1B2A" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+        <Style x:Key="BackButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#E8EEF5" />
+            <Setter Property="TextColor" Value="#0D1B2A" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="18,12" />
+        </Style>
+        <Style x:Key="Input" TargetType="Entry">
+            <Setter Property="HeightRequest" Value="52" />
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="TextColor" Value="#111D31" />
+            <Setter Property="PlaceholderColor" Value="#8291A5" />
+        </Style>
+    </ContentPage.Resources>
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="16" MaximumWidthRequest="440"
-                             HorizontalOptions="Center" VerticalOptions="Center">
-            <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start"
-                    Padding="12,6" />
-            <Label Text="Crear cuenta de Cajero" FontSize="24" FontAttributes="Bold"
-                   HorizontalTextAlignment="Center" />
-            <Label Text="La cuenta se guardará en este dispositivo. Configúrala también en otros equipos hasta que se habilite la sincronización LAN."
-                   FontSize="13" HorizontalTextAlignment="Center" />
-            <Entry Placeholder="Nombre de usuario" Text="{Binding UserName}" ReturnType="Next" />
-            <Entry Placeholder="Contraseña (mínimo 15 caracteres)" Text="{Binding Password}"
-                   IsPassword="True" ReturnType="Next" />
-            <Entry Placeholder="Confirma la contraseña" Text="{Binding PasswordConfirmation}"
-                   IsPassword="True" ReturnType="Go" />
-            <Label Text="{Binding ErrorMessage}" TextColor="Firebrick" />
-            <Button Text="Crear cuenta" Command="{Binding CreateAccountCommand}" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-        </VerticalStackLayout>
+        <Grid Padding="16,20">
+            <VerticalStackLayout Spacing="18" MaximumWidthRequest="520" HorizontalOptions="Center">
+                <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start" Style="{StaticResource BackButton}" />
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Crear cuenta de cajero" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Prepara un acceso para operar ventas en este dispositivo." FontSize="14" TextColor="#61738A" />
+                </VerticalStackLayout>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Datos de acceso" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="La cuenta se guarda localmente. Configúrala también en otros equipos hasta habilitar la sincronización LAN." FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Nombre de usuario" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Nombre de usuario" Text="{Binding UserName}" ReturnType="Next" Style="{StaticResource Input}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Contraseña" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Mínimo 15 caracteres" Text="{Binding Password}" IsPassword="True" ReturnType="Next" Style="{StaticResource Input}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Confirmar contraseña" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Repite la contraseña" Text="{Binding PasswordConfirmation}" IsPassword="True" ReturnType="Go" Style="{StaticResource Input}" />
+                        </VerticalStackLayout>
+                        <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+                        <Button Text="Crear cuenta" Command="{Binding CreateAccountCommand}" Style="{StaticResource PrimaryButton}" />
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="#008060" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
     </ScrollView>
 </ContentPage>

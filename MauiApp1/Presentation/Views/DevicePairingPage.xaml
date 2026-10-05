@@ -4,44 +4,86 @@
              xmlns:vm="clr-namespace:MauiApp1.Presentation.ViewModels"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="MauiApp1.Presentation.Views.DevicePairingPage"
-             x:DataType="vm:DevicePairingViewModel" Title="Vinculación por red local">
+             x:DataType="vm:DevicePairingViewModel" Title="Vinculación por red local" BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#008060" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#E8EEF5" />
+            <Setter Property="TextColor" Value="#0D1B2A" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+        <Style x:Key="Input" TargetType="Entry">
+            <Setter Property="HeightRequest" Value="52" />
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="TextColor" Value="#111D31" />
+            <Setter Property="PlaceholderColor" Value="#8291A5" />
+        </Style>
+    </ContentPage.Resources>
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="14" MaximumWidthRequest="600" HorizontalOptions="Center">
-            <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start" />
-            <Label Text="Vincular con el coordinador" FontSize="24" FontAttributes="Bold" />
-            <Label Text="Conecta ambos dispositivos al Wi-Fi del negocio. El coordinador debe estar instalado y encendido en Windows." />
-            <Label Text="{Binding LinkStatus}" FontAttributes="Bold" />
-            <Button Text="Desvincular este dispositivo" Clicked="OnUnlinkClicked" IsVisible="{Binding CanUnlink}" />
-            <Label Text="Al desvincular, se revoca el acceso al coordinador. Los productos, ventas y demás datos locales de este dispositivo se conservan. El coordinador debe estar disponible en la red local." IsVisible="{Binding CanUnlink}" FontSize="13" />
-            <Label Text="Dirección del coordinador" />
-            <Entry Placeholder="https://192.168.1.10:5080" Text="{Binding Address}" IsEnabled="{Binding CanEditAddress}" Keyboard="Url" />
-            <Label Text="Código de seguridad del coordinador (SHA-256)" />
-            <Entry Placeholder="64 caracteres del certificado de Windows" Text="{Binding Fingerprint}" IsEnabled="{Binding CanEditConnection}" MaxLength="95" />
-            <Label Text="Copia este código de seguridad desde la instalación del coordinador en Windows. Permite reconocer el equipo autorizado al conectarse." FontSize="13" />
-            <Border Padding="14" IsVisible="{Binding CanGenerateCode}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Autorizar otro dispositivo desde Windows" FontAttributes="Bold" />
-                    <Label Text="Confirma las credenciales del Administrador del coordinador y entrega el código generado al otro dispositivo." />
-                    <Entry Placeholder="Administrador del coordinador" Text="{Binding UserName}" IsEnabled="{Binding CanEditForm}" />
-                    <Entry Placeholder="Contraseña del Administrador" Text="{Binding Password}" IsPassword="True" IsEnabled="{Binding CanEditForm}" />
-                    <Button Text="Generar código de vinculación" Command="{Binding GenerateCodeCommand}" />
-                    <Label Text="{Binding GeneratedCode}" FontSize="20" FontAttributes="Bold" />
-                    <zxing:BarcodeGeneratorView Value="{Binding GeneratedQrPayload}" Format="QrCode"
-                                                HeightRequest="240" WidthRequest="240" HorizontalOptions="Center"
-                                                IsVisible="{Binding CanShowGeneratedQr}" />
-                    <Label Text="Escanea este QR con el teléfono. Incluye la dirección, la huella y el código temporal; vence junto con el código."
-                           IsVisible="{Binding CanShowGeneratedQr}" FontSize="13" />
+        <Grid Padding="16,20">
+            <VerticalStackLayout Spacing="18" MaximumWidthRequest="680" HorizontalOptions="Center">
+                <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start" Style="{StaticResource SecondaryButton}" />
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Vincular dispositivo" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Conecta este equipo con el coordinador de Windows mediante la red local." FontSize="14" TextColor="#61738A" />
                 </VerticalStackLayout>
-            </Border>
-            <VerticalStackLayout IsVisible="{Binding ShowPairForm}" Spacing="12">
-                <Label Text="Vincular este dispositivo" FontAttributes="Bold" />
-                <Button Text="Escanear QR de Windows" Clicked="OnScanQrClicked" IsVisible="{Binding CanScanQr}" />
-                <Entry Placeholder="Código de ocho dígitos" Text="{Binding Code}" Keyboard="Numeric" MaxLength="8" IsEnabled="{Binding CanEditForm}" />
-                <Button Text="Vincular / reintentar" Command="{Binding PairCommand}" />
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Estado de la vinculación" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="{Binding LinkStatus}" FontAttributes="Bold" TextColor="#008060" />
+                        <Label Text="Conecta ambos dispositivos al Wi-Fi del negocio. El coordinador debe estar instalado y encendido en Windows." FontSize="13" TextColor="#61738A" />
+                        <Button Text="Desvincular este dispositivo" Clicked="OnUnlinkClicked" IsVisible="{Binding CanUnlink}" Style="{StaticResource SecondaryButton}" />
+                        <Label Text="Al desvincular, se revoca el acceso al coordinador. Los datos locales se conservan." IsVisible="{Binding CanUnlink}" FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="14">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Datos del coordinador" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Usa la dirección y la huella de seguridad mostradas en Windows." FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Dirección del coordinador" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="https://192.168.1.10:5080" Text="{Binding Address}" IsEnabled="{Binding CanEditAddress}" Keyboard="Url" Style="{StaticResource Input}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Código de seguridad (SHA-256)" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Huella del certificado de Windows" Text="{Binding Fingerprint}" IsEnabled="{Binding CanEditConnection}" MaxLength="95" Style="{StaticResource Input}" />
+                        </VerticalStackLayout>
+                        <Label Text="La huella permite reconocer el equipo autorizado al conectarse." FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding CanGenerateCode}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Autorizar otro dispositivo" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Confirma las credenciales del Administrador y entrega el código generado al teléfono." FontSize="13" TextColor="#61738A" />
+                        <Entry Placeholder="Administrador del coordinador" Text="{Binding UserName}" IsEnabled="{Binding CanEditForm}" Style="{StaticResource Input}" />
+                        <Entry Placeholder="Contraseña del Administrador" Text="{Binding Password}" IsPassword="True" IsEnabled="{Binding CanEditForm}" Style="{StaticResource Input}" />
+                        <Button Text="Generar código de vinculación" Command="{Binding GenerateCodeCommand}" Style="{StaticResource PrimaryButton}" />
+                        <Label Text="{Binding GeneratedCode}" FontSize="20" FontAttributes="Bold" TextColor="#0D1B2A" HorizontalTextAlignment="Center" />
+                        <zxing:BarcodeGeneratorView Value="{Binding GeneratedQrPayload}" Format="QrCode" HeightRequest="240" WidthRequest="240" HorizontalOptions="Center" IsVisible="{Binding CanShowGeneratedQr}" />
+                        <Label Text="Escanea este QR con el teléfono. Vence junto con el código temporal." IsVisible="{Binding CanShowGeneratedQr}" FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding ShowPairForm}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Vincular este dispositivo" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Button Text="Escanear QR de Windows" Clicked="OnScanQrClicked" IsVisible="{Binding CanScanQr}" Style="{StaticResource SecondaryButton}" />
+                        <Entry Placeholder="Código de ocho dígitos" Text="{Binding Code}" Keyboard="Numeric" MaxLength="8" IsEnabled="{Binding CanEditForm}" Style="{StaticResource Input}" />
+                        <Button Text="Vincular / reintentar" Command="{Binding PairCommand}" Style="{StaticResource PrimaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
+                <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" HorizontalOptions="Center" Color="#008060" />
+                <Label Text="{Binding Message}" TextColor="#B42318" FontSize="14" />
+                <Label Text="Las cuentas y los datos siguen siendo locales hasta completar la sincronización." FontSize="13" TextColor="#61738A" />
             </VerticalStackLayout>
-            <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" />
-            <Label Text="{Binding Message}" />
-            <Label Text="Esta vinculación prepara la autorización del dispositivo. Las cuentas y los datos siguen siendo locales hasta completar la sincronización." FontSize="13" />
-        </VerticalStackLayout>
+        </Grid>
     </ScrollView>
 </ContentPage>

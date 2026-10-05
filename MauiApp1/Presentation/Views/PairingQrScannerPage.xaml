@@ -3,13 +3,20 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="MauiApp1.Presentation.Views.PairingQrScannerPage"
-             Title="Escanear QR">
-    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="16">
-        <Label Text="Apunta la cámara al QR que aparece en Windows" FontSize="20" FontAttributes="Bold" />
-        <zxing:CameraBarcodeReaderView x:Name="CameraView" Grid.Row="1" BarcodesDetected="OnBarcodesDetected" />
+             Title="Escanear QR" BackgroundColor="#F7F9FB">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16,20" RowSpacing="16">
+        <VerticalStackLayout Spacing="4">
+            <Label Text="Escanear código QR" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+            <Label Text="Apunta la cámara al QR que aparece en Windows." FontSize="14" TextColor="#61738A" />
+        </VerticalStackLayout>
+        <Border Grid.Row="1" Margin="0,6" Padding="10" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+            <zxing:CameraBarcodeReaderView x:Name="CameraView" BarcodesDetected="OnBarcodesDetected" />
+        </Border>
         <VerticalStackLayout Grid.Row="2" Spacing="12">
-            <Label x:Name="StatusLabel" Text="El QR contiene una clave temporal de vinculación." />
-            <Button Text="Cancelar" Clicked="OnCancelClicked" />
+            <Border Padding="14" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 12">
+                <Label x:Name="StatusLabel" Text="El QR contiene una clave temporal de vinculación." TextColor="#52657D" />
+            </Border>
+            <Button Text="Cancelar" Clicked="OnCancelClicked" BackgroundColor="#E8EEF5" TextColor="#0D1B2A" CornerRadius="11" Padding="18,13" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

@@ -3,26 +3,59 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
              x:Class="MauiApp1.Presentation.Views.SyncManagementPage"
-             Title="Sincronización y conexión">
+             Title="Sincronización y conexión" BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#008060" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#E8EEF5" />
+            <Setter Property="TextColor" Value="#0D1B2A" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+    </ContentPage.Resources>
     <Grid Padding="24">
         <ScrollView>
-            <VerticalStackLayout Spacing="14" MaximumWidthRequest="720" HorizontalOptions="Center">
-                <Button Text="← Volver al menú principal" Clicked="OnBackClicked" HorizontalOptions="Start" />
-                <Label Text="Sincronización y conexión" FontSize="26" FontAttributes="Bold" />
-                <Label Text="Consulta el estado de la red, sincroniza los cambios pendientes y administra la conexión con los dispositivos del negocio." />
-                <Border Padding="14" Stroke="Gray">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Estado del coordinador" FontAttributes="Bold" />
-                        <Label x:Name="CoordinatorStatusLabel" Text="Consultando coordinador…" />
-                        <Label x:Name="NetworkStatusLabel" />
-                        <Label x:Name="RealtimeStatusLabel" />
-                        <Label x:Name="SyncStatusLabel" />
+            <VerticalStackLayout Spacing="18" MaximumWidthRequest="760" HorizontalOptions="Center">
+                <Button Text="← Volver al menú principal" Clicked="OnBackClicked" HorizontalOptions="Start" Style="{StaticResource SecondaryButton}" />
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Sincronización y conexión" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Mantén conectados los dispositivos del negocio y administra los cambios pendientes." FontSize="14" TextColor="#61738A" />
+                </VerticalStackLayout>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="5,*" ColumnSpacing="12">
+                            <BoxView Color="#008060" CornerRadius="3" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                <Label Text="Estado de la conexión" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="Información actual del coordinador y de esta sesión." FontSize="13" TextColor="#61738A" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Border Padding="14" BackgroundColor="#F7F9FB" Stroke="#E3EAF2" StrokeShape="RoundRectangle 12">
+                            <VerticalStackLayout Spacing="8">
+                                <Label x:Name="CoordinatorStatusLabel" Text="Consultando coordinador…" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label x:Name="NetworkStatusLabel" FontSize="13" TextColor="#61738A" />
+                                <Label x:Name="RealtimeStatusLabel" FontSize="13" TextColor="#61738A" />
+                                <Label x:Name="SyncStatusLabel" FontSize="13" TextColor="#52657D" />
+                            </VerticalStackLayout>
+                        </Border>
                     </VerticalStackLayout>
                 </Border>
-                <Button x:Name="SynchronizeButton" Text="Sincronizar ahora" Clicked="OnSynchronizeClicked" />
-                <Button Text="Actualizar estado" Clicked="OnRefreshClicked" />
-                <Button x:Name="ReviewConflictsButton" Text="Revisar conflictos" Clicked="OnReviewConflictsClicked" />
-                <Button Text="Vincular o desvincular dispositivo" Clicked="OnDevicePairingClicked" />
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Acciones" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Sincroniza cuando quieras enviar o recibir cambios." FontSize="13" TextColor="#61738A" />
+                        <Button x:Name="SynchronizeButton" Text="Sincronizar ahora" Clicked="OnSynchronizeClicked" Style="{StaticResource PrimaryButton}" />
+                        <Button Text="Actualizar estado" Clicked="OnRefreshClicked" Style="{StaticResource SecondaryButton}" />
+                        <Button x:Name="ReviewConflictsButton" Text="Revisar conflictos" Clicked="OnReviewConflictsClicked" Style="{StaticResource SecondaryButton}" />
+                        <Button Text="Vincular o desvincular dispositivo" Clicked="OnDevicePairingClicked" Style="{StaticResource SecondaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
         </ScrollView>
     </Grid>

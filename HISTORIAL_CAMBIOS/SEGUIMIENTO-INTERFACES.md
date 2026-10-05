@@ -21,11 +21,11 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 13 | Clientes y crédito (`CustomerManagementPage`) | Clientes | Adaptada; pendiente de revisión |
 | 14 | Pagos (`PaymentManagementPage`) | Cobro y pagos | Adaptada; pendiente de revisión |
 | 15 | Reportes (`ReportsPage`) | Tarjetas y jerarquía visual de la referencia compartida | Adaptada; pendiente de revisión en Windows y Android |
-| 16 | Gestión de cuentas de cajero (`CashierSetupPage`) | Usuarios / administración | Pendiente |
-| 17 | Sincronización y conexión (`SyncManagementPage`) | Panel de sincronización | Pendiente |
-| 18 | Revisión de conflictos (`ConflictReviewPage`) | Sincronización | Pendiente |
-| 19 | Vinculación de dispositivo (`DevicePairingPage`) | Sincronización | Pendiente |
-| 20 | Lector QR de vinculación (`PairingQrScannerPage`) | Sincronización | Pendiente |
+| 16 | Gestión de cuentas de cajero (`CashierSetupPage`) | Usuarios / administración | Rediseñada; pendiente de revisión |
+| 17 | Sincronización y conexión (`SyncManagementPage`) | Panel de sincronización | Rediseñada; pendiente de revisión |
+| 18 | Revisión de conflictos (`ConflictReviewPage`) | Sincronización | Rediseñada; pendiente de revisión |
+| 19 | Vinculación de dispositivo (`DevicePairingPage`) | Sincronización | Rediseñada; pendiente de revisión |
+| 20 | Lector QR de vinculación (`PairingQrScannerPage`) | Sincronización | Rediseñada; pendiente de revisión |
 | 21 | Más opciones (`MoreOptionsPage`) | Vista del botón «Más» | Adaptada; pendiente de revisión |
 | 22 | Revisión de venta (`SaleReviewPage`) | Referencia de confirmación | Adaptada; reemplaza visualmente la confirmación nativa existente; pendiente de revisión |
 

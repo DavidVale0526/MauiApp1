@@ -1,4 +1,5 @@
 using MauiApp1.Application.Sync;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace MauiApp1.Presentation.Views;
 
@@ -6,8 +7,8 @@ public sealed class ConflictReviewPage : CoordinatorRefreshPage
 {
     private readonly ICoordinatorConflictReviewService _service;
     private readonly ILocalOperationSyncService _operationSyncService;
-    private readonly VerticalStackLayout _items = new() { Spacing = 14, Padding = new Thickness(16) };
-    private readonly Label _queueStatus = new();
+    private readonly VerticalStackLayout _items = new() { Spacing = 16, Padding = new Thickness(16, 20) };
+    private readonly Label _queueStatus = new() { FontSize = 13, TextColor = Colors.Gray };
 
     public ConflictReviewPage(ICoordinatorConflictReviewService service, ILocalOperationSyncService operationSyncService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
@@ -15,15 +16,16 @@ public sealed class ConflictReviewPage : CoordinatorRefreshPage
         _service = service;
         _operationSyncService = operationSyncService;
         Title = "Revisión de conflictos";
-        var back = new Button { Text = "← Volver a sincronización", HorizontalOptions = LayoutOptions.Start };
+        BackgroundColor = Color.FromArgb("#F7F9FB");
+        var back = new Button { Text = "← Volver a sincronización", HorizontalOptions = LayoutOptions.Start, BackgroundColor = Color.FromArgb("#E8EEF5"), TextColor = Color.FromArgb("#0D1B2A"), CornerRadius = 11, Padding = new Thickness(18, 12) };
         back.Clicked += async (_, _) => await Navigation.PopModalAsync();
-        var refresh = new Button { Text = "Actualizar conflictos" };
+        var refresh = CreateSecondaryButton("Actualizar conflictos");
         refresh.Clicked += async (_, _) => await LoadAsync();
-        var retry = new Button { Text = "Reintentar sincronización" };
+        var retry = CreatePrimaryButton("Reintentar sincronización");
         retry.Clicked += async (_, _) => await RetrySyncAsync();
         _items.Add(back);
-        _items.Add(new Label { Text = "Cambios simultáneos", FontSize = 24, FontAttributes = FontAttributes.Bold });
-        _items.Add(new Label { Text = "Aquí aparecen cambios simultáneos que el coordinador ya recibió. Las operaciones pendientes de envío se muestran aparte; por sí solas no son conflictos." });
+        _items.Add(new Label { Text = "Cambios simultáneos", FontSize = 28, FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#111D31") });
+        _items.Add(new Label { Text = "Aquí aparecen cambios simultáneos que el coordinador ya recibió. Las operaciones pendientes de envío se muestran aparte; por sí solas no son conflictos.", FontSize = 14, TextColor = Color.FromArgb("#61738A") });
         _items.Add(refresh);
         _items.Add(retry);
         _items.Add(_queueStatus);
@@ -53,34 +55,60 @@ public sealed class ConflictReviewPage : CoordinatorRefreshPage
         }
         IReadOnlyList<CoordinatorConflictItem> conflicts;
         try { conflicts = await _service.GetOpenAsync(); }
-        catch (InvalidOperationException exception) { _items.Add(new Label { Text = exception.Message }); return; }
-        catch { _items.Add(new Label { Text = "No se pudieron consultar los conflictos. Comprueba la conexión local." }); return; }
+        catch (InvalidOperationException exception) { _items.Add(CreateMessageLabel(exception.Message)); return; }
+        catch { _items.Add(CreateMessageLabel("No se pudieron consultar los conflictos. Comprueba la conexión local.")); return; }
         if (conflicts.Count == 0)
         {
-            _items.Add(new Label { Text = "No hay conflictos pendientes de revisión." });
+            _items.Add(new Border { Padding = 16, BackgroundColor = Colors.White, Stroke = Color.FromArgb("#E3EAF2"), StrokeShape = new RoundRectangle { CornerRadius = 12 }, Content = CreateMessageLabel("No hay conflictos pendientes de revisión.") });
             return;
         }
         foreach (var conflict in conflicts)
         {
             var card = new VerticalStackLayout { Spacing = 8, Padding = new Thickness(12) };
-            card.Add(new Label { Text = conflict.OperationType, FontAttributes = FontAttributes.Bold, FontSize = 18 });
-            card.Add(new Label { Text = conflict.Message });
-            card.Add(new Label { Text = conflict.IsLocalConflict ? "Versión actual de este dispositivo" : "Versión vigente en el coordinador", FontAttributes = FontAttributes.Bold });
-            card.Add(new Label { Text = conflict.CurrentSummary });
-            card.Add(new Label { Text = "Versión recibida", FontAttributes = FontAttributes.Bold });
-            card.Add(new Label { Text = conflict.ProposedSummary });
-            var keep = new Button { Text = conflict.IsLocalConflict ? "Conservar versión de este dispositivo" : "Conservar versión del coordinador" };
+            card.Add(new Label { Text = conflict.OperationType, FontAttributes = FontAttributes.Bold, FontSize = 18, TextColor = Color.FromArgb("#111D31") });
+            card.Add(new Label { Text = conflict.Message, FontSize = 13, TextColor = Color.FromArgb("#61738A") });
+            card.Add(new Label { Text = conflict.IsLocalConflict ? "Versión actual de este dispositivo" : "Versión vigente en el coordinador", FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#52657D") });
+            card.Add(new Label { Text = conflict.CurrentSummary, TextColor = Color.FromArgb("#111D31") });
+            card.Add(new Label { Text = "Versión recibida", FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#52657D") });
+            card.Add(new Label { Text = conflict.ProposedSummary, TextColor = Color.FromArgb("#111D31") });
+            var keep = CreateSecondaryButton(conflict.IsLocalConflict ? "Conservar versión de este dispositivo" : "Conservar versión del coordinador");
             keep.Clicked += async (_, _) => await ResolveAsync(conflict, applyIncoming: false);
             card.Add(keep);
             if (conflict.CanApplyIncoming)
             {
-                var apply = new Button { Text = conflict.IsLocalConflict ? "Aplicar versión recibida del coordinador" : "Usar versión recibida" };
+                var apply = CreatePrimaryButton(conflict.IsLocalConflict ? "Aplicar versión recibida del coordinador" : "Usar versión recibida");
                 apply.Clicked += async (_, _) => await ResolveAsync(conflict, applyIncoming: true);
                 card.Add(apply);
             }
-            _items.Add(new Border { Stroke = Colors.Gray, Padding = 1, Content = card });
+            _items.Add(new Border { BackgroundColor = Colors.White, Stroke = Color.FromArgb("#E3EAF2"), StrokeThickness = 1, StrokeShape = new RoundRectangle { CornerRadius = 14 }, Padding = 1, Content = card });
         }
     }
+
+    private static Button CreatePrimaryButton(string text) => new()
+    {
+        Text = text,
+        BackgroundColor = Color.FromArgb("#008060"),
+        TextColor = Colors.White,
+        CornerRadius = 11,
+        FontAttributes = FontAttributes.Bold,
+        Padding = new Thickness(18, 13)
+    };
+
+    private static Button CreateSecondaryButton(string text) => new()
+    {
+        Text = text,
+        BackgroundColor = Color.FromArgb("#E8EEF5"),
+        TextColor = Color.FromArgb("#0D1B2A"),
+        CornerRadius = 11,
+        Padding = new Thickness(18, 13)
+    };
+
+    private static Label CreateMessageLabel(string text) => new()
+    {
+        Text = text,
+        FontSize = 14,
+        TextColor = Color.FromArgb("#61738A")
+    };
 
     private async Task RetrySyncAsync()
     {
