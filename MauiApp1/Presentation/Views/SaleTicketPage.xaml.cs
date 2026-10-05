@@ -18,6 +18,7 @@ public partial class SaleTicketPage : ContentPage
         if (sender is Grid layout)
         {
             layout.Padding = Width >= 900 ? new Thickness(32, 28) : new Thickness(16, 20);
+            TicketLayout.WidthRequest = Math.Min(720, Math.Max(0, layout.Width - layout.Padding.HorizontalThickness));
         }
     }
 }

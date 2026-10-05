@@ -124,6 +124,12 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 
     public Guid? LastCompletedSaleOperationId => _lastCompletedSaleOperationId;
 
+    public string CartSummaryText => $"{Lines.Count} productos";
+
+    public string TotalAmountText => TotalText.StartsWith("Total: ", StringComparison.Ordinal)
+        ? $"C$ {TotalText[7..]}"
+        : TotalText;
+
     public string TotalText
     {
         get
@@ -409,6 +415,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     private void OnLinesChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
     {
         OnPropertyChanged(nameof(TotalText));
+        OnPropertyChanged(nameof(TotalAmountText));
+        OnPropertyChanged(nameof(CartSummaryText));
         OnPropertyChanged(nameof(CanConfirm));
     }
 
@@ -433,6 +441,10 @@ public sealed record SaleProductOption(ProductId Id, string Name, string Unit, M
 {
     public string DisplayName => $"{Name} ({Unit})";
 
+    public string PriceText => $"C$ {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}";
+
+    public string StockText => $"Disponible: {Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+
     public string PriceAndStockText =>
         $"Precio: {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}   |   Disponible: {Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
 }
@@ -443,7 +455,9 @@ public sealed record SaleCartLine(ProductId ProductId, string Name, string Unit,
 
     public string QuantityText => $"{Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
 
-    public string PriceText => $"{SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)} c/u";
+    public string PriceText => $"C$ {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)} c/u";
+
+    public string TotalAmountText => $"C$ {(LineTotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
 
     public string TotalText => $"Subtotal: {(LineTotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
 }

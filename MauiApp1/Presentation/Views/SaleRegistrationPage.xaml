@@ -1,170 +1,212 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
-             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
-             x:Class="MauiApp1.Presentation.Views.SaleRegistrationPage"
-             x:DataType="viewModels:SaleRegistrationViewModel"
-             Title="Registrar venta"
-             Shell.NavBarIsVisible="False"
-             BackgroundColor="#F7F9FB">
-    <ContentPage.Resources>
-        <Style x:Key="SaleSurfaceStyle" TargetType="Border">
-            <Setter Property="BackgroundColor" Value="White" />
-            <Setter Property="Stroke" Value="#E3EAF2" />
-            <Setter Property="StrokeThickness" Value="1" />
-            <Setter Property="StrokeShape" Value="RoundRectangle 14" />
-            <Setter Property="Padding" Value="20" />
-        </Style>
-        <Style x:Key="SalePrimaryButtonStyle" TargetType="Button">
-            <Setter Property="BackgroundColor" Value="#0D1B2A" />
-            <Setter Property="TextColor" Value="White" />
-            <Setter Property="FontAttributes" Value="Bold" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="Padding" Value="16,12" />
-        </Style>
-        <Style x:Key="SaleSecondaryButtonStyle" TargetType="Button">
-            <Setter Property="BackgroundColor" Value="#EEF2F7" />
-            <Setter Property="TextColor" Value="#26384C" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="14,10" />
-        </Style>
-        <Style x:Key="SaleFieldBorderStyle" TargetType="Border">
-            <Setter Property="BackgroundColor" Value="White" />
-            <Setter Property="Stroke" Value="#DCE5EF" />
-            <Setter Property="StrokeThickness" Value="1" />
-            <Setter Property="StrokeShape" Value="RoundRectangle 9" />
-            <Setter Property="Padding" Value="12,2" />
-        </Style>
-    </ContentPage.Resources>
-
-    <ScrollView VerticalScrollBarVisibility="Never">
-        <VerticalStackLayout x:Name="SaleLayout" SizeChanged="OnSaleLayoutSizeChanged"
-                             Padding="18,22" Spacing="20" HorizontalOptions="Center" MaximumWidthRequest="1440">
-            <VerticalStackLayout Spacing="12">
-                <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked"
-                        Style="{StaticResource SaleSecondaryButtonStyle}" />
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                    <Label Text="Punto de venta" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
-                    <Label Grid.Row="1" Text="Agrega productos y revisa la venta antes de confirmarla." FontSize="14" TextColor="#61738A" />
-                    <Border Grid.Column="1" Grid.RowSpan="2" BackgroundColor="#EAF7F1" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 20" Padding="12,6" VerticalOptions="Center">
-                        <Label Text="Venta" FontSize="12" FontAttributes="Bold" TextColor="#18794E" />
-                    </Border>
-                </Grid>
-            </VerticalStackLayout>
-
-            <Grid x:Name="ContentPanels" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="18" RowSpacing="16">
-                <Border x:Name="ProductPanel" Grid.Row="0" Grid.Column="0" Style="{StaticResource SaleSurfaceStyle}">
-                    <VerticalStackLayout Spacing="16">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="Agregar productos" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Elige un producto activo e indica la cantidad." FontSize="12" TextColor="#718198" />
-                        </VerticalStackLayout>
-
-                        <Border BackgroundColor="#F7F9FB" Stroke="#E6ECF3" StrokeThickness="1"
-                                StrokeShape="RoundRectangle 10" Padding="12,8">
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                                <CheckBox IsChecked="{Binding IsCredit}" IsEnabled="{Binding CanEditLines}"
-                                          Color="#0D1B2A" VerticalOptions="Center" />
-                                <Label Grid.Column="1" Text="Registrar como venta a crédito" FontSize="13"
-                                       TextColor="#26384C" VerticalOptions="Center" />
-                            </Grid>
-                        </Border>
-
-                        <VerticalStackLayout IsVisible="{Binding IsCredit}" Spacing="6">
-                            <Label Text="CLIENTE" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.6" TextColor="#61738A" />
-                            <Border Style="{StaticResource SaleFieldBorderStyle}">
-                                <Picker Title="Selecciona un cliente" ItemsSource="{Binding Customers}"
-                                        ItemDisplayBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedCustomer}"
-                                        IsEnabled="{Binding CanEditLines}" TextColor="#172438" />
-                            </Border>
-                        </VerticalStackLayout>
-
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="PRODUCTO" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.6" TextColor="#61738A" />
-                            <Border Style="{StaticResource SaleFieldBorderStyle}">
-                                <Picker Title="Selecciona un producto activo" ItemsSource="{Binding Products}"
-                                        ItemDisplayBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedProduct}"
-                                        IsEnabled="{Binding CanEditLines}" TextColor="#172438" />
-                            </Border>
-                            <Label Text="{Binding SelectedProductDetails}" FontSize="12" TextColor="#52657D" />
-                        </VerticalStackLayout>
-
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="CANTIDAD" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.6" TextColor="#61738A" />
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                <Border Style="{StaticResource SaleFieldBorderStyle}" HeightRequest="50">
-                                    <Entry Placeholder="Ej.: 1 o 0.500" Keyboard="Numeric" Text="{Binding QuantityInput}"
-                                           IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#9AA9BA"
-                                           HorizontalTextAlignment="Start" VerticalOptions="Center" />
-                                </Border>
-                                <Button Grid.Column="1" Text="Agregar" Command="{Binding AddLineCommand}"
-                                        Style="{StaticResource SalePrimaryButtonStyle}" VerticalOptions="Center" />
-                            </Grid>
-                        </VerticalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <Border x:Name="CartPanel" Grid.Row="0" Grid.Column="1" Style="{StaticResource SaleSurfaceStyle}">
-                    <VerticalStackLayout Spacing="14">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <VerticalStackLayout Spacing="3">
-                                <Label Text="Resumen de la venta" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
-                                <Label Text="Revisa los productos y cantidades." FontSize="12" TextColor="#718198" />
-                            </VerticalStackLayout>
-                            <Border Grid.Column="1" BackgroundColor="#F1F5F9" StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 18" Padding="11,5" VerticalOptions="Center">
-                                <Label Text="Carrito" FontSize="11" FontAttributes="Bold" TextColor="#52657D" />
-                            </Border>
-                        </Grid>
-
-                        <CollectionView x:Name="CartCollection" ItemsSource="{Binding Lines}" HeightRequest="310"
-                                        SelectionMode="None" VerticalScrollBarVisibility="Default">
-                            <CollectionView.EmptyView>
-                                <Border BackgroundColor="#F7F9FB" Stroke="#E6ECF3" StrokeThickness="1"
-                                        StrokeShape="RoundRectangle 10" Padding="18" Margin="0,8">
-                                    <VerticalStackLayout Spacing="5" HorizontalOptions="Center" VerticalOptions="Center">
-                                        <Label Text="Tu venta está vacía" FontSize="15" FontAttributes="Bold" TextColor="#52657D" HorizontalTextAlignment="Center" />
-                                        <Label Text="Agrega un producto para comenzar." FontSize="12" TextColor="#718198" HorizontalTextAlignment="Center" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </CollectionView.EmptyView>
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="viewModels:SaleCartLine">
-                                    <Border BackgroundColor="#FFFFFF" Stroke="#E8EDF3" StrokeThickness="1"
-                                            StrokeShape="RoundRectangle 10" Padding="12" Margin="0,0,0,8">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                            <VerticalStackLayout Grid.Column="0" Spacing="3">
-                                                <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="#172438" />
-                                                <Label Text="{Binding QuantityText}" FontSize="12" TextColor="#52657D" />
-                                                <Label Text="{Binding PriceText}" FontSize="11" TextColor="#718198" />
-                                            </VerticalStackLayout>
-                                            <VerticalStackLayout Grid.Column="1" Spacing="6" HorizontalOptions="End" VerticalOptions="Center">
-                                                <Label Text="{Binding TotalText}" FontSize="13" FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="End" />
-                                                <Button Text="Quitar" Clicked="OnRemoveLineClicked"
-                                                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}"
-                                                        Style="{StaticResource SaleSecondaryButtonStyle}" FontSize="11" Padding="10,5" />
-                                            </VerticalStackLayout>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-
-                        <BoxView HeightRequest="1" Color="#E8EDF3" />
-                        <Label Text="{Binding TotalText}" FontSize="23" FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="End" />
-
-                        <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="13" />
-                        <Label Text="{Binding StatusMessage}" TextColor="#18794E" FontSize="13" />
-                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#0D1B2A" HorizontalOptions="Center" />
-                        <Button Text="{Binding ConfirmButtonText}" Clicked="OnReviewClicked" IsEnabled="{Binding CanConfirm}"
-                                Style="{StaticResource SalePrimaryButtonStyle}" HeightRequest="52" />
-                        <Label Text="Al confirmar, la venta se registra y se actualizan las existencias. El comprobante se puede abrir al guardarla." FontSize="11"
-                               TextColor="#718198" LineBreakMode="WordWrap" />
-                    </VerticalStackLayout>
-                </Border>
-            </Grid>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:views="clr-namespace:MauiApp1.Presentation.Views" xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels" x:Class="MauiApp1.Presentation.Views.SaleRegistrationPage" x:DataType="viewModels:SaleRegistrationViewModel" Title="Ventas" Shell.NavBarIsVisible="False" BackgroundColor="#F7F9FB" NavigationPage.HasNavigationBar="False">
+  <ContentPage.Resources>
+    <Style x:Key="Surface" TargetType="Border">
+      <Setter Property="BackgroundColor" Value="White" />
+      <Setter Property="Stroke" Value="#DFE7F0" />
+      <Setter Property="StrokeThickness" Value="1" />
+      <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style x:Key="Primary" TargetType="Button">
+      <Setter Property="BackgroundColor" Value="#007F60" />
+      <Setter Property="TextColor" Value="White" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontAttributes" Value="Bold" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style x:Key="Secondary" TargetType="Button">
+      <Setter Property="BackgroundColor" Value="#F0F3F7" />
+      <Setter Property="TextColor" Value="#45556B" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="12,10" />
+    </Style>
+    <Style x:Key="Muted" TargetType="Label">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="TextColor" Value="#647792" />
+      <Setter Property="LineBreakMode" Value="WordWrap" />
+    </Style>
+    <Style x:Key="Field" TargetType="Border">
+      <Setter Property="BackgroundColor" Value="#F7F9FC" />
+      <Setter Property="Stroke" Value="#DFE7F0" />
+      <Setter Property="StrokeShape" Value="RoundRectangle 9" />
+      <Setter Property="Padding" Value="12,2" />
+      <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+  </ContentPage.Resources>
+  <Grid x:Name="PageLayout" SizeChanged="OnSaleLayoutSizeChanged" Padding="16,20">
+    <Grid x:Name="SaleLayout" HorizontalOptions="Center" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Button Text="←" Clicked="OnBackClicked" Style="{StaticResource Secondary}" FontSize="24" WidthRequest="44" HeightRequest="44" Padding="0" SemanticProperties.Description="Volver" />
+        <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+          <Label Text="Ventas" FontSize="28" FontAttributes="Bold" TextColor="#0D172B" />
+          <Label Text="Selecciona productos para la venta." Style="{StaticResource Muted}" />
         </VerticalStackLayout>
-    </ScrollView>
+        <Border Grid.Column="2" BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="12,5" VerticalOptions="Center">
+          <Label Text="Venta" FontSize="12" TextColor="#007F60" FontAttributes="Bold" />
+        </Border>
+      </Grid>
+      <Grid x:Name="ContentPanels" Grid.Row="1" ColumnDefinitions="*,360" ColumnSpacing="20">
+        <Border x:Name="ProductPanel" Padding="0" BackgroundColor="Transparent" StrokeThickness="0">
+          <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+            <Border Style="{StaticResource Surface}" Padding="16">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <Image Source="nav_inventory.png" WidthRequest="24" HeightRequest="24" />
+                <VerticalStackLayout Grid.Column="1" Spacing="3">
+                  <Label Text="Productos disponibles" FontSize="18" FontAttributes="Bold" TextColor="#152137" />
+                  <Label Text="Toca un producto para seleccionarlo." Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+              </Grid>
+            </Border>
+            <CollectionView x:Name="ProductsCollection" Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct, Mode=TwoWay}" SelectionMode="Single" ItemSizingStrategy="MeasureAllItems" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalScrollBarVisibility="Never" IsEnabled="{Binding CanEditLines}">
+              <CollectionView.EmptyView>
+                <Border Style="{StaticResource Surface}">
+                  <Label Text="No hay productos activos para vender." Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                </Border>
+              </CollectionView.EmptyView>
+              <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:SaleProductOption">
+                  <Border Style="{StaticResource Surface}" Margin="0,0,0,10" HorizontalOptions="Fill" MinimumWidthRequest="280" WidthRequest="{Binding Source={x:Reference ProductsCollection}, Path=Width}">
+                    <VisualStateManager.VisualStateGroups>
+                      <VisualStateGroup Name="CommonStates">
+                        <VisualState Name="Normal" />
+                        <VisualState Name="Selected">
+                          <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="#ECFCF5" />
+                            <Setter Property="Stroke" Value="#007F60" />
+                          </VisualState.Setters>
+                        </VisualState>
+                      </VisualStateGroup>
+                    </VisualStateManager.VisualStateGroups>
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6" HorizontalOptions="Fill">
+                      <Label Text="{Binding DisplayName}" FontSize="17" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                      <Label Grid.Column="1" Text="{Binding PriceText}" FontSize="17" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" HorizontalTextAlignment="End" />
+                      <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding StockText}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Border Grid.Row="2" Style="{StaticResource Surface}" Padding="14">
+              <VerticalStackLayout Spacing="10">
+                <Label Text="{Binding SelectedProductDetails}" Style="{StaticResource Muted}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                  <VerticalStackLayout Spacing="5">
+                    <Label Text="CANTIDAD" FontSize="11" FontAttributes="Bold" TextColor="#52657D" />
+                    <Border Style="{StaticResource Field}">
+                      <Entry Placeholder="Ej.: 1 o 0.500" Keyboard="Numeric" Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#94A3B8" HorizontalTextAlignment="Start" FontSize="16" />
+                    </Border>
+                  </VerticalStackLayout>
+                  <Button Grid.Column="1" Text="+ Agregar" Command="{Binding AddLineCommand}" Style="{StaticResource Primary}" VerticalOptions="End" />
+                </Grid>
+              </VerticalStackLayout>
+            </Border>
+          </Grid>
+        </Border>
+        <Border x:Name="CartPanel" Grid.Column="1" Style="{StaticResource Surface}">
+          <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="14">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <VerticalStackLayout Spacing="5">
+                <Label Text="Carrito" FontSize="23" FontAttributes="Bold" TextColor="#0D172B" />
+                <Label Text="{Binding CartSummaryText}" TextColor="#007F60" FontSize="13" FontAttributes="Bold" />
+              </VerticalStackLayout>
+              <Button x:Name="CloseCartButton" Grid.Column="1" Text="×" Clicked="OnCloseCartClicked" Style="{StaticResource Secondary}" FontSize="24" WidthRequest="42" HeightRequest="42" Padding="0" IsVisible="False" SemanticProperties.Description="Volver al catálogo" />
+            </Grid>
+            <VerticalStackLayout Grid.Row="1" Spacing="10">
+              <Border Style="{StaticResource Field}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                  <CheckBox IsChecked="{Binding IsCredit}" IsEnabled="{Binding CanEditLines}" Color="#007F60" />
+                  <Label Grid.Column="1" Text="Venta a crédito" FontSize="14" TextColor="#34445A" VerticalOptions="Center" />
+                </Grid>
+              </Border>
+              <Border Style="{StaticResource Field}" IsVisible="{Binding IsCredit}">
+                <Picker Title="Selecciona un cliente" ItemsSource="{Binding Customers}" ItemDisplayBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedCustomer}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" TitleColor="#647792" FontSize="14" />
+              </Border>
+            </VerticalStackLayout>
+            <CollectionView x:Name="CartCollection" Grid.Row="2" ItemsSource="{Binding Lines}" SelectionMode="None">
+              <CollectionView.EmptyView>
+                <Border BackgroundColor="#F7F9FB" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="20">
+                  <VerticalStackLayout Spacing="8">
+                    <Image Source="nav_sales.png" WidthRequest="30" HeightRequest="30" HorizontalOptions="Center" />
+                    <Label Text="Tu venta está vacía" FontSize="16" TextColor="#34445A" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                    <Label Text="Agrega un producto para comenzar." Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                  </VerticalStackLayout>
+                </Border>
+              </CollectionView.EmptyView>
+              <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="viewModels:SaleCartLine">
+                  <Border BackgroundColor="#F5F7FA" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14" Margin="0,0,0,10">
+                    <VerticalStackLayout Spacing="8">
+                      <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <VerticalStackLayout Spacing="3">
+                          <Label Text="{Binding QuantityText}" Style="{StaticResource Muted}" />
+                          <Label Text="{Binding PriceText}" FontSize="12" TextColor="#647792" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1" Text="{Binding TotalAmountText}" FontSize="16" FontAttributes="Bold" TextColor="#007F60" VerticalOptions="Center" />
+                      </Grid>
+                      <Button Text="Quitar" Clicked="OnRemoveLineClicked" IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}" Style="{StaticResource Secondary}" FontSize="12" Padding="10,5" HorizontalOptions="End" />
+                    </VerticalStackLayout>
+                  </Border>
+                </DataTemplate>
+              </CollectionView.ItemTemplate>
+            </CollectionView>
+            <VerticalStackLayout Grid.Row="3" Spacing="12">
+              <BoxView HeightRequest="1" Color="#E4EBF2" />
+              <Border BackgroundColor="#F4F6F9" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14">
+                <VerticalStackLayout Spacing="6">
+                  <Label Text="TOTAL DE LA VENTA" FontSize="11" FontAttributes="Bold" TextColor="#647792" />
+                  <Label Text="{Binding TotalAmountText}" FontSize="27" FontAttributes="Bold" TextColor="#0D172B" />
+                </VerticalStackLayout>
+              </Border>
+              <Button Text="{Binding ConfirmButtonText}" Clicked="OnReviewClicked" IsEnabled="{Binding CanConfirm}" Style="{StaticResource Primary}" />
+              <Label Text="Al confirmar se registra la venta y se actualizan las existencias." FontSize="11" TextColor="#647792" />
+            </VerticalStackLayout>
+          </Grid>
+        </Border>
+      </Grid>
+      <VerticalStackLayout Grid.Row="2" Spacing="4">
+        <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="13">
+          <Label.Triggers>
+            <DataTrigger TargetType="Label" Binding="{Binding ErrorMessage}" Value="">
+              <Setter Property="IsVisible" Value="False" />
+            </DataTrigger>
+          </Label.Triggers>
+        </Label>
+        <Label Text="{Binding StatusMessage}" TextColor="#007F60" FontSize="13">
+          <Label.Triggers>
+            <DataTrigger TargetType="Label" Binding="{Binding StatusMessage}" Value="">
+              <Setter Property="IsVisible" Value="False" />
+            </DataTrigger>
+          </Label.Triggers>
+        </Label>
+        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#007F60" HorizontalOptions="Center" />
+      </VerticalStackLayout>
+      <Border x:Name="MobileSummary" Grid.Row="3" Style="{StaticResource Surface}" Padding="14" IsVisible="False">
+        <VerticalStackLayout Spacing="10">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Label Text="{Binding CartSummaryText}" FontSize="14" FontAttributes="Bold" TextColor="#007F60" VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Ver detalle ↑" Clicked="OnShowCartClicked" Style="{StaticResource Secondary}" FontSize="12" Padding="10,6" />
+          </Grid>
+          <BoxView Color="#E4EBF2" HeightRequest="1" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Label Text="{Binding TotalAmountText}" FontSize="21" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Revisar →" Clicked="OnReviewClicked" IsEnabled="{Binding CanConfirm}" Style="{StaticResource Primary}">
+              <Button.Triggers>
+                <DataTrigger TargetType="Button" Binding="{Binding ConfirmButtonText}" Value="Reintentar la misma venta">
+                  <Setter Property="Text" Value="Reintentar →" />
+                </DataTrigger>
+              </Button.Triggers>
+            </Button>
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+      <Grid x:Name="CartSheetBackdrop" Grid.RowSpan="4" BackgroundColor="#900D172B" IsVisible="False" Padding="0,12,0,0" ZIndex="10">
+        <ContentView x:Name="CartSheetHost" VerticalOptions="End" />
+      </Grid>
+    </Grid>
+  </Grid>
 </views:CoordinatorRefreshPage>

@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels" x:Class="MauiApp1.Presentation.Views.SaleReviewPage" x:DataType="viewModels:SaleRegistrationViewModel" Title="Confirmar venta" BackgroundColor="#900D172B" NavigationPage.HasNavigationBar="False">
+  <Grid x:Name="ReviewRoot" Padding="20" SizeChanged="OnReviewSizeChanged">
+    <Border x:Name="ReviewSurface" BackgroundColor="White" StrokeThickness="0" StrokeShape="RoundRectangle 20" Padding="20" HorizontalOptions="Center" VerticalOptions="Center">
+      <Grid RowDefinitions="Auto,*,Auto" RowSpacing="18">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <Border BackgroundColor="#CBFAE7" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12" VerticalOptions="Start">
+            <Label Text="✓" FontSize="24" FontAttributes="Bold" TextColor="#007F60" />
+          </Border>
+          <VerticalStackLayout Grid.Column="1" Spacing="5">
+            <Label x:Name="ReviewTitle" Text="Confirmar venta" FontSize="24" FontAttributes="Bold" TextColor="#0D172B" />
+            <Label Text="{Binding CartSummaryText}" FontSize="13" TextColor="#647792" />
+          </VerticalStackLayout>
+          <Button Grid.Column="2" Text="×" Clicked="OnCancelClicked" BackgroundColor="#F0F3F7" TextColor="#45556B" WidthRequest="42" HeightRequest="42" Padding="0" CornerRadius="9" FontSize="24" SemanticProperties.Description="Cancelar revisión" />
+        </Grid>
+        <ScrollView Grid.Row="1">
+          <VerticalStackLayout Spacing="18">
+            <Border BackgroundColor="#F2F5F8" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="14">
+              <VerticalStackLayout Spacing="12">
+                <Label Text="Artículos en canasta" FontSize="19" FontAttributes="Bold" TextColor="#0D172B" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Lines}" Spacing="10">
+                  <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SaleCartLine">
+                      <Border BackgroundColor="White" StrokeThickness="0" StrokeShape="RoundRectangle 9" Padding="14">
+                        <VerticalStackLayout Spacing="6">
+                          <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#19253B" />
+                          <Label Text="{Binding QuantityText}" FontSize="14" FontAttributes="Bold" TextColor="#007F60" />
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Label Text="{Binding PriceText}" FontSize="13" TextColor="#647792" />
+                            <Label Grid.Column="1" Text="{Binding TotalAmountText}" FontSize="17" FontAttributes="Bold" TextColor="#0D172B" />
+                          </Grid>
+                        </VerticalStackLayout>
+                      </Border>
+                    </DataTemplate>
+                  </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+              </VerticalStackLayout>
+            </Border>
+            <Border BackgroundColor="#0D172B" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="20">
+              <VerticalStackLayout Spacing="7">
+                <Label Text="TOTAL DE LA VENTA" FontSize="12" FontAttributes="Bold" TextColor="#B7C4D6" />
+                <Label Text="{Binding TotalAmountText}" FontSize="34" FontAttributes="Bold" TextColor="White" />
+              </VerticalStackLayout>
+            </Border>
+            <Border BackgroundColor="#EBFAF3" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16">
+              <Label x:Name="TermsText" FontSize="14" TextColor="#00694F" LineBreakMode="WordWrap" />
+            </Border>
+            <Label Text="La fecha y hora se registrarán automáticamente." FontSize="13" TextColor="#647792" />
+          </VerticalStackLayout>
+        </ScrollView>
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
+          <Button x:Name="CancelButton" Text="Volver a revisar" Clicked="OnCancelClicked" BackgroundColor="#F0F3F7" TextColor="#34445A" FontSize="13" CornerRadius="10" Padding="12,14" />
+          <Button x:Name="ConfirmButton" Grid.Column="1" Text="Registrar venta" Clicked="OnConfirmClicked" BackgroundColor="#007F60" TextColor="White" FontSize="13" FontAttributes="Bold" CornerRadius="10" Padding="12,14" />
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
+</ContentPage>

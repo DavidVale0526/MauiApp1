@@ -1,81 +1,70 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
-             x:Class="MauiApp1.Presentation.Views.SaleTicketPage"
-             x:DataType="viewModels:SaleTicketViewModel"
-             Title="Ticket interno"
-             BackgroundColor="#F7F9FB">
-    <ScrollView>
-        <Grid Padding="16,20" SizeChanged="OnPageSizeChanged">
-            <VerticalStackLayout x:Name="TicketLayout" Spacing="18" MaximumWidthRequest="620"
-                                 HorizontalOptions="Center">
-                <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked"
-                        BackgroundColor="#E8EEF5" TextColor="#0D1B2A"
-                        CornerRadius="12" Padding="18,12" />
-
-                <Border Padding="0" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
-                        StrokeShape="RoundRectangle 18">
-                    <VerticalStackLayout Spacing="0">
-                        <VerticalStackLayout Padding="24,26,24,20" Spacing="10" HorizontalOptions="Fill">
-                            <Border Padding="12,6" BackgroundColor="#E8EEF5" StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 20" HorizontalOptions="Center">
-                                <Label Text="COMPROBANTE INTERNO" FontSize="11" FontAttributes="Bold"
-                                       TextColor="#34445A" />
-                            </Border>
-                            <Label Text="{Binding StoreName}" FontSize="26" FontAttributes="Bold"
-                                   TextColor="#111D31" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding DocumentType}" FontSize="15" FontAttributes="Bold"
-                                   TextColor="#34445A" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding ReferenceText}" FontSize="13" TextColor="#61738A"
-                                   HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding DateText}" FontSize="14" TextColor="#34445A"
-                                   HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding ActorText}" FontSize="13" TextColor="#61738A"
-                                   HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding CurrencyText}" FontSize="13" TextColor="#61738A"
-                                   HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding CreditDetailsText}" FontSize="13" TextColor="#34445A"
-                                   HorizontalTextAlignment="Center" />
-                        </VerticalStackLayout>
-
-                        <BoxView HeightRequest="1" Color="#E3EAF2" />
-
-                        <VerticalStackLayout Padding="22,18" Spacing="14">
-                            <Label Text="Detalle de productos" FontSize="16" FontAttributes="Bold" TextColor="#111D31" />
-                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Lines}" Spacing="0">
-                                <BindableLayout.ItemTemplate>
-                                    <DataTemplate x:DataType="viewModels:SaleTicketLine">
-                                        <Grid Padding="0,12" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                            <VerticalStackLayout Grid.Column="0" Spacing="4">
-                                                <Label Text="{Binding NameText}" FontSize="14" FontAttributes="Bold"
-                                                       TextColor="#111D31" />
-                                                <Label Text="{Binding QuantityAndUnitText}" FontSize="13" TextColor="#61738A" />
-                                            </VerticalStackLayout>
-                                            <Label Grid.Column="1" Text="{Binding LineTotalText}" FontSize="14"
-                                                   FontAttributes="Bold" TextColor="#111D31"
-                                                   VerticalOptions="Center" HorizontalTextAlignment="End" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </BindableLayout.ItemTemplate>
-                            </VerticalStackLayout>
-                            <BoxView HeightRequest="1" Color="#E3EAF2" />
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                <Label Text="TOTAL" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                                <Label Grid.Column="1" Text="{Binding TotalText}" FontSize="20"
-                                       FontAttributes="Bold" TextColor="#0D1B2A" HorizontalTextAlignment="End" />
-                            </Grid>
-                        </VerticalStackLayout>
-
-                        <VerticalStackLayout Padding="18,14" Spacing="4" BackgroundColor="#F7F9FB">
-                            <Label Text="Documento interno de consulta. No es factura ni comprobante fiscal."
-                                   FontSize="12" TextColor="#61738A" HorizontalTextAlignment="Center" />
-                            <Label Text="Este registro no contiene impuestos ni datos de cobro."
-                                   FontSize="12" TextColor="#61738A" HorizontalTextAlignment="Center" />
-                        </VerticalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-            </VerticalStackLayout>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels" x:Class="MauiApp1.Presentation.Views.SaleTicketPage" x:DataType="viewModels:SaleTicketViewModel" Title="Comprobante de venta" Shell.NavBarIsVisible="False" BackgroundColor="#F7F9FB" NavigationPage.HasNavigationBar="False">
+  <ScrollView>
+    <Grid x:Name="PageLayout" Padding="16,20" SizeChanged="OnPageSizeChanged">
+      <VerticalStackLayout x:Name="TicketLayout" Spacing="22" MaximumWidthRequest="720" HorizontalOptions="Center">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+          <Button Text="←" Clicked="OnBackClicked" BackgroundColor="#EEF2F7" TextColor="#45556B" WidthRequest="44" HeightRequest="44" FontSize="24" Padding="0" CornerRadius="10" SemanticProperties.Description="Volver" />
+          <VerticalStackLayout Grid.Column="1" Spacing="4">
+            <Label Text="Comprobante de venta" FontSize="23" FontAttributes="Bold" TextColor="#0D172B" />
+            <Label Text="{Binding ReferenceText}" FontSize="13" TextColor="#647792" />
+          </VerticalStackLayout>
         </Grid>
-    </ScrollView>
+        <VerticalStackLayout Spacing="12" Padding="0,8">
+          <Border BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="16,7" HorizontalOptions="Center">
+            <Label Text="✓  VENTA REGISTRADA" FontSize="12" FontAttributes="Bold" TextColor="#007F60" />
+          </Border>
+          <Border BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="18" HorizontalOptions="Center">
+            <Label Text="✓" FontSize="32" FontAttributes="Bold" TextColor="#007F60" />
+          </Border>
+          <Label Text="¡Venta registrada!" FontSize="29" FontAttributes="Bold" TextColor="#0D172B" HorizontalTextAlignment="Center" />
+          <Label Text="{Binding TotalText}" FontSize="38" FontAttributes="Bold" TextColor="#007F60" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+        <Border BackgroundColor="White" Stroke="#DFE7F0" StrokeThickness="1" StrokeShape="RoundRectangle 22" Padding="0">
+          <VerticalStackLayout Spacing="0">
+            <VerticalStackLayout Padding="22" Spacing="8">
+              <Label Text="{Binding StoreName}" FontSize="24" FontAttributes="Bold" TextColor="#0D172B" HorizontalTextAlignment="Center" />
+              <Label Text="{Binding DocumentType}" FontSize="13" FontAttributes="Bold" TextColor="#647792" HorizontalTextAlignment="Center" />
+              <Label Text="{Binding DateText}" FontSize="13" TextColor="#647792" HorizontalTextAlignment="Center" />
+              <Label Text="{Binding ActorText}" FontSize="13" TextColor="#647792" HorizontalTextAlignment="Center" />
+              <Label Text="{Binding CurrencyText}" FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Padding="18,0,18,22" Spacing="16">
+              <BoxView Color="#E7EDF4" HeightRequest="1" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <Label Text="PRODUCTO / CANTIDAD" FontSize="11" FontAttributes="Bold" TextColor="#94A3B8" />
+                <Label Grid.Column="1" Text="TOTAL" FontSize="11" FontAttributes="Bold" TextColor="#94A3B8" />
+              </Grid>
+              <VerticalStackLayout BindableLayout.ItemsSource="{Binding Lines}" Spacing="16">
+                <BindableLayout.ItemTemplate>
+                  <DataTemplate x:DataType="viewModels:SaleTicketLine">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <VerticalStackLayout Spacing="5">
+                        <Label Text="{Binding NameText}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" />
+                        <Label Text="{Binding QuantityAndUnitText}" FontSize="12" TextColor="#647792" LineBreakMode="WordWrap" />
+                      </VerticalStackLayout>
+                      <Label Grid.Column="1" Text="{Binding LineTotalText}" FontSize="15" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </BindableLayout.ItemTemplate>
+              </VerticalStackLayout>
+              <BoxView Color="#E7EDF4" HeightRequest="1" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Label Text="TOTAL" FontSize="17" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding TotalText}" FontSize="23" FontAttributes="Bold" TextColor="#007F60" />
+              </Grid>
+              <Border BackgroundColor="#F4F7FA" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14">
+                <Label Text="{Binding CreditDetailsText}" FontSize="13" TextColor="#45556B" LineBreakMode="WordWrap" />
+              </Border>
+              <Label Text="{Binding ReferenceText}" FontSize="12" TextColor="#94A3B8" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Padding="18,16" Spacing="6" BackgroundColor="#F7F9FB">
+              <Label Text="Documento interno de consulta. No es factura ni comprobante fiscal." FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
+              <Label Text="Este registro no contiene impuestos ni datos de cobro." FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+          </VerticalStackLayout>
+        </Border>
+      </VerticalStackLayout>
+    </Grid>
+  </ScrollView>
 </ContentPage>

@@ -8,24 +8,47 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
 {
     private void OnSaleLayoutSizeChanged(object? sender, EventArgs args)
     {
-        var useDesktopLayout = SaleLayout.Width >= 920;
+        if (PageLayout.Width <= 0) return;
+        var useDesktopLayout = PageLayout.Width >= 900;
+        PageLayout.Padding = useDesktopLayout ? new Thickness(28, 24) : new Thickness(16, 16);
+        SaleLayout.WidthRequest = Math.Min(1440, Math.Max(0, PageLayout.Width - PageLayout.Padding.HorizontalThickness));
         ContentPanels.ColumnDefinitions.Clear();
         ContentPanels.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
         if (useDesktopLayout)
         {
-            ContentPanels.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            ContentPanels.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(360)));
+            if (!ContentPanels.Children.Contains(CartPanel))
+            {
+                CartSheetHost.Content = null;
+                ContentPanels.Add(CartPanel, 1);
+            }
+            CartSheetBackdrop.IsVisible = false;
+        }
+        else if (ContentPanels.Children.Contains(CartPanel))
+        {
+            ContentPanels.Remove(CartPanel);
+            CartSheetHost.Content = CartPanel;
         }
 
-        Grid.SetColumn(ProductPanel, 0);
-        Grid.SetRow(ProductPanel, 0);
-        Grid.SetColumn(CartPanel, useDesktopLayout ? 1 : 0);
-        Grid.SetRow(CartPanel, useDesktopLayout ? 0 : 1);
-        CartCollection.HeightRequest = useDesktopLayout ? 560 : 300;
-        SaleLayout.Padding = useDesktopLayout ? new Thickness(32, 28) : new Thickness(16, 20);
+        MobileSummary.IsVisible = !useDesktopLayout;
+        CloseCartButton.IsVisible = !useDesktopLayout;
+        CartSheetHost.HeightRequest = Math.Max(0, Math.Min(800, PageLayout.Height * 0.92));
+    }
+
+    private void OnShowCartClicked(object? sender, EventArgs args) => CartSheetBackdrop.IsVisible = true;
+
+    private void OnCloseCartClicked(object? sender, EventArgs args) => CartSheetBackdrop.IsVisible = false;
+
+    protected override bool OnBackButtonPressed()
+    {
+        if (!CartSheetBackdrop.IsVisible) return base.OnBackButtonPressed();
+        CartSheetBackdrop.IsVisible = false;
+        return true;
     }
 
     private readonly SaleRegistrationViewModel _viewModel;
     private readonly ISaleService _saleService;
+    private bool _reviewInProgress;
 
     public SaleRegistrationPage(SaleRegistrationViewModel viewModel, ISaleService saleService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
@@ -44,7 +67,11 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
 
     protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.RefreshAfterCoordinatorChangesAsync();
 
-    private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
+    private async void OnBackClicked(object? sender, EventArgs eventArgs)
+    {
+        if (CartSheetBackdrop.IsVisible) CartSheetBackdrop.IsVisible = false;
+        else await Navigation.PopModalAsync();
+    }
 
     private void OnRemoveLineClicked(object? sender, EventArgs eventArgs)
     {
@@ -56,28 +83,38 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
 
     private async void OnReviewClicked(object? sender, EventArgs eventArgs)
     {
+        if (_reviewInProgress) return;
         var sale = _viewModel.PrepareSale();
         if (sale is null)
         {
             return;
         }
 
-        var retry = _viewModel.ConfirmButtonText.StartsWith("Reintentar", StringComparison.Ordinal);
-        var confirmed = await DisplayAlertAsync(
-            retry ? "Reintentar venta" : "Confirmar venta",
-            _viewModel.BuildReviewText(),
-            retry ? "Reintentar" : "Registrar venta",
-            retry ? "Cancelar" : "Volver a revisar");
-        if (!confirmed)
+        _reviewInProgress = true;
+        try
+        {
+            var retry = _viewModel.ConfirmButtonText.StartsWith("Reintentar", StringComparison.Ordinal);
+            var review = new SaleReviewPage(_viewModel, sale, retry);
+            await Navigation.PushModalAsync(review);
+            if (!await review.Decision)
+            {
+                _viewModel.CancelReview();
+                return;
+            }
+
+            var saved = await _viewModel.RecordPendingAsync();
+            CartSheetBackdrop.IsVisible = false;
+            if (saved)
+            {
+                await ShowSavedTicketAsync();
+            }
+        }
+        catch
         {
             _viewModel.CancelReview();
-            return;
+            await DisplayAlertAsync("Revisión de venta", "No se pudo completar la revisión. Vuelve a intentarlo.", "Aceptar");
         }
-
-        if (await _viewModel.RecordPendingAsync())
-        {
-            await ShowSavedTicketAsync();
-        }
+        finally { _reviewInProgress = false; }
     }
 
     private async Task ShowSavedTicketAsync()
