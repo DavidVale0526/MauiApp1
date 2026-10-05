@@ -14,9 +14,11 @@ public sealed class OtherExitViewModel(
     IInventoryMovementService movementService) : INotifyPropertyChanged
 {
     private ProductSummary? _selectedProduct;
+    private InventoryExitTypeOption? _selectedExitType;
     private OtherExitReasonOption? _selectedReason;
     private string _quantityInput = string.Empty;
     private string _otherReasonDetail = string.Empty;
+    private string _mixedWasteUnit = "libra";
     private string _errorMessage = string.Empty;
     private bool _isBusy;
     private InventoryOperationDraft? _pendingOperation;
@@ -25,6 +27,12 @@ public sealed class OtherExitViewModel(
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ProductSummary> Products { get; } = [];
+
+    public IReadOnlyList<InventoryExitTypeOption> ExitTypeOptions { get; } =
+    [
+        new("Salida de producto", false),
+        new("Merma mixta (no atribuida)", true)
+    ];
 
     public IReadOnlyList<OtherExitReasonOption> ReasonOptions { get; } =
     [
@@ -41,6 +49,20 @@ public sealed class OtherExitViewModel(
         {
             if (SetProperty(ref _selectedProduct, value))
             {
+                OnPropertyChanged(nameof(AvailableStockText));
+            }
+        }
+    }
+
+    public InventoryExitTypeOption? SelectedExitType
+    {
+        get => _selectedExitType;
+        set
+        {
+            if (SetProperty(ref _selectedExitType, value))
+            {
+                OnPropertyChanged(nameof(IsMixedWaste));
+                OnPropertyChanged(nameof(IsProductExit));
                 OnPropertyChanged(nameof(AvailableStockText));
             }
         }
@@ -70,6 +92,12 @@ public sealed class OtherExitViewModel(
         set => SetProperty(ref _otherReasonDetail, value);
     }
 
+    public string MixedWasteUnit
+    {
+        get => _mixedWasteUnit;
+        set => SetProperty(ref _mixedWasteUnit, value);
+    }
+
     public string ErrorMessage
     {
         get => _errorMessage;
@@ -91,11 +119,17 @@ public sealed class OtherExitViewModel(
 
     public bool IsOtherReason => SelectedReason?.RequiresDescription == true;
 
+    public bool IsMixedWaste => SelectedExitType?.IsMixedWaste == true;
+
+    public bool IsProductExit => !IsMixedWaste;
+
     public bool CanEdit => !IsBusy && _pendingOperation is null;
 
     public string SubmitButtonText => _pendingAttempted ? "Reintentar guardado" : "Revisar y confirmar salida";
 
-    public string AvailableStockText => SelectedProduct is null
+    public string AvailableStockText => IsMixedWaste
+        ? "Merma mixta: se registra aparte y no se asigna a un producto."
+        : SelectedProduct is null
         ? "Existencia disponible: selecciona un producto."
         : $"Existencia disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}";
 
@@ -112,6 +146,7 @@ public sealed class OtherExitViewModel(
             }
 
             SelectedProduct = Products.FirstOrDefault(product => product.Id == selectedId) ?? Products.FirstOrDefault();
+            SelectedExitType ??= ExitTypeOptions[0];
             ErrorMessage = Products.Count == 0 ? "No hay productos activos para registrar una salida." : string.Empty;
         }
         catch
@@ -128,9 +163,15 @@ public sealed class OtherExitViewModel(
         }
 
         ErrorMessage = string.Empty;
-        if (SelectedProduct is null)
+        if (!IsMixedWaste && SelectedProduct is null)
         {
             ErrorMessage = "Selecciona un producto activo.";
+            return null;
+        }
+
+        if (IsMixedWaste && string.IsNullOrWhiteSpace(MixedWasteUnit))
+        {
+            ErrorMessage = "Especifica la unidad en la que pesaste la merma mixta.";
             return null;
         }
 
@@ -162,22 +203,22 @@ public sealed class OtherExitViewModel(
             return null;
         }
 
-        if (quantity.MilliUnits > SelectedProduct.Stock.MilliUnits)
+        if (!IsMixedWaste && quantity.MilliUnits > SelectedProduct!.Stock.MilliUnits)
         {
             ErrorMessage = $"Existencia insuficiente. Disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}.";
             return null;
         }
 
-        if (SelectedReason is null)
+        if (!IsMixedWaste && SelectedReason is null)
         {
             ErrorMessage = "Selecciona el motivo de la salida.";
             return null;
         }
 
-        var reason = SelectedReason.RequiresDescription
-            ? $"Otro: {OtherReasonDetail.Trim()}"
-            : SelectedReason.Name;
-        if (SelectedReason.RequiresDescription && string.IsNullOrWhiteSpace(OtherReasonDetail))
+        var reason = IsMixedWaste
+            ? string.IsNullOrWhiteSpace(OtherReasonDetail) ? "Merma mixta" : $"Merma mixta: {OtherReasonDetail.Trim()}"
+            : SelectedReason!.RequiresDescription ? $"Otro: {OtherReasonDetail.Trim()}" : SelectedReason.Name;
+        if (!IsMixedWaste && SelectedReason!.RequiresDescription && string.IsNullOrWhiteSpace(OtherReasonDetail))
         {
             ErrorMessage = "Describe la otra causa de la salida.";
             return null;
@@ -188,10 +229,12 @@ public sealed class OtherExitViewModel(
             DateTime.UtcNow,
             [new InventoryMovementLineDraft(
                 0,
-                SelectedProduct.Id,
-                InventoryMovementType.OtherExit,
+                IsMixedWaste ? default : SelectedProduct!.Id,
+                IsMixedWaste ? InventoryMovementType.MixedWaste : InventoryMovementType.OtherExit,
                 quantity,
-                reason)],
+                reason,
+                IsMixedWaste ? "Merma mixta (no atribuida)" : SelectedProduct!.Name,
+                IsMixedWaste ? MixedWasteUnit.Trim() : SelectedProduct!.Unit)],
             NegativeStockPolicy.Reject);
         _pendingAttempted = false;
         OnPropertyChanged(nameof(CanEdit));
@@ -201,13 +244,15 @@ public sealed class OtherExitViewModel(
 
     public string BuildReviewText()
     {
-        if (_pendingOperation is null || SelectedProduct is null)
+        if (_pendingOperation is null)
         {
             return string.Empty;
         }
 
         var line = _pendingOperation.Lines[0];
-        return $"Producto: {SelectedProduct.Name}\nCantidad: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}\nMotivo: {line.Reason}\n\nEsta salida disminuirá las existencias.";
+        return IsMixedWaste
+            ? $"Tipo: Merma mixta no atribuida\nCantidad: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {line.UnitSnapshot}\nMotivo: {line.Reason}\n\nSe registrará para conciliación posterior; no se asignará a un producto."
+            : $"Producto: {SelectedProduct!.Name}\nCantidad: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}\nMotivo: {line.Reason}\n\nEsta salida disminuirá las existencias.";
     }
 
     public void CancelReview()
@@ -238,6 +283,8 @@ public sealed class OtherExitViewModel(
             _pendingAttempted = false;
             QuantityInput = string.Empty;
             OtherReasonDetail = string.Empty;
+            MixedWasteUnit = "libra";
+            SelectedExitType = ExitTypeOptions[0];
             SelectedReason = null;
             ErrorMessage = result.AlreadyApplied
                 ? "Esta salida ya estaba registrada; no se volvió a descontar existencia."
@@ -269,3 +316,5 @@ public sealed class OtherExitViewModel(
 }
 
 public sealed record OtherExitReasonOption(string Name, bool RequiresDescription);
+
+public sealed record InventoryExitTypeOption(string Name, bool IsMixedWaste);

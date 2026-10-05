@@ -31,7 +31,7 @@ internal sealed class EfInventoryMovementService(
         }
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var productIds = lines.Select(line => line.ProductId.Value).Distinct().ToArray();
+        var productIds = lines.Where(line => !line.ProductId.IsEmpty).Select(line => line.ProductId.Value).Distinct().ToArray();
         var productSnapshots = await context.Products.AsNoTracking()
             .Where(product => productIds.Contains(product.ProductId))
             .ToDictionaryAsync(product => product.ProductId,
@@ -44,11 +44,15 @@ internal sealed class EfInventoryMovementService(
                 productSnapshots.TryGetValue(line.ProductId.Value, out var snapshot);
                 return new InventoryMovementPayloadLine(
                     line.LineNumber, line.ProductId.Value, line.Type, line.Quantity.MilliUnits, line.Reason,
-                    snapshot.Name, snapshot.Unit);
+                    line.ProductNameSnapshot ?? snapshot.Name ?? "Merma mixta (no atribuida)",
+                    line.UnitSnapshot ?? snapshot.Unit ?? string.Empty);
             }).ToArray()));
 
+        var operationType = lines[0].Type == InventoryMovementType.MixedWaste
+            ? "Inventory.MixedWasteRecorded"
+            : OutboxOperationType;
         var result = await movementWriter.StageAsync(
-            context, operation, actor.Id.Value, OutboxOperationType, payloadJson,
+            context, operation, actor.Id.Value, operationType, payloadJson,
             requireActiveProducts: true, cancellationToken);
         if (!result.Succeeded || result.AlreadyApplied)
         {

@@ -35,15 +35,21 @@
                             </Border>
                         </Grid>
 
-                        <Grid x:Name="SelectionGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto"
+                        <Grid x:Name="SelectionGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto"
                               ColumnSpacing="14" RowSpacing="14">
-                            <VerticalStackLayout x:Name="ProductField" Grid.Row="0" Spacing="7">
+                            <VerticalStackLayout x:Name="ExitTypeField" Grid.Row="0" Spacing="7">
+                                <Label Text="Tipo de salida" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                                <Picker Title="Selecciona el tipo" ItemsSource="{Binding ExitTypeOptions}"
+                                        ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedExitType}"
+                                        IsEnabled="{Binding CanEdit}" TextColor="#111D31" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout x:Name="ProductField" Grid.Row="1" Spacing="7" IsVisible="{Binding IsProductExit}">
                                 <Label Text="Producto" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                                 <Picker Title="Selecciona un producto activo" ItemsSource="{Binding Products}"
                                         ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedProduct}"
-                                        IsEnabled="{Binding CanEdit}" TextColor="#111D31" />
+                                        IsEnabled="{Binding CanEdit}" TextColor="#111D31" IsVisible="{Binding IsProductExit}" />
                             </VerticalStackLayout>
-                            <VerticalStackLayout x:Name="ReasonField" Grid.Row="1" Spacing="7">
+                            <VerticalStackLayout x:Name="ReasonField" Grid.Row="2" Spacing="7" IsVisible="{Binding IsProductExit}">
                                 <Label Text="Motivo de la baja" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                                 <Picker Title="Selecciona el motivo" ItemsSource="{Binding ReasonOptions}"
                                         ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedReason}"
@@ -51,7 +57,7 @@
                             </VerticalStackLayout>
                         </Grid>
 
-                        <Grid x:Name="StockQuantityGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto"
+                        <Grid x:Name="StockQuantityGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto"
                               ColumnSpacing="14" RowSpacing="14">
                             <Border x:Name="StockCard" Grid.Row="0" Padding="16" BackgroundColor="#F7F9FB"
                                     Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 13">
@@ -60,7 +66,13 @@
                                     <Label Text="{Binding AvailableStockText}" FontSize="17" FontAttributes="Bold" TextColor="#111D31" />
                                 </VerticalStackLayout>
                             </Border>
-                            <VerticalStackLayout x:Name="QuantityField" Grid.Row="1" Spacing="7">
+                            <VerticalStackLayout x:Name="MixedWasteUnitField" Grid.Row="1" Spacing="7" IsVisible="{Binding IsMixedWaste}">
+                                <Label Text="Unidad de la merma" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                                <Entry Placeholder="Ej. libra o kg" Text="{Binding MixedWasteUnit}"
+                                       IsEnabled="{Binding CanEdit}" HeightRequest="52"
+                                       BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout x:Name="QuantityField" Grid.Row="2" Spacing="7">
                                 <Label Text="Cantidad a retirar" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                                 <Entry Placeholder="Ej. 1.000" Keyboard="Numeric" Text="{Binding QuantityInput}"
                                        IsEnabled="{Binding CanEdit}" HeightRequest="52"

@@ -35,7 +35,7 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
             new("＋", "Registrar compra", "Agregar productos recibidos", typeof(PurchaseRegistrationPage)),
             new("↻", "Historial de compras", "Consultar compras registradas", typeof(PurchaseHistoryPage)),
             new("⇅", "Movimientos de inventario", "Consultar entradas y salidas", typeof(InventoryMovementHistoryPage)),
-            new("−", "Registrar salida", "Registrar una salida de inventario", typeof(OtherExitPage))
+            new("−", "Registrar salida o merma", "Registrar una salida de producto o merma mixta", typeof(OtherExitPage))
         ]);
 
         AddOptions(CustomerOptions,

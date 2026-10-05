@@ -41,7 +41,7 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
             return InventoryOperationResult.Failure("El historial contiene una operación incompleta; no se modificó el inventario.");
         }
 
-        var productIds = lines.Select(line => line.ProductId.Value).Distinct().ToArray();
+        var productIds = lines.Where(line => !line.ProductId.IsEmpty).Select(line => line.ProductId.Value).Distinct().ToArray();
         var products = await context.Products
             .Where(product => productIds.Contains(product.ProductId))
             .ToDictionaryAsync(product => product.ProductId, cancellationToken);
@@ -58,7 +58,7 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
         var deltas = new Dictionary<Guid, long>();
         try
         {
-            foreach (var line in lines)
+            foreach (var line in lines.Where(line => line.Type != InventoryMovementType.MixedWaste))
             {
                 var delta = line.Type == InventoryMovementType.PurchaseEntry
                     ? line.Quantity.MilliUnits
@@ -88,14 +88,15 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
 
         foreach (var line in lines)
         {
+            var product = line.ProductId.IsEmpty ? null : products[line.ProductId.Value];
             context.InventoryMovements.Add(new InventoryMovementEntity
             {
                 MovementId = Guid.NewGuid(),
                 OperationId = operation.OperationId,
                 LineNumber = line.LineNumber,
-                ProductId = line.ProductId.Value,
-                ProductNameSnapshot = line.ProductNameSnapshot ?? products[line.ProductId.Value].Name,
-                UnitSnapshot = line.UnitSnapshot ?? products[line.ProductId.Value].Unit,
+                ProductId = line.ProductId.IsEmpty ? null : line.ProductId.Value,
+                ProductNameSnapshot = line.ProductNameSnapshot ?? product?.Name ?? "Merma mixta (no atribuida)",
+                UnitSnapshot = line.UnitSnapshot ?? product?.Unit ?? string.Empty,
                 Type = (int)line.Type,
                 QuantityMilliUnits = line.Quantity.MilliUnits,
                 Reason = line.Reason,
@@ -145,7 +146,8 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
             .OrderBy(line => line.LineNumber)
             .Select(line => line with { Reason = line.Reason?.Trim() })
             .ToArray();
-        if (lines.Any(line => line.LineNumber < 0 || line.ProductId.IsEmpty ||
+        if (lines.Any(line => line.LineNumber < 0 ||
+                              (line.ProductId.IsEmpty && line.Type != InventoryMovementType.MixedWaste) ||
                               !Enum.IsDefined(line.Type) || line.Quantity.MilliUnits <= 0) ||
             lines.Select(line => line.LineNumber).Distinct().Count() != lines.Length ||
             lines.Select(line => line.Type).Distinct().Count() != 1)
@@ -154,7 +156,7 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
             return false;
         }
 
-        if (lines.Any(line => line.Type == InventoryMovementType.OtherExit && string.IsNullOrWhiteSpace(line.Reason)))
+        if (lines.Any(line => (line.Type == InventoryMovementType.OtherExit || line.Type == InventoryMovementType.MixedWaste) && string.IsNullOrWhiteSpace(line.Reason)))
         {
             errorMessage = "Escribe el motivo de cada salida distinta de una venta.";
             return false;
@@ -166,7 +168,10 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
             return false;
         }
 
-        if (lines.Any(line => line.Type != InventoryMovementType.OtherExit && line.Reason is not null))
+        if (lines.Any(line => line.Type == InventoryMovementType.MixedWaste &&
+                              (!line.ProductId.IsEmpty || string.IsNullOrWhiteSpace(line.UnitSnapshot) ||
+                               line.Reason is null || !line.Reason.StartsWith("Merma mixta", StringComparison.Ordinal))) ||
+            lines.Any(line => line.Type != InventoryMovementType.OtherExit && line.Type != InventoryMovementType.MixedWaste && line.Reason is not null))
         {
             errorMessage = "El motivo solo se registra para salidas distintas de una venta.";
             return false;

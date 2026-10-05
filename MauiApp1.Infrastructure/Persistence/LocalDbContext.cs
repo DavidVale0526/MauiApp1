@@ -147,7 +147,7 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.MovementId).ValueGeneratedNever();
             entity.Property(item => item.OperationId).IsRequired();
             entity.Property(item => item.LineNumber).IsRequired();
-            entity.Property(item => item.ProductId).IsRequired();
+            entity.Property(item => item.ProductId);
             entity.Property(item => item.ProductNameSnapshot).HasDefaultValue(string.Empty).IsRequired();
             entity.Property(item => item.UnitSnapshot).HasDefaultValue(string.Empty).IsRequired();
             entity.Property(item => item.Type).IsRequired();

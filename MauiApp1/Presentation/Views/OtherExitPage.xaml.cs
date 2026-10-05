@@ -54,20 +54,16 @@ public partial class OtherExitPage : CoordinatorRefreshPage
 
         SelectionGrid.ColumnDefinitions.Clear();
         SelectionGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-        if (isWide)
-        {
-            SelectionGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-        }
         SelectionGrid.RowDefinitions.Clear();
         SelectionGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        if (!isWide)
-        {
-            SelectionGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        }
-        Grid.SetRow(ProductField, 0);
+        SelectionGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        SelectionGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        Grid.SetRow(ExitTypeField, 0);
+        Grid.SetColumn(ExitTypeField, 0);
+        Grid.SetRow(ProductField, 1);
         Grid.SetColumn(ProductField, 0);
-        Grid.SetRow(ReasonField, isWide ? 0 : 1);
-        Grid.SetColumn(ReasonField, isWide ? 1 : 0);
+        Grid.SetRow(ReasonField, 2);
+        Grid.SetColumn(ReasonField, 0);
 
         StockQuantityGrid.ColumnDefinitions.Clear();
         StockQuantityGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -77,13 +73,13 @@ public partial class OtherExitPage : CoordinatorRefreshPage
         }
         StockQuantityGrid.RowDefinitions.Clear();
         StockQuantityGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        if (!isWide)
-        {
-            StockQuantityGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        }
+        StockQuantityGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        StockQuantityGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         Grid.SetRow(StockCard, 0);
         Grid.SetColumn(StockCard, 0);
-        Grid.SetRow(QuantityField, isWide ? 0 : 1);
-        Grid.SetColumn(QuantityField, isWide ? 1 : 0);
+        Grid.SetRow(MixedWasteUnitField, 1);
+        Grid.SetColumn(MixedWasteUnitField, 0);
+        Grid.SetRow(QuantityField, 2);
+        Grid.SetColumn(QuantityField, 0);
     }
 }

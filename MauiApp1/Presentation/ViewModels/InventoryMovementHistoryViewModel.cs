@@ -69,6 +69,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
         InventoryMovementType.PurchaseEntry => "Entrada por compra",
         InventoryMovementType.SaleExit => "Salida por venta",
         InventoryMovementType.OtherExit => "Otra salida",
+        InventoryMovementType.MixedWaste => "Merma mixta",
         _ => "Movimiento"
     };
 
@@ -77,6 +78,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
         InventoryMovementType.PurchaseEntry => Color.FromArgb("#E8F5EE"),
         InventoryMovementType.SaleExit => Color.FromArgb("#EAF1FF"),
         InventoryMovementType.OtherExit => Color.FromArgb("#FFF3E6"),
+        InventoryMovementType.MixedWaste => Color.FromArgb("#FDECEC"),
         _ => Color.FromArgb("#EEF1F5")
     };
 
@@ -85,6 +87,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
         InventoryMovementType.PurchaseEntry => Color.FromArgb("#18794E"),
         InventoryMovementType.SaleExit => Color.FromArgb("#315CB8"),
         InventoryMovementType.OtherExit => Color.FromArgb("#A85B00"),
+        InventoryMovementType.MixedWaste => Color.FromArgb("#B42318"),
         _ => Color.FromArgb("#52657D")
     };
 

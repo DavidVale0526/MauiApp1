@@ -113,7 +113,7 @@ internal static class Program
                     "Miscelanea Ari", "Coordinator");
         Directory.CreateDirectory(dataDirectory);
         var centralDatabasePath = Path.Combine(dataDirectory, "miscelanea-ari-central.db");
-        builder.Services.AddLocalPersistence(centralDatabasePath);
+        builder.Services.AddLocalPersistence(centralDatabasePath, registerLocalSyncServices: false);
         builder.Services.AddSingleton<CoordinatorConnectionRegistry>();
         builder.Services.AddSingleton(_ => new CoordinatorPairingStore(centralDatabasePath));
         builder.Services.AddSingleton(serviceProvider => new CoordinatorChangeBroadcaster(

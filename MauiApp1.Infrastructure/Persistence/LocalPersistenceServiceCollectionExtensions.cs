@@ -30,7 +30,10 @@ public static class LocalPersistenceServiceCollectionExtensions
     public const string DatabaseFileName = "miscelanea-ari.db";
 
     public static IServiceCollection AddLocalPersistence(
-        this IServiceCollection services, string databasePath, bool migrationsManagedExternally = false)
+        this IServiceCollection services,
+        string databasePath,
+        bool migrationsManagedExternally = false,
+        bool registerLocalSyncServices = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
@@ -45,8 +48,11 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddScoped<ILocalUnitOfWork>(provider => provider.GetRequiredService<LocalDbContext>());
         services.AddSingleton<Pbkdf2PasswordHasher>();
         services.AddSingleton<CoordinatorBusinessOperationApplier>();
-        services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorConflictReviewService, MauiApp1.Infrastructure.Sync.CoordinatorConflictReviewService>();
-        services.AddSingleton<MauiApp1.Application.Sync.ILocalOperationSyncService, MauiApp1.Infrastructure.Lan.LocalOperationSyncService>();
+        if (registerLocalSyncServices)
+        {
+            services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorConflictReviewService, MauiApp1.Infrastructure.Sync.CoordinatorConflictReviewService>();
+            services.AddSingleton<MauiApp1.Application.Sync.ILocalOperationSyncService, MauiApp1.Infrastructure.Lan.LocalOperationSyncService>();
+        }
         services.AddSingleton<IAuthenticationService, LocalAuthenticationService>();
         services.AddTransient<ICategoryService, EfCategoryService>();
         services.AddTransient<IProductService, EfProductService>();

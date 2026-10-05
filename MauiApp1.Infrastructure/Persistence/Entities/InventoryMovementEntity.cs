@@ -9,7 +9,8 @@ internal sealed class InventoryMovementEntity
 
     public int LineNumber { get; set; }
 
-    public Guid ProductId { get; set; }
+    /// <summary>Es nulo para una merma mixta no atribuida a un producto concreto.</summary>
+    public Guid? ProductId { get; set; }
 
     public string ProductNameSnapshot { get; set; } = string.Empty;
 

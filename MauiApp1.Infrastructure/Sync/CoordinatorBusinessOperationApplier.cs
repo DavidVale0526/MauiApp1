@@ -66,6 +66,9 @@ public sealed class CoordinatorBusinessOperationApplier
                 case "Inventory.Recorded":
                     await ApplyInventoryAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
                     break;
+                case "Inventory.MixedWasteRecorded":
+                    await ApplyMixedWasteAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
+                    break;
                 case "Credit.PaymentRecorded":
                     await ApplyPaymentAsync(context, payloadJson, actorUserId, cancellationToken);
                     break;
@@ -263,6 +266,23 @@ public sealed class CoordinatorBusinessOperationApplier
             throw new BusinessOperationConflictException("El movimiento de inventario está incompleto.");
         foreach (var line in payload.Lines.OrderBy(item => item.LineNumber))
         {
+            if (line.Type == InventoryMovementType.MixedWaste)
+            {
+                if (line.ProductId != Guid.Empty || line.QuantityMilliUnits <= 0 ||
+                    string.IsNullOrWhiteSpace(line.UnitSnapshot) ||
+                    string.IsNullOrWhiteSpace(line.Reason) ||
+                    !line.Reason.StartsWith("Merma mixta", StringComparison.Ordinal))
+                    throw new BusinessOperationConflictException("La merma mixta contiene datos inválidos.");
+                context.InventoryMovements.Add(new InventoryMovementEntity
+                {
+                    MovementId = Guid.NewGuid(), OperationId = operationId, LineNumber = line.LineNumber,
+                    ProductId = null, ProductNameSnapshot = "Merma mixta (no atribuida)", UnitSnapshot = line.UnitSnapshot,
+                    Type = (int)InventoryMovementType.MixedWaste, QuantityMilliUnits = line.QuantityMilliUnits,
+                    Reason = line.Reason, OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor
+                });
+                continue;
+            }
+
             var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == line.ProductId, ct)
                 ?? throw new BusinessOperationConflictException("Un producto del movimiento no existe en el coordinador.");
             if (line.QuantityMilliUnits <= 0) throw new BusinessOperationConflictException("La cantidad debe ser positiva.");
@@ -282,6 +302,28 @@ public sealed class CoordinatorBusinessOperationApplier
                 Type = (int)movementType, QuantityMilliUnits = line.QuantityMilliUnits, Reason = line.Reason,
                 OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor });
         }
+    }
+
+    private static async Task ApplyMixedWasteAsync(LocalDbContext context, Guid operationId, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InventoryOperationPayload>(json);
+        if (payload.OperationId != operationId || payload.Lines.Count != 1 || payload.OccurredAtUtc.Kind != DateTimeKind.Utc)
+            throw new BusinessOperationConflictException("La merma mixta está incompleta.");
+
+        var line = payload.Lines[0];
+        if (line.Type != InventoryMovementType.MixedWaste || line.ProductId != Guid.Empty || line.QuantityMilliUnits <= 0 ||
+            string.IsNullOrWhiteSpace(line.UnitSnapshot) || string.IsNullOrWhiteSpace(line.Reason) ||
+            !line.Reason.StartsWith("Merma mixta", StringComparison.Ordinal))
+            throw new BusinessOperationConflictException("La merma mixta contiene datos inválidos.");
+
+        context.InventoryMovements.Add(new InventoryMovementEntity
+        {
+            MovementId = Guid.NewGuid(), OperationId = operationId, LineNumber = line.LineNumber,
+            ProductId = null, ProductNameSnapshot = "Merma mixta (no atribuida)", UnitSnapshot = line.UnitSnapshot,
+            Type = (int)InventoryMovementType.MixedWaste, QuantityMilliUnits = line.QuantityMilliUnits,
+            Reason = line.Reason, OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor
+        });
+        await Task.CompletedTask;
     }
 
     private static async Task ApplyPaymentAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)

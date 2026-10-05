@@ -48,7 +48,8 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
             new(null, "Todos"),
             new(InventoryMovementType.PurchaseEntry, "Entrada por compra"),
             new(InventoryMovementType.SaleExit, "Salida por venta"),
-            new(InventoryMovementType.OtherExit, "Otra salida")
+            new(InventoryMovementType.OtherExit, "Otra salida"),
+            new(InventoryMovementType.MixedWaste, "Merma mixta")
         ];
         _selectedSalesMode = SalesModes[0];
         _selectedStatus = Statuses[0];
@@ -259,6 +260,7 @@ public sealed record MovementReportCard(MovementReportRow Row)
         InventoryMovementType.PurchaseEntry => "Entrada por compra",
         InventoryMovementType.SaleExit => "Salida por venta",
         InventoryMovementType.OtherExit => "Otra salida",
+        InventoryMovementType.MixedWaste => "Merma mixta",
         _ => "Movimiento"
     };
     public string QuantityText
