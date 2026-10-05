@@ -345,9 +345,9 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (!decimal.TryParse(QuantityInput, NumberStyles.Number, CultureInfo.CurrentCulture, out var amount))
+        if (!TryParseQuantity(QuantityInput, out var amount))
         {
-            ErrorMessage = "Escribe una cantidad válida usando el separador decimal de este dispositivo.";
+            ErrorMessage = "Escribe una cantidad válida. Puedes usar punto o coma decimal, por ejemplo 0.750.";
             return;
         }
 
@@ -410,6 +410,18 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         }
 
         QuantityInput = string.Empty;
+    }
+
+    private static bool TryParseQuantity(string? input, out decimal amount)
+    {
+        amount = 0;
+        if (string.IsNullOrWhiteSpace(input)) return false;
+
+        // Acepta punto o coma decimal, sin interpretar separadores de miles ambiguos.
+        var normalized = input.Trim().Replace(',', '.');
+        if (normalized.Count(character => character == '.') > 1) return false;
+
+        return decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
     }
 
     private void OnLinesChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)

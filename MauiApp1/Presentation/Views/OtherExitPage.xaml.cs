@@ -77,9 +77,10 @@ public partial class OtherExitPage : CoordinatorRefreshPage
         StockQuantityGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         Grid.SetRow(StockCard, 0);
         Grid.SetColumn(StockCard, 0);
-        Grid.SetRow(MixedWasteUnitField, 1);
+        Grid.SetColumnSpan(StockCard, isWide ? 2 : 1);
+        Grid.SetRow(MixedWasteUnitField, isWide ? 1 : 1);
         Grid.SetColumn(MixedWasteUnitField, 0);
-        Grid.SetRow(QuantityField, 2);
-        Grid.SetColumn(QuantityField, 0);
+        Grid.SetRow(QuantityField, isWide ? 1 : 2);
+        Grid.SetColumn(QuantityField, isWide ? 1 : 0);
     }
 }

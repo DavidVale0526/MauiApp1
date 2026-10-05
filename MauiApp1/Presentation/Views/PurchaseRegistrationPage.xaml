@@ -30,10 +30,22 @@
                                    FontSize="13" TextColor="#61738A" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="7">
-                            <Label Text="Producto" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Label Text="Producto (unidad de inventario y venta)" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                             <Picker Title="Selecciona un producto activo" ItemsSource="{Binding Products}"
                                     ItemDisplayBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedProduct}"
                                     IsEnabled="{Binding CanEditLines}" TextColor="#111D31" />
+                            <Label Text="{Binding StockUnitDescription}" FontSize="12" TextColor="#61738A"
+                                   LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Unidad en que recibiste la compra" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Picker Title="Selecciona la unidad de compra" ItemsSource="{Binding PurchaseUnitOptions}"
+                                    SelectedItem="{Binding SelectedPurchaseUnit}" IsEnabled="{Binding CanEditLines}"
+                                    TextColor="#111D31" />
+                            <Entry Placeholder="Escribe la unidad" Text="{Binding OtherPurchaseUnit}"
+                                   IsVisible="{Binding IsCustomPurchaseUnit}" IsEnabled="{Binding CanEditLines}"
+                                   HeightRequest="48" BackgroundColor="White" TextColor="#111D31"
+                                   PlaceholderColor="#8291A5" />
                         </VerticalStackLayout>
                         <Grid x:Name="QuantityControls" ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="7">
@@ -46,6 +58,29 @@
                                     IsEnabled="{Binding CanEditLines}" BackgroundColor="#0D1B2A"
                                     TextColor="White" CornerRadius="11" Padding="20,12" VerticalOptions="End" />
                         </Grid>
+                        <Border Padding="14" BackgroundColor="#F2F7F5" Stroke="#D9E9E1" StrokeThickness="1"
+                                StrokeShape="RoundRectangle 12">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Conversión a la unidad del producto" FontSize="14" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="Escribe cuántas unidades del producto contiene una unidad recibida. Si ambas unidades son iguales, deja 1."
+                                       FontSize="12" TextColor="#61738A" LineBreakMode="WordWrap" />
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                    <Label Text="1" FontSize="15" TextColor="#34445A" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding EffectivePurchaseUnit}" FontSize="14"
+                                           TextColor="#34445A" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                                    <Label Grid.Column="2" Text="=" FontSize="15" TextColor="#61738A" VerticalOptions="Center" />
+                                    <Entry Grid.Column="3" Placeholder="Equivale a" Keyboard="Numeric" Text="{Binding ConversionFactorInput}"
+                                           IsEnabled="{Binding CanEditLines}" HeightRequest="48" BackgroundColor="White"
+                                           TextColor="#111D31" PlaceholderColor="#8291A5" />
+                                    <Label Grid.Column="4" Text="{Binding StockUnit}" FontSize="14" TextColor="#34445A"
+                                           VerticalOptions="Center" />
+                                </Grid>
+                                <Label Text="{Binding ConversionPreviewText}" FontSize="13" TextColor="#087F5B"
+                                       LineBreakMode="WordWrap" />
+                                <Label Text="La cantidad convertida se suma a la existencia y esa será la unidad usada para vender."
+                                       FontSize="12" TextColor="#61738A" LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+                        </Border>
                     </VerticalStackLayout>
                 </Border>
 
@@ -76,6 +111,8 @@
                                             <VerticalStackLayout Spacing="3">
                                                 <Label Text="{Binding Name}" FontAttributes="Bold" TextColor="#111D31" />
                                                 <Label Text="{Binding QuantityText}" FontSize="13" TextColor="#61738A" />
+                                                <Label Text="{Binding ConversionText}" FontSize="12" TextColor="#087F5B"
+                                                       LineBreakMode="WordWrap" />
                                             </VerticalStackLayout>
                                             <Button Grid.Column="1" Text="Quitar" Clicked="OnRemoveLineClicked"
                                                     IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}"

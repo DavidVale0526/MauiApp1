@@ -63,6 +63,7 @@ public sealed class OtherExitViewModel(
             {
                 OnPropertyChanged(nameof(IsMixedWaste));
                 OnPropertyChanged(nameof(IsProductExit));
+                OnPropertyChanged(nameof(AvailableStockTitle));
                 OnPropertyChanged(nameof(AvailableStockText));
             }
         }
@@ -127,8 +128,10 @@ public sealed class OtherExitViewModel(
 
     public string SubmitButtonText => _pendingAttempted ? "Reintentar guardado" : "Revisar y confirmar salida";
 
+    public string AvailableStockTitle => IsMixedWaste ? "Merma mixta" : "Existencia disponible";
+
     public string AvailableStockText => IsMixedWaste
-        ? "Merma mixta: se registra aparte y no se asigna a un producto."
+        ? "Se registra aparte y no se asigna a un producto."
         : SelectedProduct is null
         ? "Existencia disponible: selecciona un producto."
         : $"Existencia disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}";

@@ -15,7 +15,7 @@
                             TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
                     <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
                         <Label Text="Salida de inventario" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
-                        <Label Text="Registra productos que salen por un motivo distinto a una venta."
+                        <Label Text="Registra salidas de productos o merma mixta."
                                FontSize="14" TextColor="#61738A" />
                     </VerticalStackLayout>
                 </Grid>
@@ -59,10 +59,10 @@
 
                         <Grid x:Name="StockQuantityGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto"
                               ColumnSpacing="14" RowSpacing="14">
-                            <Border x:Name="StockCard" Grid.Row="0" Padding="16" BackgroundColor="#F7F9FB"
+                            <Border x:Name="StockCard" Grid.Row="0" Grid.ColumnSpan="2" Padding="16" BackgroundColor="#F7F9FB"
                                     Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 13">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="Existencia disponible" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                                    <Label Text="{Binding AvailableStockTitle}" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
                                     <Label Text="{Binding AvailableStockText}" FontSize="17" FontAttributes="Bold" TextColor="#111D31" />
                                 </VerticalStackLayout>
                             </Border>
