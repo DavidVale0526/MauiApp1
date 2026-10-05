@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
+             x:Class="MauiApp1.Presentation.Views.MoreOptionsPage"
+             Title="Más opciones" BackgroundColor="#F7F9FB">
+    <ScrollView VerticalScrollBarVisibility="Never">
+        <Grid Padding="16,20">
+            <VerticalStackLayout MaximumWidthRequest="820" HorizontalOptions="Center" Spacing="22">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18" VerticalOptions="Center">
+                    <Button Text="←" Clicked="OnBackClicked" BackgroundColor="Transparent"
+                            TextColor="#111D31" FontSize="30" Padding="8,2" WidthRequest="48" />
+                    <Label Grid.Column="1" Text="Más opciones" FontSize="28" FontAttributes="Bold"
+                           TextColor="#111D31" VerticalOptions="Center" />
+                </Grid>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="OPERACIONES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="OperationsOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="INVENTARIO Y COMPRAS" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="InventoryOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="CLIENTES Y REPORTES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="CustomerOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="ADMINISTRACIÓN" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="AdministrationOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+</views:CoordinatorRefreshPage>

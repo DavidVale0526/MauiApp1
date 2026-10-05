@@ -50,6 +50,7 @@ namespace MauiApp1
             builder.Services.AddTransient<AccessPageViewModel>();
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<MainPageViewModel>();
+            builder.Services.AddTransient<MoreOptionsPage>();
             builder.Services.AddTransient<CashierSetupPage>();
             builder.Services.AddTransient<CashierSetupViewModel>();
             builder.Services.AddTransient<CategoryManagementPage>();

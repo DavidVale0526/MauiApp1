@@ -26,10 +26,12 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 18 | Revisión de conflictos (`ConflictReviewPage`) | Sincronización | Pendiente |
 | 19 | Vinculación de dispositivo (`DevicePairingPage`) | Sincronización | Pendiente |
 | 20 | Lector QR de vinculación (`PairingQrScannerPage`) | Sincronización | Pendiente |
+| 21 | Más opciones (`MoreOptionsPage`) | Vista del botón «Más» | Adaptada; pendiente de revisión |
 
 ## Notas
 
-- La página `moviles` de Figma incluye una barra inferior persistente con Inicio, Ventas, Inventario, Reportes y Más. Se añadió en Android a las vistas de operación; Inventario y Reportes llevan a las consultas existentes, mientras Más reúne el resto de módulos y acciones disponibles. En escritorio se mantiene la navegación lateral.
+- La página `moviles` de Figma incluye una barra inferior persistente con Inicio, Ventas, Inventario, Reportes y Más. Se añadió en Android a las vistas de operación; Más abre una pantalla dedicada que agrupa todas las opciones disponibles. En escritorio se mantiene la navegación lateral y se añadieron iconos a sus accesos.
+- `MoreOptionsPage` adapta la pantalla del botón «Más» con las opciones que ya existen en la aplicación. Proveedores, caja, configuración y ayuda aparecen en la referencia Figma, pero no se agregaron porque todavía no son funciones implementadas.
 - `StockConsultationPage` se registra por separado del catálogo porque es una pantalla independiente en la aplicación.
 - Para `InventoryMovementHistoryPage` se revisó el diseño de escritorio `movimientos de invetario` en Figma; no hay una vista específica equivalente en `moviles`. Se adaptó el listado de datos existentes y se omitieron indicadores, filtros y exportación que la aplicación aún no ofrece.
 - Para `OtherExitPage` se revisó en `interfaces` el formulario modal `agregar una nueva salida`; no hay un diseño equivalente en `moviles`. Se adaptó el formulario actual y se mantuvieron solo los motivos, campos y confirmación que ya están implementados.

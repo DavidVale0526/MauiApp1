@@ -1,7 +1,5 @@
 using MauiApp1.Application.Sync;
-using MauiApp1.Application.Authentication;
 using Microsoft.Extensions.DependencyInjection;
-using MauiApp1.Domain.Users;
 
 namespace MauiApp1.Presentation.Views;
 
@@ -70,11 +68,11 @@ public abstract class CoordinatorRefreshPage : ContentPage
             BackgroundColor = Colors.White
         };
 
-        var home = CreateNavigationButton("⌂", "Inicio", IsHomePage(), async () => await NavigateHomeAsync());
-        var sales = CreateNavigationButton("▣", "Ventas", IsSalesPage(), async () => await NavigateSalesAsync());
-        var inventory = CreateNavigationButton("▤", "Inventario", IsInventoryPage(), async () => await NavigateToPageAsync<StockConsultationPage>());
-        var reports = CreateNavigationButton("▥", "Reportes", GetType().Name == nameof(ReportsPage), async () => await NavigateToPageAsync<ReportsPage>());
-        var more = CreateNavigationButton("☰", "Más", false, async () => await ShowMoreOptionsAsync());
+        var home = CreateNavigationButton("nav_home", "Inicio", IsHomePage(), async () => await NavigateHomeAsync());
+        var sales = CreateNavigationButton("nav_sales", "Ventas", IsSalesPage(), async () => await NavigateSalesAsync());
+        var inventory = CreateNavigationButton("nav_inventory", "Inventario", IsInventoryPage(), async () => await NavigateToPageAsync<StockConsultationPage>());
+        var reports = CreateNavigationButton("nav_reports", "Reportes", GetType().Name == nameof(ReportsPage), async () => await NavigateToPageAsync<ReportsPage>());
+        var more = CreateNavigationButton("nav_more", "Más", IsMorePage(), async () => await NavigateMoreAsync());
         grid.Add(home, 0);
         grid.Add(sales, 1);
         grid.Add(inventory, 2);
@@ -92,22 +90,45 @@ public abstract class CoordinatorRefreshPage : ContentPage
         };
     }
 
-    private static Button CreateNavigationButton(string icon, string title, bool isSelected, Func<Task> onClicked)
+    private static View CreateNavigationButton(string iconName, string title, bool isSelected, Func<Task> onClicked)
     {
-        var button = new Button
+        var icon = new Image
         {
-            Text = $"{icon}\n{title}",
-            FontSize = 12,
+            Source = isSelected ? $"{iconName}_active.png" : $"{iconName}.png",
+            WidthRequest = 23,
+            HeightRequest = 23,
+            HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Center,
+            Aspect = Aspect.AspectFit
+        };
+        var label = new Label
+        {
+            Text = title,
+            FontSize = 11,
             FontAttributes = isSelected ? FontAttributes.Bold : FontAttributes.None,
-            TextColor = isSelected ? Color.FromArgb("#0D1B2A") : Color.FromArgb("#61738A"),
+            TextColor = isSelected ? Color.FromArgb("#008060") : Color.FromArgb("#4C5258"),
+            HorizontalTextAlignment = TextAlignment.Center,
+            VerticalTextAlignment = TextAlignment.Center
+        };
+        var item = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition(GridLength.Star),
+                new RowDefinition(GridLength.Auto)
+            },
+            RowSpacing = 2,
+            Padding = new Thickness(2, 3),
             BackgroundColor = Colors.Transparent,
-            Padding = new Thickness(6, 2),
-            CornerRadius = 10,
             HorizontalOptions = LayoutOptions.Fill,
             VerticalOptions = LayoutOptions.Fill
         };
-        button.Clicked += async (_, _) => await onClicked();
-        return button;
+        item.Add(icon, 0);
+        Grid.SetRow(label, 1);
+        item.Add(label);
+        item.GestureRecognizers.Add(new TapGestureRecognizer { Command = new Command(async () => await onClicked()) });
+        SemanticProperties.SetDescription(item, title);
+        return item;
     }
 
     private bool IsHomePage() => GetType().Name == "MainPage";
@@ -115,6 +136,18 @@ public abstract class CoordinatorRefreshPage : ContentPage
     private bool IsSalesPage() => GetType().Name is "SaleRegistrationPage" or "SaleHistoryPage";
 
     private bool IsInventoryPage() => GetType().Name is "StockConsultationPage" or "ProductManagementPage" or "CategoryManagementPage";
+
+    private bool IsMorePage() => GetType().Name == nameof(MoreOptionsPage);
+
+    private async Task NavigateMoreAsync()
+    {
+        if (IsMorePage()) return;
+        var services = Handler?.MauiContext?.Services;
+        if (services is null) return;
+        await CloseModalPagesAsync();
+        var page = services.GetRequiredService<MoreOptionsPage>();
+        await Shell.Current.Navigation.PushModalAsync(new NavigationPage(page));
+    }
 
     private async Task NavigateHomeAsync()
     {
@@ -142,51 +175,7 @@ public abstract class CoordinatorRefreshPage : ContentPage
         await Shell.Current.Navigation.PushModalAsync(new NavigationPage(page));
     }
 
-    private async Task ShowMoreOptionsAsync()
-    {
-        var options = new List<string>
-        {
-            "Productos", "Categorías", "Existencias", "Registrar compra", "Historial de compras",
-            "Movimientos de inventario", "Registrar salida", "Clientes y crédito", "Crédito y pagos", "Reportes",
-            "Sincronización y conexión"
-        };
-        var services = Handler?.MauiContext?.Services;
-        if (services?.GetService<IAuthenticationService>()?.CurrentUser?.Role == UserRole.Administrator)
-            options.Add("Cuentas de cajero");
-        options.Add("Cerrar sesión");
-
-        var selected = await DisplayActionSheetAsync("Más opciones", "Cancelar", null, options.ToArray());
-        if (string.IsNullOrWhiteSpace(selected) || selected == "Cancelar") return;
-        if (selected == "Cerrar sesión")
-        {
-            var signInService = services?.GetService<ICoordinatedSignInService>();
-            if (signInService is not null) await signInService.SignOutAsync();
-            return;
-        }
-
-        var pageType = selected switch
-        {
-            "Productos" => typeof(ProductManagementPage),
-            "Categorías" => typeof(CategoryManagementPage),
-            "Existencias" => typeof(StockConsultationPage),
-            "Registrar compra" => typeof(PurchaseRegistrationPage),
-            "Historial de compras" => typeof(PurchaseHistoryPage),
-            "Movimientos de inventario" => typeof(InventoryMovementHistoryPage),
-            "Registrar salida" => typeof(OtherExitPage),
-            "Clientes y crédito" => typeof(CustomerManagementPage),
-            "Crédito y pagos" => typeof(PaymentManagementPage),
-            "Reportes" => typeof(ReportsPage),
-            "Sincronización y conexión" => typeof(SyncManagementPage),
-            "Cuentas de cajero" => typeof(CashierSetupPage),
-            _ => null
-        };
-        if (pageType is null || services?.GetService(pageType) is not Page targetPage) return;
-
-        await CloseModalPagesAsync();
-        await Shell.Current.Navigation.PushModalAsync(new NavigationPage(targetPage));
-    }
-
-    private static async Task CloseModalPagesAsync()
+    protected static async Task CloseModalPagesAsync()
     {
         var navigation = Shell.Current?.Navigation;
         if (navigation is null) return;
