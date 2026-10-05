@@ -61,6 +61,8 @@ public abstract class CoordinatorRefreshPage : ContentPage
             {
                 new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Star)
             },
             Padding = new Thickness(8, 4),
@@ -70,10 +72,14 @@ public abstract class CoordinatorRefreshPage : ContentPage
 
         var home = CreateNavigationButton("⌂", "Inicio", IsHomePage(), async () => await NavigateHomeAsync());
         var sales = CreateNavigationButton("▣", "Ventas", IsSalesPage(), async () => await NavigateSalesAsync());
-        var more = CreateNavigationButton("•••", "Más", false, async () => await ShowMoreOptionsAsync());
+        var inventory = CreateNavigationButton("▤", "Inventario", IsInventoryPage(), async () => await NavigateToPageAsync<StockConsultationPage>());
+        var reports = CreateNavigationButton("▥", "Reportes", GetType().Name == nameof(ReportsPage), async () => await NavigateToPageAsync<ReportsPage>());
+        var more = CreateNavigationButton("☰", "Más", false, async () => await ShowMoreOptionsAsync());
         grid.Add(home, 0);
         grid.Add(sales, 1);
-        grid.Add(more, 2);
+        grid.Add(inventory, 2);
+        grid.Add(reports, 3);
+        grid.Add(more, 4);
 
         return new Border
         {
@@ -108,6 +114,8 @@ public abstract class CoordinatorRefreshPage : ContentPage
 
     private bool IsSalesPage() => GetType().Name is "SaleRegistrationPage" or "SaleHistoryPage";
 
+    private bool IsInventoryPage() => GetType().Name is "StockConsultationPage" or "ProductManagementPage" or "CategoryManagementPage";
+
     private async Task NavigateHomeAsync()
     {
         if (IsHomePage()) return;
@@ -116,11 +124,21 @@ public abstract class CoordinatorRefreshPage : ContentPage
 
     private async Task NavigateSalesAsync()
     {
-        if (GetType().Name == "SaleRegistrationPage") return;
+        if (GetType().Name == nameof(SaleRegistrationPage)) return;
         var services = Handler?.MauiContext?.Services;
         if (services is null) return;
         await CloseModalPagesAsync();
         var page = services.GetRequiredService<SaleRegistrationPage>();
+        await Shell.Current.Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async Task NavigateToPageAsync<TPage>() where TPage : Page
+    {
+        if (GetType() == typeof(TPage)) return;
+        var services = Handler?.MauiContext?.Services;
+        if (services is null) return;
+        await CloseModalPagesAsync();
+        var page = services.GetRequiredService<TPage>();
         await Shell.Current.Navigation.PushModalAsync(new NavigationPage(page));
     }
 

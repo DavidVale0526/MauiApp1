@@ -29,7 +29,7 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 
 ## Notas
 
-- La página `moviles` de Figma incluye una barra inferior persistente para navegar. Se añadió en Android a las vistas de operación con accesos a Inicio, Ventas y Más; Más reúne los módulos y acciones que ya existen. En escritorio se mantiene la navegación lateral.
+- La página `moviles` de Figma incluye una barra inferior persistente con Inicio, Ventas, Inventario, Reportes y Más. Se añadió en Android a las vistas de operación; Inventario y Reportes llevan a las consultas existentes, mientras Más reúne el resto de módulos y acciones disponibles. En escritorio se mantiene la navegación lateral.
 - `StockConsultationPage` se registra por separado del catálogo porque es una pantalla independiente en la aplicación.
 - Para `InventoryMovementHistoryPage` se revisó el diseño de escritorio `movimientos de invetario` en Figma; no hay una vista específica equivalente en `moviles`. Se adaptó el listado de datos existentes y se omitieron indicadores, filtros y exportación que la aplicación aún no ofrece.
 - Para `OtherExitPage` se revisó en `interfaces` el formulario modal `agregar una nueva salida`; no hay un diseño equivalente en `moviles`. Se adaptó el formulario actual y se mantuvieron solo los motivos, campos y confirmación que ya están implementados.
