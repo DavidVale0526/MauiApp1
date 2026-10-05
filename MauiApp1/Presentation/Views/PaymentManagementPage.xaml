@@ -5,42 +5,109 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.PaymentManagementPage"
              x:DataType="viewModels:PaymentManagementViewModel"
-             Title="Crédito y pagos">
+             Title="Crédito y pagos" BackgroundColor="#F7F9FB">
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="14">
-            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-            <Label Text="Crédito y pagos" FontSize="28" FontAttributes="Bold" />
-            <Label Text="Selecciona una deuda para consultar sus abonos o registrar un pago." />
-            <Picker Title="Cliente y cuenta por cobrar" ItemsSource="{Binding Accounts}"
-                    ItemDisplayBinding="{Binding DisplayText}" SelectedItem="{Binding SelectedAccount}"
-                    IsEnabled="{Binding CanEditPayment}" />
-            <Label Text="{Binding SelectedAccount.AccountDetails}" />
-            <Label Text="Registrar un abono" FontSize="20" FontAttributes="Bold" />
-            <Entry Placeholder="Monto del pago" Keyboard="Numeric" Text="{Binding AmountInput}"
-                   IsEnabled="{Binding CanEditPayment}" />
-            <Button Text="{Binding RecordButtonText}" Clicked="OnReviewPaymentClicked"
-                    IsEnabled="{Binding CanRecord}" />
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
-            <Label Text="{Binding StatusMessage}" TextColor="Green" />
-            <Label Text="Historial de pagos de esta deuda" FontSize="20" FontAttributes="Bold" />
-            <CollectionView ItemsSource="{Binding Payments}" HeightRequest="300">
-                <CollectionView.EmptyView><Label Text="Esta cuenta aún no tiene pagos registrados." Padding="8" /></CollectionView.EmptyView>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:PaymentHistoryItem">
-                        <Border Padding="12" Margin="0,4">
-                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
-                                <Label Grid.Row="0" Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
-                                <Label Grid.Row="0" Grid.Column="1" Text="{Binding AmountText}" FontAttributes="Bold" />
-                                <Label Grid.Row="1" Grid.Column="0" Text="{Binding ActorText}" FontSize="12" />
-                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding ReferenceText}" FontSize="12" />
-                            </Grid>
+        <Grid x:Name="PageLayout" Padding="16,20" SizeChanged="OnPageSizeChanged">
+            <Grid x:Name="ContentLayout" MaximumWidthRequest="1180" HorizontalOptions="Center"
+                  ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="18">
+                <Grid x:Name="HeaderArea" Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked"
+                            BackgroundColor="#E8EEF5" TextColor="#0D1B2A" CornerRadius="12"
+                            Padding="18,12" VerticalOptions="Center" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                        <Label Text="Crédito y pagos" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Consulta saldos pendientes y registra los pagos recibidos."
+                               FontSize="14" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <Border x:Name="PaymentFormCard" Grid.Row="1" Grid.Column="0" Padding="20"
+                        BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Cuenta por cobrar" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Selecciona el cliente y la deuda que recibió el pago."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Cliente y cuenta" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Picker Title="Selecciona una cuenta" ItemsSource="{Binding Accounts}"
+                                    ItemDisplayBinding="{Binding DisplayText}" SelectedItem="{Binding SelectedAccount}"
+                                    IsEnabled="{Binding CanEditPayment}" TextColor="#111D31"
+                                    BackgroundColor="#FFFFFF" />
+                        </VerticalStackLayout>
+                        <Border Padding="14" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
+                                StrokeShape="RoundRectangle 12">
+                            <Label Text="{Binding SelectedAccount.AccountDetails}" FontSize="13"
+                                   TextColor="#52657D" />
                         </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-            <Label Text="Los pagos se conservan en el historial; no se editan ni eliminan desde esta pantalla."
-                   FontSize="12" Opacity="0.8" />
-            <Button Text="Actualizar" Clicked="OnRefreshClicked" />
-        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E3EAF2" />
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Registrar un abono" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="El importe no puede superar el saldo pendiente."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Monto del pago" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="0.00" Keyboard="Numeric" Text="{Binding AmountInput}"
+                                   IsEnabled="{Binding CanEditPayment}" HeightRequest="52"
+                                   BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
+                        </VerticalStackLayout>
+                        <Button Text="{Binding RecordButtonText}" Clicked="OnReviewPaymentClicked"
+                                IsEnabled="{Binding CanRecord}" BackgroundColor="#0D1B2A"
+                                TextColor="White" CornerRadius="11" Padding="18,13" />
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                           HorizontalOptions="Center" Color="#0D1B2A" />
+                        <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+                        <Label Text="{Binding StatusMessage}" TextColor="#16794B" FontSize="14" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="PaymentHistoryCard" Grid.Row="2" Grid.Column="0" Padding="20"
+                        BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="14">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Historial de pagos" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Abonos registrados para la cuenta seleccionada."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <CollectionView x:Name="PaymentsCollection" ItemsSource="{Binding Payments}"
+                                        HeightRequest="420" SelectionMode="None">
+                            <CollectionView.EmptyView>
+                                <Border Padding="20" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
+                                        StrokeShape="RoundRectangle 12">
+                                    <Label Text="Esta cuenta aún no tiene pagos registrados."
+                                           HorizontalTextAlignment="Center" TextColor="#61738A" />
+                                </Border>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:PaymentHistoryItem">
+                                    <Border Margin="0,0,0,10" Padding="15" BackgroundColor="#FFFFFF"
+                                            Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 13">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="5">
+                                            <Label Grid.Row="0" Grid.Column="0" Text="{Binding DateText}"
+                                                   FontSize="14" FontAttributes="Bold" TextColor="#111D31" />
+                                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding AmountText}"
+                                                   FontSize="15" FontAttributes="Bold" TextColor="#16794B"
+                                                   HorizontalTextAlignment="End" />
+                                            <Label Grid.Row="1" Grid.Column="0" Text="{Binding ActorText}"
+                                                   FontSize="12" TextColor="#61738A" />
+                                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding ReferenceText}"
+                                                   FontSize="12" TextColor="#61738A" HorizontalTextAlignment="End" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                        <Label Text="Los pagos se conservan en el historial; no se editan ni eliminan desde esta pantalla."
+                               FontSize="12" TextColor="#61738A" />
+                        <Button Text="Actualizar" Clicked="OnRefreshClicked" BackgroundColor="#E8EEF5"
+                                TextColor="#0D1B2A" CornerRadius="11" Padding="18,12" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+        </Grid>
     </ScrollView>
 </views:CoordinatorRefreshPage>

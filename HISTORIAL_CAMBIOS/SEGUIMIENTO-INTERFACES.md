@@ -18,8 +18,8 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 10 | Historial de compras (`PurchaseHistoryPage`) | Historial de compras | Adaptada; pendiente de revisión |
 | 11 | Historial de movimientos (`InventoryMovementHistoryPage`) | Movimientos de inventario | Adaptada; pendiente de revisión |
 | 12 | Salida de inventario (`OtherExitPage`) | Salidas / mermas | Adaptada; pendiente de revisión |
-| 13 | Clientes y crédito (`CustomerManagementPage`) | Clientes | Pendiente |
-| 14 | Pagos (`PaymentManagementPage`) | Pagos / saldos | Pendiente |
+| 13 | Clientes y crédito (`CustomerManagementPage`) | Clientes | Adaptada; pendiente de revisión |
+| 14 | Pagos (`PaymentManagementPage`) | Cobro y pagos | Adaptada; pendiente de revisión |
 | 15 | Reportes (`ReportsPage`) | Reportes | Pendiente |
 | 16 | Gestión de cuentas de cajero (`CashierSetupPage`) | Usuarios / administración | Pendiente |
 | 17 | Sincronización y conexión (`SyncManagementPage`) | Panel de sincronización | Pendiente |
@@ -29,9 +29,12 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 
 ## Notas
 
+- La página `moviles` de Figma incluye una barra inferior persistente para navegar. Se añadió en Android a las vistas de operación con accesos a Inicio, Ventas y Más; Más reúne los módulos y acciones que ya existen. En escritorio se mantiene la navegación lateral.
 - `StockConsultationPage` se registra por separado del catálogo porque es una pantalla independiente en la aplicación.
 - Para `InventoryMovementHistoryPage` se revisó el diseño de escritorio `movimientos de invetario` en Figma; no hay una vista específica equivalente en `moviles`. Se adaptó el listado de datos existentes y se omitieron indicadores, filtros y exportación que la aplicación aún no ofrece.
 - Para `OtherExitPage` se revisó en `interfaces` el formulario modal `agregar una nueva salida`; no hay un diseño equivalente en `moviles`. Se adaptó el formulario actual y se mantuvieron solo los motivos, campos y confirmación que ya están implementados.
+- Para `CustomerManagementPage` se buscaron referencias de clientes y crédito en ambas páginas de Figma; no hay una pantalla dedicada. Las menciones de cliente aparecen dentro de ventas y compras, por lo que se aplicaron los estilos visuales generales sin agregar filtros ni acciones.
+- Para `PaymentManagementPage` se buscaron pagos y saldos en `interfaces` y `moviles`. Figma contiene elementos de cobro en ventas y pagos en movimientos de caja, pero no una pantalla dedicada para registrar abonos a deudas de clientes. Se aplicó el estilo visual general y se conservaron las funciones actuales de selección de cuenta, confirmación, registro e historial.
 - No encontré una pantalla móvil dedicada al catálogo en la página `moviles` de Figma; esa vista se adapta al teléfono con el mismo contenido disponible y una disposición de una columna.
 - Los diseños muestran campos, cifras, filtros y acciones que algunas vistas actuales no tienen. No se agregan a la aplicación durante esta adaptación visual.
 - `CoordinatorRefreshPage` es una clase base, no una pantalla visible, por lo que no se marca como vista.

@@ -51,4 +51,30 @@ public partial class PaymentManagementPage : CoordinatorRefreshPage
         if (Navigation.ModalStack.Count > 0) await Navigation.PopModalAsync();
         else if (Navigation.NavigationStack.Count > 1) await Navigation.PopAsync();
     }
+
+    private void OnPageSizeChanged(object? sender, EventArgs eventArgs)
+    {
+        var isWide = Width >= 900;
+        PageLayout.Padding = isWide ? new Thickness(32, 28) : new Thickness(16, 20);
+
+        ContentLayout.ColumnDefinitions.Clear();
+        ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        if (isWide)
+            ContentLayout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+
+        ContentLayout.RowDefinitions.Clear();
+        ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        ContentLayout.RowDefinitions.Add(new RowDefinition(isWide ? GridLength.Star : GridLength.Auto));
+        if (!isWide)
+            ContentLayout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+        Grid.SetRow(HeaderArea, 0);
+        Grid.SetColumn(HeaderArea, 0);
+        Grid.SetColumnSpan(HeaderArea, isWide ? 2 : 1);
+        Grid.SetRow(PaymentFormCard, 1);
+        Grid.SetColumn(PaymentFormCard, 0);
+        Grid.SetRow(PaymentHistoryCard, isWide ? 1 : 2);
+        Grid.SetColumn(PaymentHistoryCard, isWide ? 1 : 0);
+        PaymentsCollection.HeightRequest = isWide ? 560 : 420;
+    }
 }

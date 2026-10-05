@@ -12,7 +12,7 @@ public partial class MainPage : CoordinatorRefreshPage
         var useDesktopLayout = RootLayout.Width >= 950;
         RootLayout.ColumnDefinitions[0].Width = new GridLength(useDesktopLayout ? 250 : 0);
         Sidebar.IsVisible = useDesktopLayout;
-        BottomActionsGrid.IsVisible = !useDesktopLayout;
+        BottomActionsGrid.IsVisible = false;
         DashboardContent.Padding = useDesktopLayout
             ? new Thickness(36, 30)
             : new Thickness(16, 24);

@@ -5,30 +5,94 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.CustomerManagementPage"
              x:DataType="viewModels:CustomerManagementViewModel"
-             Title="Clientes y crédito">
+             Title="Clientes y crédito" BackgroundColor="#F7F9FB">
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="14">
-            <Button Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-            <Label Text="Clientes" FontSize="28" FontAttributes="Bold" />
-            <Entry Placeholder="Nombre del cliente (obligatorio)" Text="{Binding Name}" MaxLength="120" />
-            <Entry Placeholder="Teléfono (opcional)" Text="{Binding Phone}" MaxLength="40" Keyboard="Telephone" />
-            <Button Text="Guardar cliente" Command="{Binding SaveCommand}" />
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" />
-            <Label Text="Clientes registrados y saldo de crédito" FontSize="20" FontAttributes="Bold" />
-            <CollectionView ItemsSource="{Binding Customers}" HeightRequest="360">
-                <CollectionView.EmptyView><Label Text="Aún no hay clientes registrados." Padding="8" /></CollectionView.EmptyView>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:CustomerListItem">
-                        <Border Padding="12" Margin="0,4">
-                            <VerticalStackLayout Spacing="4">
-                                <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="17" />
-                                <Label Text="{Binding ContactText}" />
-                                <Label Text="{Binding DebtText}" />
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </VerticalStackLayout>
+        <Grid x:Name="PageLayout" Padding="16,20" SizeChanged="OnPageSizeChanged">
+            <Grid x:Name="ContentLayout" MaximumWidthRequest="1180" HorizontalOptions="Center"
+                  ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="20" RowSpacing="18">
+                <Grid x:Name="HeaderArea" Grid.Row="0" Grid.ColumnSpan="1" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
+                            TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+                    <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                        <Label Text="Clientes y crédito" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Registra clientes y consulta sus saldos pendientes."
+                               FontSize="14" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <Border x:Name="CreateCustomerCard" Grid.Row="1" Grid.Column="0" Padding="20"
+                        BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Registrar cliente" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="El nombre es obligatorio; el teléfono es opcional."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Nombre del cliente" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Nombre del cliente" Text="{Binding Name}" MaxLength="120"
+                                   HeightRequest="52" BackgroundColor="White" TextColor="#111D31"
+                                   PlaceholderColor="#8291A5" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Teléfono (opcional)" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="Teléfono" Text="{Binding Phone}" MaxLength="40"
+                                   Keyboard="Telephone" HeightRequest="52" BackgroundColor="White"
+                                   TextColor="#111D31" PlaceholderColor="#8291A5" />
+                        </VerticalStackLayout>
+                        <Button Text="Guardar cliente" Command="{Binding SaveCommand}"
+                                BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="11"
+                                Padding="18,13" />
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                           HorizontalOptions="Center" Color="#0D1B2A" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="CustomerListCard" Grid.Row="2" Grid.Column="0" Padding="20"
+                        BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="14">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Clientes registrados" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Consulta el teléfono y el saldo pendiente de cada cliente."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <CollectionView x:Name="CustomersCollection" ItemsSource="{Binding Customers}"
+                                        HeightRequest="420" SelectionMode="None">
+                            <CollectionView.EmptyView>
+                                <Border Padding="20" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
+                                        StrokeShape="RoundRectangle 12">
+                                    <Label Text="Aún no hay clientes registrados."
+                                           HorizontalTextAlignment="Center" TextColor="#61738A" />
+                                </Border>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:CustomerListItem">
+                                    <Border Margin="0,0,0,10" Padding="15" BackgroundColor="#FFFFFF"
+                                            Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 13">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="4" VerticalOptions="Center">
+                                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#111D31" />
+                                                <Label Text="{Binding ContactText}" FontSize="13" TextColor="#61738A" />
+                                            </VerticalStackLayout>
+                                            <Border Grid.Column="1" Padding="11,8" BackgroundColor="#F7F9FB"
+                                                    Stroke="#E3EAF2" StrokeShape="RoundRectangle 10"
+                                                    VerticalOptions="Center">
+                                                <Label Text="{Binding DebtText}" FontSize="13" FontAttributes="Bold"
+                                                       TextColor="#0D1B2A" HorizontalTextAlignment="End" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label x:Name="ErrorLabel" Grid.Row="3" Grid.ColumnSpan="1"
+                       Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+            </Grid>
+        </Grid>
     </ScrollView>
 </views:CoordinatorRefreshPage>
