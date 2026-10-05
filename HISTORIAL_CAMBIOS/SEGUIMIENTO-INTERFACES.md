@@ -20,7 +20,7 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 | 12 | Salida de inventario (`OtherExitPage`) | Salidas / mermas | Adaptada; pendiente de revisión |
 | 13 | Clientes y crédito (`CustomerManagementPage`) | Clientes | Adaptada; pendiente de revisión |
 | 14 | Pagos (`PaymentManagementPage`) | Cobro y pagos | Adaptada; pendiente de revisión |
-| 15 | Reportes (`ReportsPage`) | Reportes | Pendiente |
+| 15 | Reportes (`ReportsPage`) | Tarjetas y jerarquía visual de la referencia compartida | Adaptada; pendiente de revisión en Windows y Android |
 | 16 | Gestión de cuentas de cajero (`CashierSetupPage`) | Usuarios / administración | Pendiente |
 | 17 | Sincronización y conexión (`SyncManagementPage`) | Panel de sincronización | Pendiente |
 | 18 | Revisión de conflictos (`ConflictReviewPage`) | Sincronización | Pendiente |
@@ -30,6 +30,7 @@ Registro de las vistas adaptadas al estilo visual de Figma. Las referencias guí
 
 ## Notas
 
+- `ReportsPage` conserva las consultas de ventas, inventario y movimientos, sus filtros y todos los campos de resultados. Se adaptaron las pestañas, tarjetas, colores y disposición de filtros para escritorio y Android; la imagen compartida se usa como referencia visual.
 - La página `moviles` de Figma incluye una barra inferior persistente con Inicio, Ventas, Inventario, Reportes y Más. Se añadió en Android a las vistas de operación; Más abre una pantalla dedicada que agrupa todas las opciones disponibles. En escritorio se mantiene la navegación lateral y se añadieron iconos a sus accesos.
 - `MoreOptionsPage` adapta la pantalla del botón «Más» con las opciones que ya existen en la aplicación. Proveedores, caja, configuración y ayuda aparecen en la referencia Figma, pero no se agregaron porque todavía no son funciones implementadas.
 - `StockConsultationPage` se registra por separado del catálogo porque es una pantalla independiente en la aplicación.

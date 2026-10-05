@@ -1,137 +1,331 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
-             xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
-             x:Class="MauiApp1.Presentation.Views.ReportsPage"
-             x:DataType="viewModels:ReportsViewModel"
-             Title="Reportes">
-    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
-        <Button Grid.Row="0" Text="← Volver" HorizontalOptions="Start" Clicked="OnBackClicked" />
-        <VerticalStackLayout Grid.Row="1" Spacing="8">
-            <Label Text="Reportes" FontSize="28" FontAttributes="Bold" />
-            <Label Text="{Binding DataNotice}" FontSize="12" Opacity="0.8" />
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="Ventas" Clicked="OnSalesClicked" />
-                <Button Grid.Column="1" Text="Inventario" Clicked="OnInventoryClicked" />
-                <Button Grid.Column="2" Text="Movimientos" Clicked="OnMovementsClicked" />
+<?xml version="1.0" encoding="utf-8"?>
+<views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:views="clr-namespace:MauiApp1.Presentation.Views" xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels" x:Class="MauiApp1.Presentation.Views.ReportsPage" x:DataType="viewModels:ReportsViewModel" Title="Reportes" Shell.NavBarIsVisible="False" BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="PanelStyle" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="Stroke" Value="#E3EAF2" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+        <Style x:Key="FieldStyle" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="#F8FAFC" />
+            <Setter Property="Stroke" Value="#E3EAF2" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 9" />
+            <Setter Property="Padding" Value="10,2" />
+            <Setter Property="MinimumHeightRequest" Value="48" />
+        </Style>
+        <Style x:Key="FilterLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="TextColor" Value="#52657D" />
+        </Style>
+        <Style TargetType="Picker">
+            <Setter Property="TextColor" Value="#26384C" />
+            <Setter Property="TitleColor" Value="#718198" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="HorizontalOptions" Value="Fill" />
+        </Style>
+        <Style TargetType="DatePicker">
+            <Setter Property="TextColor" Value="#26384C" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="HorizontalOptions" Value="Fill" />
+        </Style>
+        <Style x:Key="SecondaryTextStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextColor" Value="#61738A" />
+            <Setter Property="LineBreakMode" Value="WordWrap" />
+        </Style>
+        <Style x:Key="DetailTextStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="TextColor" Value="#34445A" />
+            <Setter Property="LineBreakMode" Value="WordWrap" />
+        </Style>
+        <Style x:Key="ResultTitleStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="TextColor" Value="#111D31" />
+            <Setter Property="LineBreakMode" Value="WordWrap" />
+        </Style>
+        <Style x:Key="ConsultButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#0D1B2A" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="18,12" />
+        </Style>
+        <Style x:Key="SectionButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#E8EEF5" />
+            <Setter Property="TextColor" Value="#52657D" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,12" />
+        </Style>
+    </ContentPage.Resources>
+    <Grid x:Name="PageLayout" Padding="24,24" SizeChanged="OnPageSizeChanged">
+        <Grid x:Name="ContentHost" MaximumWidthRequest="1260" HorizontalOptions="Center" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Button Text="←" Clicked="OnBackClicked" BackgroundColor="#E8EEF5" TextColor="#0D1B2A" FontSize="24" WidthRequest="48" HeightRequest="48" CornerRadius="10" Padding="0" VerticalOptions="Center" SemanticProperties.Description="Volver" />
+                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                    <Label x:Name="PageTitle" Text="Reportes" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Consulta ventas, existencias y movimientos." Style="{StaticResource SecondaryTextStyle}" />
+                </VerticalStackLayout>
             </Grid>
-        </VerticalStackLayout>
-        <Label Grid.Row="2" Text="{Binding ErrorMessage}" TextColor="Red" />
-        <Grid Grid.Row="3">
-            <ScrollView IsVisible="{Binding IsSalesSection}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Ventas registradas" FontSize="20" FontAttributes="Bold" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Desde" FontSize="12" />
-                            <DatePicker Date="{Binding DateFrom}" />
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="Hasta (inclusive)" FontSize="12" />
-                            <DatePicker Date="{Binding DateTo}" />
-                        </VerticalStackLayout>
-                    </Grid>
-                    <Picker Title="Modalidad" ItemsSource="{Binding SalesModes}" ItemDisplayBinding="{Binding Label}"
-                            SelectedItem="{Binding SelectedSalesMode}" />
-                    <Picker Title="Cliente" ItemsSource="{Binding Customers}" ItemDisplayBinding="{Binding Name}"
-                            SelectedItem="{Binding SelectedCustomer}" />
-                    <Button Text="Consultar ventas" Clicked="OnRefreshClicked" />
-                    <CollectionView ItemsSource="{Binding Sales}" HeightRequest="520">
-                        <CollectionView.EmptyView><Label Text="No hay ventas en el periodo y filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="viewModels:SalesReportCard">
-                                <Border Padding="12" Margin="0,4">
-                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
-                                        <Label Grid.Row="0" Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
-                                        <Label Grid.Row="0" Grid.Column="1" Text="{Binding ReferenceText}" />
-                                        <Label Grid.Row="1" Grid.Column="0" Text="{Binding ActorText}" />
-                                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding TypeText}" />
-                                        <Label Grid.Row="2" Grid.Column="0" Text="{Binding CustomerText}" />
-                                        <Label Grid.Row="3" Grid.Column="1" Text="{Binding TotalText}" FontAttributes="Bold" />
+            <VerticalStackLayout Grid.Row="1" Spacing="12">
+                <Label Text="{Binding DataNotice}" Style="{StaticResource SecondaryTextStyle}" />
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="Ventas" Clicked="OnSalesClicked" Style="{StaticResource SectionButtonStyle}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsSalesSection}" Value="True">
+                                <Setter Property="BackgroundColor" Value="#0D1B2A" />
+                                <Setter Property="TextColor" Value="White" />
+                                <Setter Property="FontAttributes" Value="Bold" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Grid.Column="1" Text="Inventario" Clicked="OnInventoryClicked" Style="{StaticResource SectionButtonStyle}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsInventorySection}" Value="True">
+                                <Setter Property="BackgroundColor" Value="#0D1B2A" />
+                                <Setter Property="TextColor" Value="White" />
+                                <Setter Property="FontAttributes" Value="Bold" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Grid.Column="2" Text="Movimientos" Clicked="OnMovementsClicked" Style="{StaticResource SectionButtonStyle}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsMovementsSection}" Value="True">
+                                <Setter Property="BackgroundColor" Value="#0D1B2A" />
+                                <Setter Property="TextColor" Value="White" />
+                                <Setter Property="FontAttributes" Value="Bold" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </Grid>
+            </VerticalStackLayout>
+            <Label Grid.Row="2" Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding ErrorMessage}" Value="">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
+            <Grid Grid.Row="3">
+                <CollectionView IsVisible="{Binding IsSalesSection}" ItemsSource="{Binding Sales}" SelectionMode="None">
+                    <CollectionView.Header>
+                        <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
+                            <Border Style="{StaticResource PanelStyle}">
+                                <VerticalStackLayout Spacing="18">
+                                    <Grid ColumnDefinitions="4,*" ColumnSpacing="12">
+                                        <BoxView Color="#008060" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                            <Label Text="Ventas registradas" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
+                                            <Label Text="Consulta las ventas del periodo y modalidad seleccionados." Style="{StaticResource SecondaryTextStyle}" />
+                                        </VerticalStackLayout>
                                     </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                    <Label Text="Los importes son ventas registradas; no representan cobros recibidos ni ganancia." FontSize="12" />
-                </VerticalStackLayout>
-            </ScrollView>
-
-            <ScrollView IsVisible="{Binding IsInventorySection}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Existencia actual" FontSize="20" FontAttributes="Bold" />
-                    <Label Text="{Binding InventoryAsOfText}" FontSize="12" />
-                    <Picker Title="Categoría" ItemsSource="{Binding Categories}" ItemDisplayBinding="{Binding Name}"
-                            SelectedItem="{Binding SelectedCategory}" />
-                    <Picker Title="Estado" ItemsSource="{Binding Statuses}" ItemDisplayBinding="{Binding Label}"
-                            SelectedItem="{Binding SelectedStatus}" />
-                    <Button Text="Consultar inventario" Clicked="OnRefreshClicked" />
-                    <CollectionView ItemsSource="{Binding Inventory}" HeightRequest="520">
-                        <CollectionView.EmptyView><Label Text="No hay productos para los filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="viewModels:InventoryReportCard">
-                                <Border Padding="12" Margin="0,4">
-                                    <VerticalStackLayout Spacing="4">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <Label Grid.Column="0" Text="{Binding Name}" FontAttributes="Bold" />
-                                            <Label Grid.Column="1" Text="{Binding StatusText}" />
-                                        </Grid>
-                                        <Label Text="{Binding CategoryText}" />
-                                        <Label Text="{Binding StockText}" />
-                                        <Label Text="{Binding MinimumText}" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </VerticalStackLayout>
-            </ScrollView>
-
-            <ScrollView IsVisible="{Binding IsMovementsSection}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Movimientos de inventario" FontSize="20" FontAttributes="Bold" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                        <VerticalStackLayout Grid.Column="0" Spacing="2">
-                            <Label Text="Desde" FontSize="12" />
-                            <DatePicker Date="{Binding DateFrom}" />
+                                    <Grid x:Name="SalesFiltersGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+                                        <VerticalStackLayout x:Name="SalesFromField" Grid.Column="0" Spacing="6">
+                                            <Label Text="Desde" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <DatePicker Date="{Binding DateFrom}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="SalesToField" Grid.Column="1" Spacing="6">
+                                            <Label Text="Hasta (inclusive)" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <DatePicker Date="{Binding DateTo}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="SalesModeField" Grid.Column="2" Spacing="6">
+                                            <Label Text="Modalidad" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Modalidad" ItemsSource="{Binding SalesModes}" ItemDisplayBinding="{Binding Label}" SelectedItem="{Binding SelectedSalesMode}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="SalesCustomerField" Grid.Column="3" Spacing="6">
+                                            <Label Text="Cliente" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Cliente" ItemsSource="{Binding Customers}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedCustomer}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Button Text="Consultar ventas" Clicked="OnRefreshClicked" Style="{StaticResource ConsultButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
                         </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="Hasta (inclusive)" FontSize="12" />
-                            <DatePicker Date="{Binding DateTo}" />
+                    </CollectionView.Header>
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource PanelStyle}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Sin resultados" FontSize="18" FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
+                                <Label Text="No hay ventas en el periodo y filtros seleccionados." Style="{StaticResource SecondaryTextStyle}" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:SalesReportCard">
+                            <Border Style="{StaticResource PanelStyle}" Margin="0,0,0,12">
+                                <VerticalStackLayout Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="{Binding ReferenceText}" Style="{StaticResource ResultTitleStyle}" />
+                                            <Label Text="{Binding DateText}" Style="{StaticResource SecondaryTextStyle}" />
+                                        </VerticalStackLayout>
+                                        <ContentView Grid.Column="1">
+                                            <Border BackgroundColor="#E8F5EF" StrokeThickness="0" StrokeShape="RoundRectangle 7" Padding="10,5" VerticalOptions="Start">
+                                                <Label Text="{Binding TypeText}" TextColor="#008060" FontSize="12" FontAttributes="Bold" />
+                                            </Border>
+                                        </ContentView>
+                                    </Grid>
+                                    <BoxView HeightRequest="1" Color="#EEF2F6" />
+                                    <Label Text="{Binding ActorText}" Style="{StaticResource DetailTextStyle}" />
+                                    <Label Text="{Binding CustomerText}" Style="{StaticResource DetailTextStyle}" />
+                                    <Label Text="{Binding TotalText}" Style="{StaticResource ResultTitleStyle}" FontSize="23" TextColor="#008060" HorizontalOptions="End" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    <CollectionView.Footer>
+                        <Label Text="Los importes son ventas registradas; no representan cobros recibidos ni ganancia." Style="{StaticResource SecondaryTextStyle}" Margin="0,12,0,16" />
+                    </CollectionView.Footer>
+                </CollectionView>
+                <CollectionView IsVisible="{Binding IsInventorySection}" ItemsSource="{Binding Inventory}" SelectionMode="None">
+                    <CollectionView.Header>
+                        <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
+                            <Border Style="{StaticResource PanelStyle}">
+                                <VerticalStackLayout Spacing="18">
+                                    <Grid ColumnDefinitions="4,*" ColumnSpacing="12">
+                                        <BoxView Color="#008060" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                            <Label Text="Existencia actual" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
+                                            <Label Text="Consulta productos por categoría y estado." Style="{StaticResource SecondaryTextStyle}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Grid x:Name="InventoryFiltersGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+                                        <VerticalStackLayout x:Name="InventoryCategoryField" Grid.Column="0" Spacing="6">
+                                            <Label Text="Categoría" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Categoría" ItemsSource="{Binding Categories}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedCategory}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="InventoryStatusField" Grid.Column="1" Spacing="6">
+                                            <Label Text="Estado" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Estado" ItemsSource="{Binding Statuses}" ItemDisplayBinding="{Binding Label}" SelectedItem="{Binding SelectedStatus}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Button Text="Consultar inventario" Clicked="OnRefreshClicked" Style="{StaticResource ConsultButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="{Binding InventoryAsOfText}" Style="{StaticResource SecondaryTextStyle}" />
                         </VerticalStackLayout>
-                    </Grid>
-                    <Picker Title="Producto" ItemsSource="{Binding Products}" ItemDisplayBinding="{Binding Name}"
-                            SelectedItem="{Binding SelectedProduct}" />
-                    <Picker Title="Tipo de movimiento" ItemsSource="{Binding MovementTypes}" ItemDisplayBinding="{Binding Label}"
-                            SelectedItem="{Binding SelectedMovementType}" />
-                    <Button Text="Consultar movimientos" Clicked="OnRefreshClicked" />
-                    <CollectionView ItemsSource="{Binding Movements}" HeightRequest="520">
-                        <CollectionView.EmptyView><Label Text="No hay movimientos en el periodo y filtros seleccionados." Padding="8" /></CollectionView.EmptyView>
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="viewModels:MovementReportCard">
-                                <Border Padding="12" Margin="0,4">
-                                    <VerticalStackLayout Spacing="4">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <Label Grid.Column="0" Text="{Binding DateText}" FontAttributes="Bold" />
-                                            <Label Grid.Column="1" Text="{Binding ReferenceText}" />
-                                        </Grid>
-                                        <Label Text="{Binding ProductText}" FontAttributes="Bold" />
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <Label Grid.Column="0" Text="{Binding TypeText}" />
-                                            <Label Grid.Column="1" Text="{Binding QuantityText}" />
-                                        </Grid>
-                                        <Label Text="{Binding ReasonText}" />
-                                        <Label Text="{Binding ActorText}" FontSize="12" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </VerticalStackLayout>
-            </ScrollView>
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                               HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True" />
+                    </CollectionView.Header>
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource PanelStyle}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Sin resultados" FontSize="18" FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
+                                <Label Text="No hay productos para los filtros seleccionados." Style="{StaticResource SecondaryTextStyle}" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:InventoryReportCard">
+                            <Border Style="{StaticResource PanelStyle}" Margin="0,0,0,12">
+                                <VerticalStackLayout Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <Label Text="{Binding Name}" Style="{StaticResource ResultTitleStyle}" />
+                                        <ContentView Grid.Column="1">
+                                            <Border BackgroundColor="#E8F5EF" StrokeThickness="0" StrokeShape="RoundRectangle 7" Padding="10,5" VerticalOptions="Start">
+                                                <Label Text="{Binding StatusText}" TextColor="#008060" FontSize="12" FontAttributes="Bold" />
+                                            </Border>
+                                        </ContentView>
+                                    </Grid>
+                                    <Label Text="{Binding CategoryText}" Style="{StaticResource SecondaryTextStyle}" />
+                                    <BoxView HeightRequest="1" Color="#EEF2F6" />
+                                    <Label Text="{Binding StockText}" Style="{StaticResource ResultTitleStyle}" />
+                                    <Label Text="{Binding MinimumText}" Style="{StaticResource DetailTextStyle}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <CollectionView IsVisible="{Binding IsMovementsSection}" ItemsSource="{Binding Movements}" SelectionMode="None">
+                    <CollectionView.Header>
+                        <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
+                            <Border Style="{StaticResource PanelStyle}">
+                                <VerticalStackLayout Spacing="18">
+                                    <Grid ColumnDefinitions="4,*" ColumnSpacing="12">
+                                        <BoxView Color="#008060" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                            <Label Text="Movimientos de inventario" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
+                                            <Label Text="Consulta entradas y salidas del periodo seleccionado." Style="{StaticResource SecondaryTextStyle}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Grid x:Name="MovementsFiltersGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+                                        <VerticalStackLayout x:Name="MovementsFromField" Grid.Column="0" Spacing="6">
+                                            <Label Text="Desde" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <DatePicker Date="{Binding DateFrom}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="MovementsToField" Grid.Column="1" Spacing="6">
+                                            <Label Text="Hasta (inclusive)" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <DatePicker Date="{Binding DateTo}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="MovementsProductField" Grid.Column="2" Spacing="6">
+                                            <Label Text="Producto" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Producto" ItemsSource="{Binding Products}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedProduct}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout x:Name="MovementsTypeField" Grid.Column="3" Spacing="6">
+                                            <Label Text="Tipo de movimiento" Style="{StaticResource FilterLabelStyle}" />
+                                            <Border Style="{StaticResource FieldStyle}">
+                                                <Picker Title="Tipo de movimiento" ItemsSource="{Binding MovementTypes}" ItemDisplayBinding="{Binding Label}" SelectedItem="{Binding SelectedMovementType}" />
+                                            </Border>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Button Text="Consultar movimientos" Clicked="OnRefreshClicked" Style="{StaticResource ConsultButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                        </VerticalStackLayout>
+                    </CollectionView.Header>
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource PanelStyle}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Sin resultados" FontSize="18" FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
+                                <Label Text="No hay movimientos en el periodo y filtros seleccionados." Style="{StaticResource SecondaryTextStyle}" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:MovementReportCard">
+                            <Border Style="{StaticResource PanelStyle}" Margin="0,0,0,12">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label Text="{Binding ProductText}" Style="{StaticResource ResultTitleStyle}" />
+                                    <Label Text="{Binding ReferenceText}" Style="{StaticResource SecondaryTextStyle}" />
+                                    <Label Text="{Binding DateText}" Style="{StaticResource SecondaryTextStyle}" />
+                                    <BoxView HeightRequest="1" Color="#EEF2F6" />
+                                    <Label Text="{Binding TypeText}" Style="{StaticResource DetailTextStyle}" FontAttributes="Bold" />
+                                    <Label Text="{Binding QuantityText}" Style="{StaticResource ResultTitleStyle}" FontSize="21" />
+                                    <Label Text="{Binding ReasonText}" Style="{StaticResource DetailTextStyle}" />
+                                    <Label Text="{Binding ActorText}" Style="{StaticResource SecondaryTextStyle}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#008060" HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True" />
+            </Grid>
         </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>
