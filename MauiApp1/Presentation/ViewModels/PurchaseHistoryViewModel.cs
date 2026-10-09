@@ -28,6 +28,7 @@ public sealed class PurchaseHistoryViewModel(IPurchaseService purchaseService) :
     }
 
     public bool HasPurchases => Purchases.Count > 0;
+    public bool HasNoPurchases => !HasPurchases;
 
     public async Task LoadAsync()
     {
@@ -43,6 +44,7 @@ public sealed class PurchaseHistoryViewModel(IPurchaseService purchaseService) :
                 Purchases.Add(new PurchaseHistoryCard(purchase));
             }
             OnPropertyChanged(nameof(HasPurchases));
+            OnPropertyChanged(nameof(HasNoPurchases));
         }
         catch
         {

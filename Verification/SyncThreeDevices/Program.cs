@@ -6,6 +6,7 @@ using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Categories;
 using MauiApp1.Application.Lan;
 using MauiApp1.Application.Products;
+using MauiApp1.Application.Purchases;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Sync;
 using MauiApp1.Coordinator.Pairing;
@@ -110,6 +111,18 @@ await phone1.Sync.SynchronizeAsync();
 Require((await phone1.Categories.GetAllAsync()).Count == 105, "repeated downloads must remain idempotent");
 Console.WriteLine("PASS: 105 initial categories downloaded by both cashier accounts; authors and repeated downloads verified.");
 
+// Reproduce an existing device with a local edit conflicting with a confirmed
+// central edit. This must preserve both conflicts without freezing the catalog.
+var disputedCentral = (await windows.Categories.GetAllAsync()).Single(item => item.Name == "Initial 000");
+var disputedLocal = (await phone1.Categories.GetAllAsync()).Single(item => item.Name == "Initial 000");
+Require((await phone1.Categories.RenameAsync(disputedLocal.Id.Value, "Local disputed")).Succeeded, "local disputed edit");
+Require((await windows.Categories.RenameAsync(disputedCentral.Id.Value, "Central disputed")).Succeeded, "central disputed edit");
+await windows.Sync.SynchronizeAsync();
+await phone1.Sync.SynchronizeAsync();
+Require((await phone1.Sync.GetStatusAsync()).ConflictCount >= 2, "both local and incoming conflicts retained");
+Require(await HasCategory(phone1, "Local disputed"), "conflicting local category must not be overwritten");
+Require((await phone1.Categories.RenameAsync(disputedLocal.Id.Value, "Dependent withheld")).Succeeded, "dependent edit queued");
+
 await phone1.Realtime.StartAsync();
 await phone2.Realtime.StartAsync();
 await WaitAsync(() => Task.FromResult(phone1.Realtime.State == CoordinatorRealtimeState.Connected &&
@@ -145,6 +158,51 @@ Require((await phone2.Categories.CreateAsync("David live")).Succeeded, "phone2 c
 await WaitAsync(async () => await HasCategory(windows, "David live") && await HasCategory(phone1, "David live"), "automatic phone2 send and live phone1 receive");
 Require(phone1.DataChangedCount > 0 && phone2.DataChangedCount > 0, "receivers must notify open views");
 Console.WriteLine("PASS: both cashier accounts upload without leaving the screen; the other phone receives changes.");
+Require(!await HasCategory(windows, "Dependent withheld"), "dependent edit must remain withheld until conflict resolution");
+
+var purchases1 = phone1.Services.GetRequiredService<IPurchaseService>();
+var purchases2 = phone2.Services.GetRequiredService<IPurchaseService>();
+var purchasesCentral = windows.Services.GetRequiredService<IPurchaseService>();
+var purchaseProduct = (await phone1.Products.GetAllAsync()).Single(item => item.Name == "Product updated");
+// Only the disposable receiver database is changed: emulate an incomplete catalog.
+await using (var incomplete = new SqliteConnection($"Data Source={phone2.Path}"))
+{
+    await incomplete.OpenAsync();
+    await using var remove = incomplete.CreateCommand();
+    remove.CommandText = "DELETE FROM Products WHERE ProductId=$id COLLATE NOCASE;";
+    remove.Parameters.AddWithValue("$id", purchaseProduct.Id.Value.ToString("D"));
+    await remove.ExecuteNonQueryAsync();
+}
+var purchase = new PurchaseDraft(Guid.NewGuid(), DateTime.UtcNow,
+    [new PurchaseLineDraft(purchaseProduct.Id, Quantity.FromDecimal(3.125m), purchaseProduct.Name, purchaseProduct.Unit)]);
+Require((await purchases1.RecordAsync(purchase)).Succeeded, "local purchase creation despite unrelated category conflict");
+Require((await purchases1.GetHistoryAsync()).Any(item => item.OperationId == purchase.OperationId), "purchase immediately exists in local history");
+await WaitAsync(async () => (await purchasesCentral.GetHistoryAsync()).Any(item => item.OperationId == purchase.OperationId) &&
+    (await phone2.Sync.GetStatusAsync()).ConflictCount > 0, "purchase received and retained when its product is missing");
+Require((await windows.Products.UpdateAsync(purchaseProduct.Id.Value,
+    new ProductDraft("Product updated", new MoneyAmount(2600), "libra", category.Id, new Quantity(2000)))).Succeeded,
+    "subsequent central product snapshot restores incomplete receiver catalog");
+await WaitAsync(async () => (await purchases2.GetHistoryAsync()).Any(item => item.OperationId == purchase.OperationId),
+    "deferred purchase restored after product arrival without blocking newer changes");
+await phone1.Sync.SynchronizeAsync();
+await phone2.Sync.SynchronizeAsync();
+Require((await purchases2.GetHistoryAsync()).Count(item => item.OperationId == purchase.OperationId) == 1, "purchase history is not duplicated");
+Require((await phone2.Products.GetAllAsync()).Single(item => item.Id == purchaseProduct.Id).Stock.MilliUnits == 3125,
+    "purchase stock applied once");
+var purchaseSequence = (await store.GetAfterAsync(0, 500, null)).Single(item => item.OperationId == purchase.OperationId).Sequence;
+await using (var replay = new SqliteConnection($"Data Source={phone2.Path}"))
+{
+    await replay.OpenAsync();
+    await using var rewind = replay.CreateCommand();
+    rewind.CommandText = "UPDATE DeviceSyncStates SET LastSequence=$cursor;";
+    rewind.Parameters.AddWithValue("$cursor", purchaseSequence - 1);
+    await rewind.ExecuteNonQueryAsync();
+}
+await phone2.Sync.SynchronizeAsync();
+Require((await purchases2.GetHistoryAsync()).Count(item => item.OperationId == purchase.OperationId) == 1 &&
+    (await phone2.Products.GetAllAsync()).Single(item => item.Id == purchaseProduct.Id).Stock.MilliUnits == 3125,
+    "replaying an already persisted purchase must not duplicate its history or stock");
+Console.WriteLine("PASS: old conflicts retained without freezing independent categories, purchases, history, or stock.");
 await windows.Worker.StopAsync();
 await phone1.Worker.StopAsync();
 await phone2.Worker.StopAsync();

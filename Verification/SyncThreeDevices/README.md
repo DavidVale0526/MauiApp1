@@ -23,11 +23,18 @@ Comprueba:
 - Creación y edición de categorías y productos.
 - Envío automático desde ambos cajeros y notificación para refrescar las vistas.
 - Conservación de cambios al detener el trabajador y recuperación al iniciarlo.
+- Conflicto previo en una categoría: conservarlo sin detener categorías o compras independientes.
+- Compra local visible inmediatamente en historial, recepción en la otra instalación y existencia aplicada una sola vez.
+- Compra recibida con producto faltante: conservarla y recuperarla cuando llega un cambio posterior del producto.
 
 Resultado del 8 de octubre de 2026: todas las comprobaciones pasaron. Una creación
 desde Windows llegó a las dos bases receptoras en 285 ms en localhost.
 Esto no mide la pantalla Android ni valida la latencia de una red Wi-Fi real.
 La instalación en los tres dispositivos y su comprobación visual siguen pendientes.
+
+La ampliación del 8 de octubre para conflictos e historial también pasó. Se prepara
+un segundo APK en `MauiApp1/bin/SyncFix-2026-10-08-r2/MiscelaneaAri-Android.apk`;
+usar ese archivo para la corrección adicional de compras y bloqueos por conflictos.
 
 ## Aplicar la corrección al negocio
 

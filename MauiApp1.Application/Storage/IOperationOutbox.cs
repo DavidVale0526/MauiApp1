@@ -22,7 +22,8 @@ public interface IOperationOutbox
 
     Task<IReadOnlyList<OutboxOperation>> GetPendingAsync(
         int maximumCount,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? actorUserId = null);
 
     Task RecordAttemptAsync(Guid operationId, CancellationToken cancellationToken = default);
 

@@ -8,7 +8,7 @@
              Title="Historial de compras" BackgroundColor="#F7F9FB">
     <Grid x:Name="PageLayout" Padding="16,20" RowDefinitions="Auto,*" RowSpacing="20"
           SizeChanged="OnPageSizeChanged">
-        <Grid x:Name="ContentHost" Grid.RowSpan="2" MaximumWidthRequest="1160" HorizontalOptions="Center"
+        <Grid x:Name="ContentHost" Grid.RowSpan="2" MaximumWidthRequest="1160" HorizontalOptions="Fill"
               RowDefinitions="Auto,*" RowSpacing="20">
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
                 <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
@@ -28,10 +28,10 @@
             <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="10">
                 <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
                 <Grid Grid.Row="1">
-                    <CollectionView ItemsSource="{Binding Purchases}" SelectionMode="None">
-                        <CollectionView.EmptyView>
+                    <ScrollView>
+                        <VerticalStackLayout Spacing="0" HorizontalOptions="Fill">
                             <Border Padding="24" BackgroundColor="White" Stroke="#E3EAF2"
-                                    StrokeShape="RoundRectangle 16" VerticalOptions="Start">
+                                    StrokeShape="RoundRectangle 16" VerticalOptions="Start" IsVisible="{Binding HasNoPurchases}">
                                 <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
                                     <Label Text="Aún no hay compras registradas." FontSize="17"
                                            FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
@@ -39,8 +39,8 @@
                                            FontSize="14" TextColor="#61738A" HorizontalTextAlignment="Center" />
                                 </VerticalStackLayout>
                             </Border>
-                        </CollectionView.EmptyView>
-                        <CollectionView.ItemTemplate>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Purchases}" HorizontalOptions="Fill">
+                        <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="viewModels:PurchaseHistoryCard">
                                 <Border Padding="18" Margin="0,0,0,12" BackgroundColor="White"
                                         Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
@@ -65,8 +65,10 @@
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
+                        </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </ScrollView>
                     <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
                                        HorizontalOptions="Center" VerticalOptions="Center" Color="#0D1B2A" />
                 </Grid>

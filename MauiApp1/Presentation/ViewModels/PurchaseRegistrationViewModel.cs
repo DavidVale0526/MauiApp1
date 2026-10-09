@@ -79,6 +79,7 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
         get => _selectedPurchaseUnit;
         set
         {
+            value ??= _selectedPurchaseUnit;
             if (SetProperty(ref _selectedPurchaseUnit, value))
             {
                 if (value == "Otra unidad") OtherPurchaseUnit = string.Empty;
@@ -99,6 +100,7 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
         get => _otherPurchaseUnit;
         set
         {
+            value ??= string.Empty;
             if (SetProperty(ref _otherPurchaseUnit, value))
             {
                 OnPropertyChanged(nameof(EffectivePurchaseUnit));
@@ -162,6 +164,11 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync()
     {
+        var selectedId = SelectedProduct?.Id;
+        var previousStockUnit = StockUnit;
+        var purchaseUnit = SelectedPurchaseUnit;
+        var customUnit = OtherPurchaseUnit;
+        var conversion = ConversionFactorInput;
         try
         {
             var products = await _productService.GetAllAsync();
@@ -171,7 +178,13 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
                 Products.Add(new PurchaseProductOption(product.Id, product.Name, product.Unit));
             }
 
-            SelectedProduct = Products.FirstOrDefault(item => item.Id == SelectedProduct?.Id) ?? Products.FirstOrDefault();
+            SelectedProduct = Products.FirstOrDefault(item => item.Id == selectedId) ?? Products.FirstOrDefault();
+            if (selectedId is not null && SelectedProduct?.Id == selectedId && StockUnit == previousStockUnit)
+            {
+                SelectedPurchaseUnit = purchaseUnit;
+                OtherPurchaseUnit = customUnit;
+                ConversionFactorInput = conversion;
+            }
             ErrorMessage = Products.Count == 0 ? "No hay productos activos para agregar a una compra." : string.Empty;
         }
         catch
@@ -366,7 +379,7 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
         QuantityInput = string.Empty;
     }
 
-    private static decimal? InferConversionFactor(string fromUnit, string toUnit)
+    private static decimal? InferConversionFactor(string? fromUnit, string? toUnit)
     {
         var from = NormalizeUnit(fromUnit);
         var to = NormalizeUnit(toUnit);
@@ -402,8 +415,9 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
         return null;
     }
 
-    private static string NormalizeUnit(string unit)
+    private static string NormalizeUnit(string? unit)
     {
+        if (string.IsNullOrWhiteSpace(unit)) return string.Empty;
         var normalized = unit.Trim().ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
         normalized = new string(normalized.Where(character => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
         return normalized switch

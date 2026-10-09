@@ -158,6 +158,7 @@ public sealed class CoordinatorBusinessOperationApplier
                 throw new BusinessOperationConflictException("Ya existe un producto con ese identificador y datos diferentes.");
             return;
         }
+        if (operationType != "Product.Resolved" && CatalogMatches(product, payload)) return;
         if (operationType != "Product.Resolved" && !force && (payload.Expected is null || !CatalogMatches(product, payload.Expected)))
             throw new BusinessOperationConflictException("El producto cambió en otro dispositivo. Se conserva esta edición para que el Administrador resuelva el conflicto.");
         if (!await context.Categories.AnyAsync(item => item.CategoryId == payload.CategoryId, ct))
@@ -201,6 +202,18 @@ public sealed class CoordinatorBusinessOperationApplier
         if (payload.OperationId != operationId || payload.Lines.Count == 0 || payload.OccurredAtUtc.Kind != DateTimeKind.Utc ||
             payload.Lines.Select(item => item.LineNumber).Distinct().Count() != payload.Lines.Count)
             throw new BusinessOperationConflictException("La compra está incompleta.");
+        var existing = await context.Purchases.AsNoTracking().SingleOrDefaultAsync(item => item.OperationId == operationId, ct);
+        if (existing is not null)
+        {
+            var lines = await context.PurchaseLines.AsNoTracking().Where(item => item.OperationId == operationId).ToListAsync(ct);
+            if (existing.OccurredAtUtc != payload.OccurredAtUtc || lines.Count != payload.Lines.Count ||
+                payload.Lines.Any(incoming => !lines.Any(saved => saved.LineNumber == incoming.LineNumber &&
+                    saved.ProductId == incoming.ProductId && saved.QuantityMilliUnits == incoming.QuantityMilliUnits &&
+                    (string.IsNullOrWhiteSpace(incoming.ProductNameSnapshot) || saved.ProductNameSnapshot == incoming.ProductNameSnapshot) &&
+                    (string.IsNullOrWhiteSpace(incoming.UnitSnapshot) || saved.UnitSnapshot == incoming.UnitSnapshot))))
+                throw new BusinessOperationConflictException("El identificador de compra ya existe con contenido diferente o incompleto.");
+            return;
+        }
         var purchase = new PurchaseEntity { OperationId = operationId, OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor };
         context.Purchases.Add(purchase);
         foreach (var line in payload.Lines.OrderBy(item => item.LineNumber))

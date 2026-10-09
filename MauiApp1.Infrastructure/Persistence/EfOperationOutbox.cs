@@ -1,6 +1,7 @@
 using MauiApp1.Application.Storage;
 using MauiApp1.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MauiApp1.Infrastructure.Persistence;
 
@@ -60,26 +61,25 @@ internal sealed class EfOperationOutbox(LocalDbContext context, ILocalDeviceIden
 
     public async Task<IReadOnlyList<OutboxOperation>> GetPendingAsync(
         int maximumCount,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? actorUserId = null)
     {
         if (maximumCount is < 1 or > 1000)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumCount), "El lote debe contener entre 1 y 1000 operaciones.");
         }
 
-        var earliestConflict = await context.OutboxMessages.AsNoTracking()
+        var conflicts = await context.OutboxMessages.AsNoTracking()
             .Where(item => item.Status == OutboxStatus.Conflict)
-            .Select(item => (DateTime?)item.CreatedAtUtc)
-            .MinAsync(cancellationToken)
+            .Select(item => new { item.CreatedAtUtc, item.PayloadJson })
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-
-        return await context.OutboxMessages
+        var pending = await context.OutboxMessages
             .AsNoTracking()
             .Where(item => item.Status == OutboxStatus.Pending &&
-                (earliestConflict == null || item.CreatedAtUtc < earliestConflict))
+                (actorUserId == null || item.ActorUserId == actorUserId))
             .OrderBy(item => item.CreatedAtUtc)
             .ThenBy(item => item.OperationId)
-            .Take(maximumCount)
             .Select(item => new OutboxOperation(
                 item.OperationId,
                 item.DeviceId,
@@ -90,6 +90,45 @@ internal sealed class EfOperationOutbox(LocalDbContext context, ILocalDeviceIden
                 item.AttemptCount))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        var blocked = conflicts.Select(item => (item.CreatedAtUtc, Resources: GetResources(item.PayloadJson))).ToArray();
+        return pending.Where(item =>
+        {
+            var resources = GetResources(item.PayloadJson);
+            return !blocked.Any(conflict => conflict.CreatedAtUtc <= item.CreatedAtUtc &&
+                (resources is null || conflict.Resources is null || resources.Overlaps(conflict.Resources)));
+        }).Take(maximumCount).ToArray();
+    }
+
+    // Preserve dependent operations, but a conflicted category must not stop an
+    // unrelated category or purchase. Unknown payloads remain conservatively blocked.
+    private static HashSet<Guid>? GetResources(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var resources = new HashSet<Guid>();
+            Visit(document.RootElement);
+            return resources.Count == 0 ? null : resources;
+            void Visit(JsonElement element)
+            {
+                if (element.ValueKind == JsonValueKind.Array)
+                    foreach (var child in element.EnumerateArray()) Visit(child);
+                else if (element.ValueKind == JsonValueKind.Object)
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        if (property.Name.Equals("CategoryId", StringComparison.OrdinalIgnoreCase) ||
+                            property.Name.Equals("ProductId", StringComparison.OrdinalIgnoreCase) ||
+                            property.Name.Equals("CustomerId", StringComparison.OrdinalIgnoreCase) ||
+                            property.Name.Equals("SaleOperationId", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (property.Value.ValueKind == JsonValueKind.String && property.Value.TryGetGuid(out var id) && id != Guid.Empty)
+                                resources.Add(id);
+                        }
+                        else Visit(property.Value);
+                    }
+            }
+        }
+        catch (JsonException) { return null; }
     }
 
     public async Task RecordAttemptAsync(Guid operationId, CancellationToken cancellationToken = default)

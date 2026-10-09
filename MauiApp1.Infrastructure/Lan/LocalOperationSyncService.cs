@@ -49,7 +49,7 @@ internal sealed class LocalOperationSyncService(
             }
             await localConnection.CloseAsync();
             var outbox = new EfOperationOutbox(context, deviceIdentity);
-            var pending = await outbox.GetPendingAsync(100, cancellationToken);
+            var pending = await outbox.GetPendingAsync(100, cancellationToken, authenticationService.CurrentUser?.Id.Value);
             foreach (var operation in pending)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -83,7 +83,9 @@ internal sealed class LocalOperationSyncService(
                 }
                 break;
             }
-            if (await ApplyIncomingChangesAsync(cancellationToken))
+            var changed = await ApplyIncomingChangesAsync(cancellationToken);
+            changed |= await RetryDeferredPurchasesAsync(cancellationToken);
+            if (changed)
                 changeNotifier.NotifyDataChanged();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -156,8 +158,11 @@ internal sealed class LocalOperationSyncService(
                             OperationId = change.OperationId, OperationType = change.OperationType, PayloadJson = change.PayloadJson,
                             Message = error.Length <= 500 ? error : error[..500], CreatedAtUtc = DateTime.UtcNow, IsResolved = false });
                     await context.SaveChangesAsync(cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
-                    return appliedChanges;
+                    // The payload is retained for review. Advance the durable cursor
+                    // so its resolution and unrelated changes can still be received.
+                    state.LastSequence = change.Sequence;
+                    await context.SaveChangesAsync(cancellationToken);
+                    continue;
                 }
                 if (change.OperationType is "Product.Resolved" or "Category.Resolved")
                     await ApplyResolutionMetadataAsync(context, change.PayloadJson, cancellationToken);
@@ -172,6 +177,35 @@ internal sealed class LocalOperationSyncService(
             await transaction.CommitAsync(cancellationToken);
             afterSequence = state.LastSequence;
         }
+    }
+
+    private async Task<bool> RetryDeferredPurchasesAsync(CancellationToken ct)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(ct);
+        var conflicts = await context.DeviceSyncConflicts.Where(item => !item.IsResolved && item.OperationType == "Purchase.Recorded")
+            .OrderBy(item => item.CoordinatorSequence).Take(100).ToListAsync(ct);
+        var changed = false;
+        foreach (var conflict in conflicts)
+        {
+            // Recover the original authenticated author from the durable journal.
+            var page = await changeClient.GetChangesAsync(conflict.CoordinatorSequence - 1, 1, ct);
+            var change = page?.Changes.SingleOrDefault();
+            if (change is null || change.OperationId != conflict.OperationId || change.Sequence != conflict.CoordinatorSequence) continue;
+            await using var transaction = await context.Database.BeginTransactionAsync(ct);
+            var actorId = await EnsureLocalActorAsync(context, change, ct);
+            await context.SaveChangesAsync(ct);
+            var error = await businessApplier.ApplyAsync((SqliteConnection)context.Database.GetDbConnection(),
+                (SqliteTransaction)transaction.GetDbTransaction(), change.OperationId, change.OperationType,
+                change.PayloadJson, change.CreatedAtUtc, actorId, ct);
+            if (error is null)
+            {
+                conflict.IsResolved = true;
+                await context.SaveChangesAsync(ct);
+                changed = true;
+            }
+            await transaction.CommitAsync(ct);
+        }
+        return changed;
     }
 
     private static async Task PublishLocalCoordinatorOperationsAsync(
