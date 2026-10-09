@@ -11,6 +11,7 @@ public sealed record CoordinatorConflictItem(Guid OperationId, string OperationT
 
 public interface ICoordinatorChangeClient
 {
+    string? LastChangeError => null;
     Task<CoordinatorChangesPage?> GetChangesAsync(long afterSequence, int limit = 100, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CoordinatorConflictItem>?> GetConflictsAsync(CancellationToken cancellationToken = default);
     Task<string?> ResolveConflictAsync(Guid operationId, bool applyIncoming, CancellationToken cancellationToken = default);

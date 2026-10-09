@@ -5,6 +5,7 @@ using MauiApp1.Infrastructure.Authentication;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using System.Net;
+using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Lan;
 
@@ -12,7 +13,8 @@ public sealed class CoordinatorRealtimeClient(
     ICoordinatorLinkStorage linkStorage,
     ICoordinatorUserSessionStorage sessionStorage,
     IAuthenticationService authenticationService,
-    ILocalOperationSyncService operationSyncService) : ICoordinatorRealtimeClient, IAsyncDisposable
+    ILocalOperationSyncService operationSyncService,
+    ILogger<CoordinatorRealtimeClient> logger) : ICoordinatorRealtimeClient, IAsyncDisposable
 {
     private readonly object _lifecycleLock = new();
     private readonly SemaphoreSlim _syncGate = new(1, 1);
@@ -114,6 +116,7 @@ public sealed class CoordinatorRealtimeClient(
                 SetState(CoordinatorRealtimeState.Connecting);
                 await _connection!.StartAsync(cancellationToken);
                 SetState(CoordinatorRealtimeState.Connected);
+                logger.LogInformation("La conexión de avisos SignalR quedó activa.");
                 await SynchronizeAfterConnectionAsync(cancellationToken);
                 return;
             }
@@ -123,12 +126,14 @@ public sealed class CoordinatorRealtimeClient(
             }
             catch (Exception exception) when (GetStatusCode(exception) is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
+                logger.LogWarning("El coordinador rechazó la sesión para los avisos SignalR.");
                 SetState(CoordinatorRealtimeState.SessionUnavailable);
                 ClearConnectionLoop(cancellationToken);
                 return;
             }
-            catch
+            catch (Exception exception)
             {
+                logger.LogWarning(exception, "No se pudo conectar SignalR; se reintentará la conexión.");
                 SetState(CoordinatorRealtimeState.Disconnected);
                 var seconds = Math.Min(30, Math.Pow(2, Math.Min(retry, 5)));
                 retry++;
@@ -174,9 +179,11 @@ public sealed class CoordinatorRealtimeClient(
             SetState(CoordinatorRealtimeState.Connected);
             await SynchronizeAfterConnectionAsync(cancellationToken);
         };
-        connection.Closed += _ =>
+        connection.Closed += exception =>
         {
             SetState(CoordinatorRealtimeState.Disconnected);
+            ClearConnectionLoop(cancellationToken);
+            if (exception is not null) logger.LogWarning(exception, "Se cerró la conexión SignalR.");
             return Task.CompletedTask;
         };
         return connection;
@@ -201,10 +208,11 @@ public sealed class CoordinatorRealtimeClient(
 
         try
         {
+            logger.LogDebug("Aviso SignalR recibido para la secuencia {Sequence}.", notice.Sequence);
             await operationSyncService.SynchronizeAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch { }
+        catch (Exception exception) { logger.LogWarning(exception, "Se recibió un aviso SignalR pero no se pudieron aplicar los cambios."); }
         finally
         {
             _syncGate.Release();
@@ -223,7 +231,7 @@ public sealed class CoordinatorRealtimeClient(
         await _syncGate.WaitAsync(cancellationToken);
         try { await operationSyncService.SynchronizeAsync(cancellationToken); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch { }
+        catch (Exception exception) { logger.LogWarning(exception, "No se pudieron recuperar los cambios al conectar SignalR."); }
         finally { _syncGate.Release(); }
     }
 

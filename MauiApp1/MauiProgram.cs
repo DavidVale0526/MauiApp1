@@ -26,6 +26,7 @@ namespace MauiApp1
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorRealtimeClient, MauiApp1.Infrastructure.Lan.CoordinatorRealtimeClient>();
+            builder.Services.AddSingleton<MauiApp1.Infrastructure.Sync.LocalOperationSyncWorker>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Sync.LocalCoordinatorDatabaseChangeMonitor>();
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Sync.LocalCoordinatorDatabaseChangeMonitor>());

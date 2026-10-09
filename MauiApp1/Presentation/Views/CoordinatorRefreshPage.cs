@@ -191,10 +191,14 @@ public abstract class CoordinatorRefreshPage : ContentPage
 
     private async void OnLocalDataChanged()
     {
-        if (!IsVisible || !await _refreshGate.WaitAsync(0)) return;
+        if (!IsVisible) return;
+        await _refreshGate.WaitAsync();
         try
         {
-            await MainThread.InvokeOnMainThreadAsync(RefreshAfterCoordinatorChangesAsync);
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                if (IsVisible) await RefreshAfterCoordinatorChangesAsync();
+            });
         }
         catch
         {

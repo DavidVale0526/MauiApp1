@@ -8,23 +8,34 @@ using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Sync;
 using MauiApp1.Domain.Users;
+using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Lan;
 
 public sealed class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
-    ILocalDeviceIdentity deviceIdentity) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient
+    ILocalDeviceIdentity deviceIdentity,
+    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
+    public string? LastChangeError { get; private set; }
 
     public async Task<CoordinatorChangesPage?> GetChangesAsync(long afterSequence, int limit = 100, CancellationToken cancellationToken = default)
     {
+        LastChangeError = null;
         var link = await ReadLinkAsync();
         var session = await sessionStorage.ReadAsync();
         if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow || afterSequence < 0)
+        {
+            LastChangeError = "No hay una sesión central activa para descargar cambios. Inicia sesión con el coordinador disponible.";
             return null;
-        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out _)) return null;
+        }
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out var validationError))
+        {
+            LastChangeError = validationError;
+            return null;
+        }
         try
         {
             using var client = CreatePinnedClient(uri!, fingerprint);
@@ -32,12 +43,31 @@ public sealed class CoordinatorPairingClient(
             client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
             client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
             using var response = await client.GetAsync($"api/sync/changes?afterSequence={afterSequence}&limit={Math.Clamp(limit, 1, 500)}", cancellationToken);
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                LastChangeError = response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized => "El coordinador rechazó la sesión de descarga. Cierra sesión e inicia sesión de nuevo con el coordinador disponible.",
+                    HttpStatusCode.NotFound => "El coordinador instalado no ofrece la descarga de cambios. Actualiza el servicio de Windows.",
+                    _ => $"El coordinador no pudo devolver los cambios (respuesta {(int)response.StatusCode}). Reintenta la sincronización."
+                };
+                return null;
+            }
             return await response.Content.ReadFromJsonAsync<CoordinatorChangesPage>(cancellationToken);
         }
-        catch (HttpRequestException) { return null; }
+        catch (HttpRequestException exception)
+        {
+            logger?.LogWarning(exception, "No se pudieron descargar los cambios del coordinador.");
+            LastChangeError = "No se pudo contactar al coordinador para descargar cambios. Comprueba la conexión LAN y la dirección de Windows.";
+            return null;
+        }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }
-        catch (System.Text.Json.JsonException) { return null; }
+        catch (System.Text.Json.JsonException exception)
+        {
+            logger?.LogWarning(exception, "El coordinador devolvió una página de cambios inválida.");
+            LastChangeError = "Los cambios recibidos tienen un formato incompatible. Actualiza el coordinador y la aplicación.";
+            return null;
+        }
     }
 
     public async Task<IReadOnlyList<CoordinatorConflictItem>?> GetConflictsAsync(CancellationToken cancellationToken = default)

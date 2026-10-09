@@ -80,7 +80,7 @@ internal sealed class CoordinatorOperationStore(string databasePath)
         await using (var existing = connection.CreateCommand())
         {
             existing.Transaction = transaction;
-            existing.CommandText = "SELECT Sequence, DeviceId, ActorUserId, OperationType, PayloadHash, Status, ConflictMessage FROM CoordinatorOperations WHERE OperationId = $id LIMIT 1;";
+            existing.CommandText = "SELECT Sequence, DeviceId, ActorUserId, OperationType, PayloadHash, Status, ConflictMessage FROM CoordinatorOperations WHERE OperationId = $id COLLATE NOCASE ORDER BY Sequence LIMIT 1;";
             existing.Parameters.AddWithValue("$id", operation.OperationId.ToString("D"));
             await using var reader = await existing.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
@@ -143,8 +143,16 @@ internal sealed class CoordinatorOperationStore(string databasePath)
             SELECT o.Sequence, o.OperationId, o.DeviceId, o.ActorUserId, u.UserName, u.Role,
                    o.OperationType, o.PayloadJson, o.CreatedAtUtc, o.ReceivedAtUtc
             FROM CoordinatorOperations o
-            LEFT JOIN UserAccounts u ON u.UserId = o.ActorUserId
-            WHERE o.Sequence > $after AND o.Status = 1 AND ($exclude IS NULL OR o.DeviceId <> $exclude)
+            LEFT JOIN UserAccounts u ON u.UserId = o.ActorUserId COLLATE NOCASE
+            WHERE o.Sequence > $after AND o.Status = 1 AND ($exclude IS NULL OR o.DeviceId <> $exclude COLLATE NOCASE)
+              AND NOT EXISTS (
+                  SELECT 1 FROM CoordinatorOperations earlier
+                  WHERE earlier.Sequence < o.Sequence AND earlier.Status = 1
+                    AND earlier.OperationId = o.OperationId COLLATE NOCASE
+                    AND earlier.DeviceId = o.DeviceId COLLATE NOCASE
+                    AND earlier.ActorUserId = o.ActorUserId COLLATE NOCASE
+                    AND earlier.OperationType = o.OperationType AND earlier.PayloadHash = o.PayloadHash
+              )
             ORDER BY o.Sequence LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$after", afterSequence);
@@ -334,7 +342,12 @@ internal sealed class CoordinatorOperationStore(string databasePath)
         var seedRows = new List<(string Id, string Device, string Actor, string Type, string Payload, long Created)>();
         await using (var read = connection.CreateCommand())
         {
-            read.CommandText = "SELECT OperationId, DeviceId, ActorUserId, OperationType, PayloadJson, CreatedAtUtc FROM OutboxMessages ORDER BY CreatedAtUtc, OperationId;";
+            read.CommandText = """
+                SELECT b.OperationId, b.DeviceId, b.ActorUserId, b.OperationType, b.PayloadJson, b.CreatedAtUtc
+                FROM OutboxMessages b
+                WHERE NOT EXISTS (SELECT 1 FROM CoordinatorOperations o WHERE o.OperationId = b.OperationId COLLATE NOCASE)
+                ORDER BY b.CreatedAtUtc, b.OperationId;
+                """;
             await using var reader = await read.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
                 seedRows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt64(5)));
@@ -347,11 +360,12 @@ internal sealed class CoordinatorOperationStore(string databasePath)
                 INSERT OR IGNORE INTO CoordinatorOperations
                     (OperationId, DeviceId, ActorUserId, OperationType, PayloadJson, PayloadHash,
                      CreatedAtUtc, ReceivedAtUtc, Status, ConflictMessage)
-                VALUES ($id, $device, $actor, $type, $payload, $hash, $created, $created, 1, NULL);
+                SELECT $id, $device, $actor, $type, $payload, $hash, $created, $created, 1, NULL
+                WHERE NOT EXISTS (SELECT 1 FROM CoordinatorOperations WHERE OperationId = $id COLLATE NOCASE);
                 """;
-            insert.Parameters.AddWithValue("$id", row.Id);
-            insert.Parameters.AddWithValue("$device", row.Device);
-            insert.Parameters.AddWithValue("$actor", row.Actor);
+            insert.Parameters.AddWithValue("$id", Guid.Parse(row.Id).ToString("D"));
+            insert.Parameters.AddWithValue("$device", Guid.Parse(row.Device).ToString("D"));
+            insert.Parameters.AddWithValue("$actor", Guid.Parse(row.Actor).ToString("D"));
             insert.Parameters.AddWithValue("$type", row.Type);
             insert.Parameters.AddWithValue("$payload", row.Payload);
             insert.Parameters.AddWithValue("$hash", SHA256.HashData(Encoding.UTF8.GetBytes(row.Payload)));
@@ -360,7 +374,16 @@ internal sealed class CoordinatorOperationStore(string databasePath)
         }
 
         await using var confirm = connection.CreateCommand();
-        confirm.CommandText = "UPDATE OutboxMessages SET Status = 1, ConfirmedAtUtc = COALESCE(ConfirmedAtUtc, CreatedAtUtc) WHERE Status = 0;";
+        confirm.CommandText = """
+            UPDATE OutboxMessages SET Status = 1, ConfirmedAtUtc = COALESCE(ConfirmedAtUtc, CreatedAtUtc)
+            WHERE Status = 0 AND EXISTS (
+                SELECT 1 FROM CoordinatorOperations o
+                WHERE o.OperationId = OutboxMessages.OperationId COLLATE NOCASE AND o.Status = 1
+                  AND o.DeviceId = OutboxMessages.DeviceId COLLATE NOCASE
+                  AND o.ActorUserId = OutboxMessages.ActorUserId COLLATE NOCASE
+                  AND o.OperationType = OutboxMessages.OperationType AND o.PayloadJson = OutboxMessages.PayloadJson
+            );
+            """;
         await confirm.ExecuteNonQueryAsync(ct);
     }
 }

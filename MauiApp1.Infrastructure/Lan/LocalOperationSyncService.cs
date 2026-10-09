@@ -25,11 +25,14 @@ internal sealed class LocalOperationSyncService(
     ILocalDataChangeNotifier changeNotifier) : ILocalOperationSyncService
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private string? _lastDownloadError;
 
     public async Task<LocalOperationSyncStatus> SynchronizeAsync(CancellationToken cancellationToken = default)
     {
         if (authenticationService.CurrentUser is null) return await GetStatusAsync(cancellationToken);
-        if (!await _gate.WaitAsync(0, cancellationToken)) return await GetStatusAsync(cancellationToken);
+        // Wait for an active pass so a SignalR notice received during a send is
+        // followed by a download instead of silently dropping the notice.
+        await _gate.WaitAsync(cancellationToken);
         try
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -83,6 +86,13 @@ internal sealed class LocalOperationSyncService(
             if (await ApplyIncomingChangesAsync(cancellationToken))
                 changeNotifier.NotifyDataChanged();
         }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _lastDownloadError = exception is InvalidOperationException
+                ? exception.Message
+                : "No se pudieron aplicar los cambios recibidos. Los datos locales se conservan; vuelve a sincronizar.";
+            throw;
+        }
         finally
         {
             _gate.Release();
@@ -108,7 +118,8 @@ internal sealed class LocalOperationSyncService(
             .OrderByDescending(item => item.LastAttemptAtUtc).Select(item => item.LastError).FirstOrDefaultAsync(cancellationToken);
         var inboundMessage = await context.DeviceSyncConflicts.AsNoTracking().Where(item => !item.IsResolved)
             .OrderByDescending(item => item.CoordinatorSequence).Select(item => item.Message).FirstOrDefaultAsync(cancellationToken);
-        return new LocalOperationSyncStatus(pending, conflicts, lastConfirmed, inboundMessage ?? outboxMessage ?? pendingMessage);
+        return new LocalOperationSyncStatus(pending, conflicts, lastConfirmed,
+            inboundMessage ?? outboxMessage ?? _lastDownloadError ?? pendingMessage);
     }
 
     private async Task<bool> ApplyIncomingChangesAsync(CancellationToken cancellationToken)
@@ -117,40 +128,50 @@ internal sealed class LocalOperationSyncService(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var state = await context.DeviceSyncStates.SingleOrDefaultAsync(item => item.DeviceId == deviceId, cancellationToken);
         var afterSequence = state?.LastSequence ?? 0;
-        var page = await changeClient.GetChangesAsync(afterSequence, 100, cancellationToken);
-        if (page is null || page.Changes.Count == 0) return false;
-
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var appliedChanges = false;
         state ??= new DeviceSyncStateEntity { DeviceId = deviceId, LastSequence = afterSequence };
-        if (context.Entry(state).State == EntityState.Detached) context.DeviceSyncStates.Add(state);
-        foreach (var change in page.Changes.OrderBy(item => item.Sequence))
+        while (true)
         {
-            var actorId = await EnsureLocalActorAsync(context, change, cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
-            var error = await businessApplier.ApplyAsync(
-                (SqliteConnection)context.Database.GetDbConnection(),
-                (SqliteTransaction)transaction.GetDbTransaction(),
-                change.OperationId, change.OperationType, change.PayloadJson, change.CreatedAtUtc, actorId, cancellationToken);
-            if (error is not null)
+            var page = await changeClient.GetChangesAsync(afterSequence, 100, cancellationToken);
+            _lastDownloadError = page is null
+                ? changeClient.LastChangeError ?? "No se pudieron descargar los cambios del coordinador. Comprueba la sesión central y la conexión LAN."
+                : null;
+            if (page is null || page.Changes.Count == 0) return appliedChanges;
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            if (context.Entry(state).State == EntityState.Detached) context.DeviceSyncStates.Add(state);
+            foreach (var change in page.Changes.OrderBy(item => item.Sequence))
             {
-                if (!await context.DeviceSyncConflicts.AnyAsync(item => item.OperationId == change.OperationId, cancellationToken))
-                    context.DeviceSyncConflicts.Add(new DeviceSyncConflictEntity { ConflictId = Guid.NewGuid(), CoordinatorSequence = change.Sequence,
-                        OperationId = change.OperationId, OperationType = change.OperationType, PayloadJson = change.PayloadJson,
-                        Message = error.Length <= 500 ? error : error[..500], CreatedAtUtc = DateTime.UtcNow, IsResolved = false });
+                if (change.Sequence <= afterSequence)
+                    throw new InvalidOperationException("El coordinador devolvió una secuencia de cambios que no avanza.");
+                var actorId = await EnsureLocalActorAsync(context, change, cancellationToken);
                 await context.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return appliedChanges;
+                var error = await businessApplier.ApplyAsync(
+                    (SqliteConnection)context.Database.GetDbConnection(),
+                    (SqliteTransaction)transaction.GetDbTransaction(),
+                    change.OperationId, change.OperationType, change.PayloadJson, change.CreatedAtUtc, actorId, cancellationToken);
+                if (error is not null)
+                {
+                    if (!await context.DeviceSyncConflicts.AnyAsync(item => item.OperationId == change.OperationId, cancellationToken))
+                        context.DeviceSyncConflicts.Add(new DeviceSyncConflictEntity { ConflictId = Guid.NewGuid(), CoordinatorSequence = change.Sequence,
+                            OperationId = change.OperationId, OperationType = change.OperationType, PayloadJson = change.PayloadJson,
+                            Message = error.Length <= 500 ? error : error[..500], CreatedAtUtc = DateTime.UtcNow, IsResolved = false });
+                    await context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return appliedChanges;
+                }
+                if (change.OperationType is "Product.Resolved" or "Category.Resolved")
+                    await ApplyResolutionMetadataAsync(context, change.PayloadJson, cancellationToken);
+                var previousConflict = await context.DeviceSyncConflicts.SingleOrDefaultAsync(
+                    item => item.OperationId == change.OperationId && !item.IsResolved, cancellationToken);
+                if (previousConflict is not null) previousConflict.IsResolved = true;
+                state.LastSequence = change.Sequence;
+                state.LastSuccessfulSyncAtUtc = DateTime.UtcNow;
+                await context.SaveChangesAsync(cancellationToken);
+                appliedChanges = true;
             }
-            if (change.OperationType is "Product.Resolved" or "Category.Resolved")
-                await ApplyResolutionMetadataAsync(context, change.PayloadJson, cancellationToken);
-            state.LastSequence = change.Sequence;
-            state.LastSuccessfulSyncAtUtc = DateTime.UtcNow;
-            await context.SaveChangesAsync(cancellationToken);
-            appliedChanges = true;
+            await transaction.CommitAsync(cancellationToken);
+            afterSequence = state.LastSequence;
         }
-        await transaction.CommitAsync(cancellationToken);
-        return appliedChanges;
     }
 
     private static async Task PublishLocalCoordinatorOperationsAsync(
@@ -175,7 +196,8 @@ internal sealed class LocalOperationSyncService(
                 INSERT OR IGNORE INTO CoordinatorOperations
                     (OperationId, DeviceId, ActorUserId, OperationType, PayloadJson, PayloadHash,
                      CreatedAtUtc, ReceivedAtUtc, Status, ConflictMessage)
-                VALUES ($id, $device, $actor, $type, $payload, $hash, $created, $received, 1, NULL);
+                SELECT $id, $device, $actor, $type, $payload, $hash, $created, $received, 1, NULL
+                WHERE NOT EXISTS (SELECT 1 FROM CoordinatorOperations WHERE OperationId = $id COLLATE NOCASE);
                 """;
             insert.Parameters.AddWithValue("$id", operation.OperationId.ToString("D"));
             insert.Parameters.AddWithValue("$device", operation.DeviceId.ToString("D"));
@@ -189,7 +211,7 @@ internal sealed class LocalOperationSyncService(
 
             await using var verify = connection.CreateCommand();
             verify.Transaction = (SqliteTransaction)transaction;
-            verify.CommandText = "SELECT DeviceId, ActorUserId, OperationType, PayloadHash, Status FROM CoordinatorOperations WHERE OperationId=$id;";
+            verify.CommandText = "SELECT DeviceId, ActorUserId, OperationType, PayloadHash, Status FROM CoordinatorOperations WHERE OperationId=$id COLLATE NOCASE ORDER BY Sequence LIMIT 1;";
             verify.Parameters.AddWithValue("$id", operation.OperationId.ToString("D"));
             await using var reader = await verify.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken) ||
@@ -201,7 +223,7 @@ internal sealed class LocalOperationSyncService(
 
             await using var confirm = connection.CreateCommand();
             confirm.Transaction = (SqliteTransaction)transaction;
-            confirm.CommandText = "UPDATE OutboxMessages SET Status=1, ConfirmedAtUtc=COALESCE(ConfirmedAtUtc, CreatedAtUtc) WHERE OperationId=$id AND Status=0;";
+            confirm.CommandText = "UPDATE OutboxMessages SET Status=1, ConfirmedAtUtc=COALESCE(ConfirmedAtUtc, CreatedAtUtc) WHERE OperationId=$id COLLATE NOCASE AND Status=0;";
             confirm.Parameters.AddWithValue("$id", operation.OperationId.ToString("D"));
             await confirm.ExecuteNonQueryAsync(cancellationToken);
         }
@@ -230,7 +252,7 @@ internal sealed class LocalOperationSyncService(
         var mapped = await context.UserAccounts.SingleOrDefaultAsync(item => item.CoordinatorUserId == change.ActorUserId, cancellationToken);
         if (mapped is not null) return mapped.UserId;
         if (change.ActorRole != (int)UserRole.Administrator && change.ActorRole != (int)UserRole.Cashier)
-            throw new InvalidOperationException("El coordinador devolvió un rol de usuario desconocido.");
+            throw new InvalidOperationException("El coordinador no incluyó un usuario válido para uno de los cambios. Actualiza el servicio coordinador de Windows y vuelve a sincronizar.");
         var userId = Guid.NewGuid();
         var (salt, hash) = await Task.Run(() => passwordHasher.Hash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))), cancellationToken);
         var userName = string.IsNullOrWhiteSpace(change.ActorUserName) ? "Usuario sincronizado" : change.ActorUserName.Trim();

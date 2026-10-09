@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../MauiApp1.Infrastructure/MauiApp1.Infrastructure.csproj" />
+    <Compile Include="../../MauiApp1.Coordinator/Sync/CoordinatorOperationStore.cs" Link="CoordinatorOperationStore.cs" />
+    <Compile Include="../../MauiApp1.Coordinator/Sync/CoordinatorChangesHub.cs" Link="CoordinatorChangesHub.cs" />
+    <Compile Include="../../MauiApp1.Coordinator/Pairing/CoordinatorPairingStore.cs" Link="CoordinatorPairingStore.cs" />
+  </ItemGroup>
+</Project>
