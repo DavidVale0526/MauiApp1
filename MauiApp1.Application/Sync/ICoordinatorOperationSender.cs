@@ -30,3 +30,4 @@ public enum CoordinatorOperationSendStatus
     Rejected,
     Unavailable
 }
+

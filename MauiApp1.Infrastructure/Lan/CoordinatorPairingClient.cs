@@ -399,3 +399,6 @@ public sealed class CoordinatorPairingClient(
     private sealed record SessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
     private sealed record ApiMessageResponse(string Message);
 }
+
+
+//agregar exepcion al cambiar direccion IP 
