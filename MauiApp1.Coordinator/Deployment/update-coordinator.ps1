@@ -24,6 +24,8 @@ $dataDirectory = [IO.Path]::GetFullPath($DataDirectory)
 $serviceExecutable = Join-Path $appDirectory 'MauiApp1.Coordinator.exe'
 $publishExecutable = Join-Path $publishDirectory 'MauiApp1.Coordinator.exe'
 $databasePath = Join-Path $dataDirectory 'miscelanea-ari-central.db'
+$desktopSettingsDirectory = Join-Path $env:ProgramData 'Miscelanea Ari\Desktop'
+$desktopSettingsPath = Join-Path $desktopSettingsDirectory 'windows-app-mode.json'
 $windowsIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
 if ([string]::IsNullOrWhiteSpace($WindowsAppUser)) { $WindowsAppUser = $windowsIdentity.Name }
 $windowsAppSid = ([Security.Principal.NTAccount]::new($WindowsAppUser)).Translate(
@@ -60,9 +62,42 @@ function Grant-CoordinatorDatabaseAccess {
 if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
     throw "No se encontró el servicio $serviceName."
 }
+$serviceConfiguration = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'"
+$serviceImagePath = [string]$serviceConfiguration.PathName
+$serviceDataMatch = [regex]::Match(
+    $serviceImagePath,
+    '--Coordinator:DataDirectory=(?:"(?<quoted>[^"]+)"|(?<plain>\S+))',
+    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+$serviceDataDirectory = if ($serviceDataMatch.Groups['quoted'].Success) {
+    $serviceDataMatch.Groups['quoted'].Value
+} elseif ($serviceDataMatch.Groups['plain'].Success) {
+    $serviceDataMatch.Groups['plain'].Value
+} else { $null }
+if ([string]::IsNullOrWhiteSpace($serviceDataDirectory) -or
+    -not [string]::Equals(
+        [IO.Path]::GetFullPath($serviceDataDirectory),
+        $dataDirectory,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw "La ruta -DataDirectory no coincide con la configuración registrada del servicio. El servicio no se detuvo. Servicio: $serviceImagePath"
+}
+
 foreach ($path in @($serviceExecutable, $publishExecutable, $databasePath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Falta un archivo requerido: $path"
+    }
+}
+
+if (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) {
+    try { $desktopSettings = Get-Content -LiteralPath $desktopSettingsPath -Raw | ConvertFrom-Json }
+    catch { throw "La configuración del modo de la aplicación Windows no es válida: $desktopSettingsPath. El servicio no se detuvo." }
+    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "La aplicación Windows está configurada como Client. El actualizador no cambiará su modo: $desktopSettingsPath"
+    }
+    if (-not [string]::Equals(
+            [IO.Path]::GetFullPath([string]$desktopSettings.Coordinator.DataDirectory),
+            $dataDirectory,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "La carpeta central configurada para la aplicación no coincide con la del servicio. El servicio no se detuvo: $desktopSettingsPath"
     }
 }
 foreach ($runtimeFile in @('hostfxr.dll', 'hostpolicy.dll', 'coreclr.dll')) {
@@ -111,6 +146,14 @@ try {
         Start-Sleep -Seconds 1
     }
     if ($health.status -ne 'ok') { throw 'El coordinador no respondió correctamente en /health.' }
+
+    if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf)) {
+        # Running the coordinator-specific updater on this machine explicitly establishes Host mode.
+        New-Item -ItemType Directory -Path $desktopSettingsDirectory -Force | Out-Null
+        @{ Coordinator = @{ Mode = 'Host'; DataDirectory = $dataDirectory } } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $desktopSettingsPath -Encoding utf8
+        Write-Output "Modo Host de la aplicación Windows registrado en: $desktopSettingsPath"
+    }
 
     Write-Output "Permisos de escritura SQLite habilitados para $WindowsAppUser."
     Write-Output "Actualización correcta. Respaldo de base y binarios: $backupRoot"

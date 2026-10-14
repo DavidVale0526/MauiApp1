@@ -3,6 +3,7 @@ using MauiApp1.Presentation.ViewModels;
 using MauiApp1.Presentation.Views;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Authentication;
+using MauiApp1.Configuration;
 using MauiApp1.Infrastructure.Persistence;
 using Microsoft.Maui.Networking;
 using ZXing.Net.Maui.Controls;
@@ -13,6 +14,11 @@ namespace MauiApp1
     {
         public static MauiApp CreateMauiApp()
         {
+            var desktopMode = DesktopCoordinatorModeOptions.LocalClient;
+#if WINDOWS
+            desktopMode = DesktopCoordinatorModeOptions.LoadForWindows();
+#endif
+
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
@@ -24,6 +30,7 @@ namespace MauiApp1
                 });
 
             builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddSingleton(desktopMode);
             builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorRealtimeClient, MauiApp1.Infrastructure.Lan.CoordinatorRealtimeClient>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Sync.LocalOperationSyncWorker>();
@@ -82,11 +89,9 @@ namespace MauiApp1
                 LocalPersistenceServiceCollectionExtensions.DatabaseFileName);
             var migrationsManagedExternally = false;
 #if WINDOWS
-            var coordinatorDatabasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "Miscelanea Ari", "Coordinator", "miscelanea-ari-central.db");
-            if (File.Exists(coordinatorDatabasePath))
+            if (desktopMode.IsHost)
             {
-                databasePath = coordinatorDatabasePath;
+                databasePath = desktopMode.GetCentralDatabasePath();
                 migrationsManagedExternally = true;
             }
 #endif
@@ -102,7 +107,8 @@ namespace MauiApp1
                 .GetAwaiter()
                 .GetResult();
 #if WINDOWS
-            app.Services.GetRequiredService<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>().Start();
+            if (desktopMode.IsHost)
+                app.Services.GetRequiredService<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>().Start();
 #endif
 
             return app;

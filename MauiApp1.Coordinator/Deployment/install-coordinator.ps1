@@ -38,6 +38,22 @@ if (-not (Test-Path -LiteralPath $centralDatabasePath -PathType Leaf)) {
     throw "Primero importa la base Windows aprobada con --bootstrap-from. Se esperaba: $centralDatabasePath"
 }
 
+$desktopSettingsDirectory = Join-Path $env:ProgramData 'Miscelanea Ari\Desktop'
+$desktopSettingsPath = Join-Path $desktopSettingsDirectory 'windows-app-mode.json'
+if (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) {
+    try { $desktopSettings = Get-Content -LiteralPath $desktopSettingsPath -Raw | ConvertFrom-Json }
+    catch { throw "La configuración del modo de la aplicación Windows no es válida: $desktopSettingsPath" }
+    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "La aplicación Windows está configurada como Client. Revisa o cambia explícitamente $desktopSettingsPath antes de instalar el coordinador."
+    }
+    if (-not [string]::Equals(
+            [IO.Path]::GetFullPath([string]$desktopSettings.Coordinator.DataDirectory),
+            $DataDirectory,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "La carpeta de datos del modo Host no coincide con la del servicio. Revisa $desktopSettingsPath antes de instalar."
+    }
+}
+
 if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
     throw "El servicio $serviceName ya existe. Retíralo con el procedimiento documentado antes de instalar una versión nueva."
 }
@@ -104,6 +120,11 @@ try {
         -Profile Private | Out-Null
 
     Start-Service -Name $serviceName
+    if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf)) {
+        New-Item -ItemType Directory -Path $desktopSettingsDirectory -Force | Out-Null
+        @{ Coordinator = @{ Mode = 'Host'; DataDirectory = $DataDirectory } } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $desktopSettingsPath -Encoding utf8
+    }
     Write-Output "Servicio iniciado. Puerto LAN privado: $Port"
     Write-Output "Permisos de escritura SQLite habilitados para $applicationUser."
     Write-Output "Huella SHA-256 del certificado para vinculación: $fingerprint"

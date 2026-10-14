@@ -1,6 +1,7 @@
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Lan;
 using MauiApp1.Application.Sync;
+using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Networking;
@@ -14,6 +15,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
     private readonly ILocalOperationSyncService _operationSyncService;
     private readonly ICoordinatedSignInService _coordinatedSignInService;
     private readonly ICoordinatorRealtimeClient _realtimeClient;
+    private readonly DesktopCoordinatorModeOptions _desktopMode;
     private readonly bool _isAdministrator;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
@@ -23,6 +25,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         ILocalOperationSyncService operationSyncService,
         ICoordinatedSignInService coordinatedSignInService,
         ICoordinatorRealtimeClient realtimeClient,
+        DesktopCoordinatorModeOptions desktopMode,
         IAuthenticationService authenticationService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
@@ -32,6 +35,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         _operationSyncService = operationSyncService;
         _coordinatedSignInService = coordinatedSignInService;
         _realtimeClient = realtimeClient;
+        _desktopMode = desktopMode;
         _isAdministrator = authenticationService.CurrentUser?.Role == UserRole.Administrator;
         ReviewConflictsButton.IsVisible = _isAdministrator;
     }
@@ -121,16 +125,24 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
 
     private async Task RefreshCoordinatorStatusAsync()
     {
+#if WINDOWS
+        if (_desktopMode.IsHost)
+        {
+            CoordinatorStatusLabel.Text = "Modo coordinador: esta instalación usa la base central configurada.";
+            return;
+        }
+#endif
+
         CoordinatorStatusLabel.Text = "Consultando coordinador…";
         try
         {
             var status = await _coordinatorClient.CheckAvailabilityAsync();
 #if WINDOWS
-            CoordinatorStatusLabel.Text = status.IsAvailable
-                ? "Coordinador disponible en esta PC. Este equipo utiliza la base central."
-                : status.IsConfigured
-                    ? "El coordinador no responde en la red local. El trabajo guardado se conserva para reintentar."
-                    : "El coordinador no está configurado o no responde en esta PC.";
+            CoordinatorStatusLabel.Text = !status.IsConfigured
+                ? "Modo cliente Windows: vincula este equipo al coordinador para sincronizar."
+                : status.IsAvailable
+                    ? status.IsConfirmed ? "Cliente Windows vinculado; coordinador disponible." : "Cliente Windows: falta completar la vinculación."
+                    : "Cliente Windows vinculado; el coordinador no responde en la red local. Los cambios se conservan para reintentar.";
 #else
             CoordinatorStatusLabel.Text = !status.IsConfigured
                 ? "Coordinador sin configurar en este dispositivo. El trabajo local sigue disponible."
@@ -185,10 +197,12 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         }
     }
 
-    private static string GetRealtimeStatusMessage(CoordinatorRealtimeState state)
+    private string GetRealtimeStatusMessage(CoordinatorRealtimeState state)
     {
 #if WINDOWS
-        return "Actualización en vivo lista; esta PC comparte la base central del coordinador.";
+        return _desktopMode.IsHost
+            ? "Modo coordinador: esta instalación comparte la base central; los avisos SignalR no aplican aquí."
+            : "Modo cliente Windows: los cambios se sincronizan por HTTPS; los avisos SignalR aún no están habilitados.";
 #else
         return state switch
         {
