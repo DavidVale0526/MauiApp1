@@ -102,7 +102,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
         get
         {
             var sign = Movement.Type == InventoryMovementType.PurchaseEntry ? "+" : "−";
-            return $"{sign}{(Movement.QuantityMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {Movement.Unit}";
+            return $"{sign}{(Movement.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Movement.Unit}";
         }
     }
 

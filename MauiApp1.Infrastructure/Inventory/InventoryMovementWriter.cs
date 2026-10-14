@@ -72,8 +72,8 @@ internal sealed class InventoryMovementWriter(ILocalDeviceIdentity deviceIdentit
                 if (delta < 0 && resultingStock < 0 && operation.NegativeStockPolicy == NegativeStockPolicy.Reject)
                 {
                     var product = products[productId];
-                    var available = (product.StockMilliUnits / 1000m).ToString("0.000", System.Globalization.CultureInfo.CurrentCulture);
-                    var requested = (-delta / 1000m).ToString("0.000", System.Globalization.CultureInfo.CurrentCulture);
+                    var available = (product.StockMilliUnits / 1000m).ToString("0.###", System.Globalization.CultureInfo.CurrentCulture);
+                    var requested = (-delta / 1000m).ToString("0.###", System.Globalization.CultureInfo.CurrentCulture);
                     return InventoryOperationResult.Failure(
                         $"Existencia insuficiente para {product.Name}. Disponible: {available} {product.Unit}; solicitada: {requested} {product.Unit}.");
                 }

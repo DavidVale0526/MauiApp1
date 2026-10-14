@@ -21,7 +21,7 @@ public sealed record ProductSummary(
 
     public string SalePriceText => $"Precio: {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}";
 
-    public string StockText => $"Existencia: {Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+    public string StockText => $"Existencia: {Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 
-    public string MinimumStockText => $"Mínimo: {MinimumStock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+    public string MinimumStockText => $"Mínimo: {MinimumStock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 }

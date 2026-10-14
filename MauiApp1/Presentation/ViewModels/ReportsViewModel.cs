@@ -247,8 +247,8 @@ public sealed record InventoryReportCard(InventoryReportRow Row)
     public string Name => Row.ProductName;
     public string CategoryText => $"Categoría: {Row.CategoryName}";
     public string StatusText => Row.IsActive ? "Activo" : "Inactivo";
-    public string StockText => $"Existencia: {(Row.StockMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {Row.Unit}";
-    public string MinimumText => $"Mínimo: {(Row.MinimumStockMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {Row.Unit}";
+    public string StockText => $"Existencia: {(Row.StockMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Row.Unit}";
+    public string MinimumText => $"Mínimo: {(Row.MinimumStockMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Row.Unit}";
 }
 
 public sealed record MovementReportCard(MovementReportRow Row)
@@ -268,7 +268,7 @@ public sealed record MovementReportCard(MovementReportRow Row)
         get
         {
             var sign = Row.Type == InventoryMovementType.PurchaseEntry ? "+" : "−";
-            return $"{sign}{(Row.QuantityMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {Row.Unit}";
+            return $"{sign}{(Row.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Row.Unit}";
         }
     }
     public string ReasonText => string.IsNullOrWhiteSpace(Row.Reason) ? "Sin motivo adicional" : Row.Reason;

@@ -133,7 +133,7 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         Name = product.Name;
         SalePrice = product.SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture);
         Unit = product.Unit;
-        MinimumStock = product.MinimumStock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture);
+        MinimumStock = product.MinimumStock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture);
         SelectedCategory = Categories.FirstOrDefault(category => category.Id.Value == product.CategoryId.Value);
         ErrorMessage = string.Empty;
         OnPropertyChanged(nameof(IsEditing));

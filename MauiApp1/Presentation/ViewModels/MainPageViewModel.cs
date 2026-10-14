@@ -65,7 +65,7 @@ public sealed class MainPageViewModel : System.ComponentModel.INotifyPropertyCha
             LowStockAlertMessage = products.Count == 0
                 ? string.Empty
                 : "Existencias en el mínimo o por debajo:\n" + string.Join("\n", products.Select(product =>
-                    $"• {product.Name}: {product.Stock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit} (mínimo {product.MinimumStock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit})"));
+                    $"• {product.Name}: {product.Stock.ToDecimal().ToString("0.###", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit} (mínimo {product.MinimumStock.ToDecimal().ToString("0.###", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit})"));
         }
         catch
         {

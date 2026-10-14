@@ -134,7 +134,7 @@ public sealed class OtherExitViewModel(
         ? "Se registra aparte y no se asigna a un producto."
         : SelectedProduct is null
         ? "Existencia disponible: selecciona un producto."
-        : $"Existencia disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}";
+        : $"Existencia disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}";
 
     public async Task LoadAsync()
     {
@@ -208,7 +208,7 @@ public sealed class OtherExitViewModel(
 
         if (!IsMixedWaste && quantity.MilliUnits > SelectedProduct!.Stock.MilliUnits)
         {
-            ErrorMessage = $"Existencia insuficiente. Disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}.";
+            ErrorMessage = $"Existencia insuficiente. Disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}.";
             return null;
         }
 
@@ -254,8 +254,8 @@ public sealed class OtherExitViewModel(
 
         var line = _pendingOperation.Lines[0];
         return IsMixedWaste
-            ? $"Tipo: Merma mixta no atribuida\nCantidad: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {line.UnitSnapshot}\nMotivo: {line.Reason}\n\nSe registrará para conciliación posterior; no se asignará a un producto."
-            : $"Producto: {SelectedProduct!.Name}\nCantidad: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}\nMotivo: {line.Reason}\n\nEsta salida disminuirá las existencias.";
+            ? $"Tipo: Merma mixta no atribuida\nCantidad: {line.Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {line.UnitSnapshot}\nMotivo: {line.Reason}\n\nSe registrará para conciliación posterior; no se asignará a un producto."
+            : $"Producto: {SelectedProduct!.Name}\nCantidad: {line.Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}\nMotivo: {line.Reason}\n\nEsta salida disminuirá las existencias.";
     }
 
     public void CancelReview()

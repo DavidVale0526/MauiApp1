@@ -81,5 +81,5 @@ public sealed record SaleHistoryCard(SaleHistoryEntry Sale)
     public string LinesText => string.Join(
         Environment.NewLine,
         Sale.Lines.Select(line =>
-            $"• {line.ProductName}: {(line.QuantityMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {line.Unit} × {(line.SalePriceMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)} = {(line.LineTotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}"));
+            $"• {line.ProductName}: {(line.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {line.Unit} × {(line.SalePriceMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)} = {(line.LineTotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}"));
 }

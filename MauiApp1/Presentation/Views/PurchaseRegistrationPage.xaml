@@ -50,7 +50,7 @@
                         <Grid x:Name="QuantityControls" ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="7">
                                 <Label Text="Cantidad recibida" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
-                                <Entry Placeholder="Ej. 5.000" Keyboard="Numeric" Text="{Binding QuantityInput}"
+                                <Entry Placeholder="Ej. 5 o 0.5" Keyboard="Numeric" Text="{Binding QuantityInput}"
                                        IsEnabled="{Binding CanEditLines}" HeightRequest="52"
                                        BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
                             </VerticalStackLayout>

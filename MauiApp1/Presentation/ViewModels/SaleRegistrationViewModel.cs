@@ -261,7 +261,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         var lines = _pendingSale.Lines.Select(line =>
         {
             var lineTotal = SaleAmountCalculator.CalculateLineTotalMinorUnits(line.SalePrice, line.Quantity);
-            return $"• {line.ProductNameSnapshot}: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {line.UnitSnapshot} × {line.SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)} = {(lineTotal / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
+            return $"• {line.ProductNameSnapshot}: {line.Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {line.UnitSnapshot} × {line.SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)} = {(lineTotal / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
         }).ToArray();
         var totalMinorUnits = _pendingSale.Lines.Aggregate(0L,
             (sum, line) => checked(sum + SaleAmountCalculator.CalculateLineTotalMinorUnits(line.SalePrice, line.Quantity)));
@@ -347,7 +347,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 
         if (!TryParseQuantity(QuantityInput, out var amount))
         {
-            ErrorMessage = "Escribe una cantidad válida. Puedes usar punto o coma decimal, por ejemplo 0.750.";
+            ErrorMessage = "Escribe una cantidad válida. Puedes usar punto o coma decimal, por ejemplo 0.75.";
             return;
         }
 
@@ -378,7 +378,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             var totalQuantity = checked((existing?.Quantity.MilliUnits ?? 0) + parsed.MilliUnits);
             if (totalQuantity > SelectedProduct.Stock.MilliUnits)
             {
-                ErrorMessage = $"Existencia insuficiente para {SelectedProduct.Name}. Disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}.";
+                ErrorMessage = $"Existencia insuficiente para {SelectedProduct.Name}. Disponible: {SelectedProduct.Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {SelectedProduct.Unit}.";
                 return;
             }
 
@@ -455,17 +455,17 @@ public sealed record SaleProductOption(ProductId Id, string Name, string Unit, M
 
     public string PriceText => $"C$ {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}";
 
-    public string StockText => $"Disponible: {Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+    public string StockText => $"Disponible: {Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 
     public string PriceAndStockText =>
-        $"Precio: {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}   |   Disponible: {Stock.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+        $"Precio: {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}   |   Disponible: {Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 }
 
 public sealed record SaleCartLine(ProductId ProductId, string Name, string Unit, Quantity Quantity, MoneyAmount SalePrice)
 {
     public long LineTotalMinorUnits => SaleAmountCalculator.CalculateLineTotalMinorUnits(SalePrice, Quantity);
 
-    public string QuantityText => $"{Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+    public string QuantityText => $"{Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 
     public string PriceText => $"C$ {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)} c/u";
 

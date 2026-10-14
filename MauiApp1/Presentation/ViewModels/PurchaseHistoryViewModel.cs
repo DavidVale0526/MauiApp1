@@ -75,5 +75,5 @@ public sealed record PurchaseHistoryCard(PurchaseHistoryEntry Purchase)
     public string ProductsText => string.Join(
         Environment.NewLine,
         Purchase.Lines.Select(line =>
-            $"• {line.ProductName}: {(line.QuantityMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {line.Unit}"));
+            $"• {line.ProductName}: {(line.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {line.Unit}"));
 }

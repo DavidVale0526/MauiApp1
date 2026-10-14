@@ -99,7 +99,7 @@
                         <VerticalStackLayout x:Name="MinimumStockField" Grid.Row="2" Grid.Column="1" Spacing="5">
                             <Label Text="EXISTENCIA MÍNIMA" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
                             <Border Style="{StaticResource ProductFieldBorderStyle}" HeightRequest="48">
-                                <Entry Placeholder="0.000" Text="{Binding MinimumStock}" Keyboard="Numeric" ReturnType="Done"
+                                <Entry Placeholder="Ej.: 0 o 0.5" Text="{Binding MinimumStock}" Keyboard="Numeric" ReturnType="Done"
                                        TextColor="#172438" PlaceholderColor="#9AA9BA" HorizontalTextAlignment="Start" />
                             </Border>
                         </VerticalStackLayout>

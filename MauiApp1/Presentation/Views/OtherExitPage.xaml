@@ -74,7 +74,7 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout x:Name="QuantityField" Grid.Row="2" Spacing="7">
                                 <Label Text="Cantidad a retirar" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
-                                <Entry Placeholder="Ej. 1.000" Keyboard="Numeric" Text="{Binding QuantityInput}"
+                                <Entry Placeholder="Ej. 1 o 0.5" Keyboard="Numeric" Text="{Binding QuantityInput}"
                                        IsEnabled="{Binding CanEdit}" HeightRequest="52"
                                        BackgroundColor="White" TextColor="#111D31" PlaceholderColor="#8291A5" />
                             </VerticalStackLayout>

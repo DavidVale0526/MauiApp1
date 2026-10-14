@@ -243,7 +243,7 @@ public sealed class PurchaseRegistrationViewModel : INotifyPropertyChanged
             return string.Empty;
         }
 
-        var lines = Lines.Select(line => $"• {line.Name}: {line.Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {line.Unit}\n  Conversión: {line.ConversionText}");
+        var lines = Lines.Select(line => $"• {line.Name}: {line.Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {line.Unit}\n  Conversión: {line.ConversionText}");
         return $"Se registrarán estas cantidades y se sumarán a las existencias:\n\n{string.Join("\n", lines)}\n\nLa fecha y hora se registrarán automáticamente.";
     }
 
@@ -452,5 +452,5 @@ public sealed record PurchaseProductOption(ProductId Id, string Name, string Uni
 
 public sealed record PurchaseCartLine(ProductId ProductId, string Name, string Unit, Quantity Quantity, string ConversionText)
 {
-    public string QuantityText => $"{Quantity.ToDecimal().ToString("0.000", CultureInfo.CurrentCulture)} {Unit}";
+    public string QuantityText => $"{Quantity.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {Unit}";
 }

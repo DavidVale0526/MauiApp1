@@ -87,7 +87,7 @@ public sealed class StockConsultationViewModel : INotifyPropertyChanged
             LowStockAlertMessage = lowStockProducts.Count == 0
                 ? "No hay productos activos en el mínimo o por debajo."
                 : "Productos activos en el mínimo o por debajo:\n" + string.Join("\n", lowStockProducts.Select(product =>
-                    $"• {product.Name}: {product.Stock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit} (mínimo {product.MinimumStock.ToDecimal().ToString("0.000", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit})"));
+                    $"• {product.Name}: {product.Stock.ToDecimal().ToString("0.###", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit} (mínimo {product.MinimumStock.ToDecimal().ToString("0.###", System.Globalization.CultureInfo.CurrentCulture)} {product.Unit})"));
         }
         catch
         {

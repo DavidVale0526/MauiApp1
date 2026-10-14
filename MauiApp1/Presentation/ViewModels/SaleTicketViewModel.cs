@@ -42,7 +42,7 @@ public sealed record SaleTicketLine(SaleHistoryLine Line)
     public string NameText => Line.ProductName;
 
     public string QuantityAndUnitText =>
-        $"{(Line.QuantityMilliUnits / 1000m).ToString("0.000", CultureInfo.CurrentCulture)} {Line.Unit} × C$ {SaleTicketViewModel.FormatMoney(Line.SalePriceMinorUnits)}";
+        $"{(Line.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Line.Unit} × C$ {SaleTicketViewModel.FormatMoney(Line.SalePriceMinorUnits)}";
 
     public string LineTotalText => $"C$ {SaleTicketViewModel.FormatMoney(Line.LineTotalMinorUnits)}";
 }

@@ -97,9 +97,9 @@
                     <VerticalStackLayout Spacing="5">
                       <Label Text="CANTIDAD" FontSize="11" FontAttributes="Bold" TextColor="#52657D" />
                     <Border Style="{StaticResource Field}">
-                      <Entry Placeholder="Ej.: 1 o 0.500" Keyboard="Text" Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#94A3B8" HorizontalTextAlignment="Start" FontSize="16" />
+                      <Entry Placeholder="Ej.: 1 o 0.5" Keyboard="Text" Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#94A3B8" HorizontalTextAlignment="Start" FontSize="16" />
                     </Border>
-                    <Label Text="Puedes usar punto o coma decimal. Ej.: 0.750" FontSize="11" TextColor="#647792" />
+                    <Label Text="Puedes usar punto o coma decimal. Ej.: 0.75" FontSize="11" TextColor="#647792" />
                   </VerticalStackLayout>
                   <Button Grid.Column="1" Text="+ Agregar" Command="{Binding AddLineCommand}" Style="{StaticResource Primary}" VerticalOptions="End" />
                 </Grid>
