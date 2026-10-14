@@ -21,6 +21,14 @@ internal static class Program
     {
         try
         {
+            if (args.Contains("--initialize-database", StringComparer.OrdinalIgnoreCase))
+            {
+                var dataDirectoryOption = ReadOption(args, "--data-directory");
+                var databaseDataDirectory = GetCoordinatorDataDirectory(dataDirectoryOption);
+                await InitializeCoordinatorDatabaseAsync(databaseDataDirectory);
+                return 0;
+            }
+
             var bootstrapSource = ReadOption(args, "--bootstrap-from");
             if (bootstrapSource is not null)
             {
@@ -38,6 +46,26 @@ internal static class Program
             Console.Error.WriteLine($"No se pudo iniciar el coordinador: {exception.Message}");
             return 1;
         }
+    }
+
+    private static async Task InitializeCoordinatorDatabaseAsync(string dataDirectory)
+    {
+        Directory.CreateDirectory(dataDirectory);
+        var databasePath = Path.Combine(dataDirectory, "miscelanea-ari-central.db");
+        if (File.Exists(databasePath))
+            throw new InvalidOperationException("La base central ya existe; no se sobrescribió ni se reinicializó.");
+
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        services.AddLogging();
+        services.AddLocalPersistence(databasePath, registerLocalSyncServices: false);
+        await using var provider = services.BuildServiceProvider();
+        await provider.GetRequiredService<ILocalDatabaseInitializer>().InitializeAsync();
+
+        var pairingStore = new CoordinatorPairingStore(databasePath);
+        await pairingStore.InitializeAsync();
+        var operationStore = new CoordinatorOperationStore(databasePath);
+        await operationStore.InitializeAsync();
+        Console.WriteLine($"Base central nueva inicializada: {databasePath}");
     }
 
     private static async Task<int> RunCoordinatorAsync(string[] args)

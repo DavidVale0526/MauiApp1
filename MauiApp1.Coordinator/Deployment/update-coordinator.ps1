@@ -3,12 +3,13 @@ param(
     [string] $PublishDirectory = (Join-Path $PSScriptRoot '..\bin\publish\win-x64'),
     [string] $DataDirectory = "$env:ProgramData\Miscelanea Ari\Coordinator",
     [string] $WindowsAppUser,
+    [switch] $SetHostMode,
     [ValidateRange(1024, 65535)] [int] $Port = 5080
 )
 
 $ErrorActionPreference = 'Stop'
-if ($PSVersionTable.PSVersion.Major -lt 7) {
-    throw 'Ejecuta este actualizador con PowerShell 7 o posterior.'
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    throw 'Se requiere Windows PowerShell 5.1 o posterior.'
 }
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -87,13 +88,16 @@ foreach ($path in @($serviceExecutable, $publishExecutable, $databasePath)) {
     }
 }
 
-if (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) {
+$desktopSettingsExists = Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf
+if ($desktopSettingsExists) {
     try { $desktopSettings = Get-Content -LiteralPath $desktopSettingsPath -Raw | ConvertFrom-Json }
     catch { throw "La configuración del modo de la aplicación Windows no es válida: $desktopSettingsPath. El servicio no se detuvo." }
-    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase)) {
+    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase) -and
+        -not ($SetHostMode -and [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Client', [StringComparison]::OrdinalIgnoreCase))) {
         throw "La aplicación Windows está configurada como Client. El actualizador no cambiará su modo: $desktopSettingsPath"
     }
-    if (-not [string]::Equals(
+    if ([string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::Equals(
             [IO.Path]::GetFullPath([string]$desktopSettings.Coordinator.DataDirectory),
             $dataDirectory,
             [StringComparison]::OrdinalIgnoreCase)) {
@@ -137,18 +141,30 @@ try {
     Start-Service -Name $serviceName
     (Get-Service -Name $serviceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
 
+    $curlPath = Join-Path $env:WINDIR 'System32\curl.exe'
+    if (-not (Test-Path -LiteralPath $curlPath)) {
+        throw 'No se encontró curl.exe para comprobar el estado local del coordinador.'
+    }
+
     $health = $null
     for ($attempt = 0; $attempt -lt 20; $attempt++) {
         try {
-            $health = Invoke-RestMethod -Uri "https://127.0.0.1:$Port/health" -SkipCertificateCheck -TimeoutSec 5
-            if ($health.status -eq 'ok') { break }
+            # curl avoids the Windows PowerShell 5.1 certificate callback/runspace
+            # issue. This probe targets only loopback /health, which exposes status
+            # and no business data; --insecure accepts the coordinator's local cert.
+            $healthJson = & $curlPath --insecure --fail --silent --show-error --max-time 5 `
+                "https://127.0.0.1:$Port/health" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                $health = $healthJson | ConvertFrom-Json
+                if ($health.status -eq 'ok') { break }
+            }
         } catch { }
         Start-Sleep -Seconds 1
     }
     if ($health.status -ne 'ok') { throw 'El coordinador no respondió correctamente en /health.' }
 
-    if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf)) {
-        # Running the coordinator-specific updater on this machine explicitly establishes Host mode.
+    if (-not $desktopSettingsExists -or $SetHostMode) {
+        # The graphical setup explicitly selected Host mode for this machine.
         New-Item -ItemType Directory -Path $desktopSettingsDirectory -Force | Out-Null
         @{ Coordinator = @{ Mode = 'Host'; DataDirectory = $dataDirectory } } |
             ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $desktopSettingsPath -Encoding utf8

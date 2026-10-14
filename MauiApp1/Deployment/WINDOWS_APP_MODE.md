@@ -2,6 +2,8 @@
 
 Una instalación normal de la aplicación Windows funciona como cliente. No hay que ejecutar comandos para configurarla como PC cliente. La aplicación tampoco decide su rol por encontrar un archivo SQLite en `ProgramData`.
 
+Para una instalación nueva, usa el asistente gráfico `MiscelaneaAriSetup.exe`: selecciona **Cliente** en las PC secundarias o **Coordinador** en la única PC Windows que alojará el servicio. La ruta Coordinador usa la confirmación de permisos estándar de Windows y deja instalada la base, el servicio y el modo Host. El instalador gráfico se genera con `MauiApp1.Setup/build-windows-installer.ps1`.
+
 La configuración se guarda en:
 
 `C:\ProgramData\Miscelanea Ari\Desktop\windows-app-mode.json`

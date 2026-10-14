@@ -37,14 +37,15 @@ Este flujo prepara la autorización de dispositivos. El coordinador está instal
 - Revisar el mensaje cuando el coordinador esté apagado y recuperar la vinculación después.
 - Confirmar el flujo en el teléfono físico. Hasta entonces, las compilaciones y pruebas del cliente compartido no sustituyen esta revisión.
 
-## Preparar el instalador del servicio
+## Preparar el coordinador sin usar la consola
 
-- Publicar `MauiApp1.Coordinator` para `win-x64` como autocontenido y ejecutar `install-coordinator.ps1` desde PowerShell 7 o posterior como Administrador. El instalador registra inicio automático, certificado HTTPS y una regla de entrada TCP en perfil Privado únicamente.
+- Distribuye el paquete generado por `MauiApp1.Setup/build-windows-installer.ps1`. La persona elige **Usar esta PC como coordinador del negocio** y confirma la solicitud estándar de permisos de Windows. El asistente prepara la base vacía o importa una base existente, instala el servicio, crea el certificado HTTPS y habilita la regla de entrada solo para redes privadas. No se abre PowerShell ni se pide escribir comandos.
+- En cada PC secundaria se elige **Conectar esta PC a un coordinador existente**. Después, el Administrador vincula desde **Sincronización y conexión**. Android se instala como cliente y escanea el QR generado en Windows.
 - Esta PC está actualmente clasificada por Windows como perfil `Public`; por eso el firewall no acepta aún conexiones desde Android por esa Wi-Fi. Para usar el coordinador allí, confirma que es la red confiable del negocio y cambia su perfil en Configuración de Windows a `Privada` antes de emparejar dispositivos.
 - No configures reenvío de puertos en el router ni expongas el coordinador a Internet.
 
 ## Actualizar una instalación existente
 
-- Publica primero la versión que se instalará y abre PowerShell 7 como Administrador. Ejecuta `MauiApp1.Coordinator/Deployment/update-coordinator.ps1` desde la carpeta del proyecto (puerto predeterminado 5080; se puede indicar otro con `-Port`).
+- Para una instalación manual, publica primero la versión que se instalará y ejecuta `MauiApp1.Coordinator/Deployment/update-coordinator.ps1` desde Windows PowerShell 5.1 o posterior como Administrador (puerto predeterminado 5080; se puede indicar otro con `-Port`). Para el flujo normal, usa el asistente gráfico de Windows: solicita los permisos de Administrador y conserva la base con un respaldo automático.
 - El actualizador guarda una copia coherente SQLite de la base central y los binarios actuales antes de detener el servicio. Después reemplaza el paquete, inicia el servicio y comprueba `/health`; si falla, restaura los binarios anteriores e intenta reactivar el servicio.
 - Este equipo tiene preparada la publicación y una copia preventiva, pero el servicio todavía no se ha actualizado porque la sesión de desarrollo no tiene privilegios para controlarlo. No uses las nuevas rutas de sesión hasta ejecutar el actualizador y confirmar su mensaje de éxito.

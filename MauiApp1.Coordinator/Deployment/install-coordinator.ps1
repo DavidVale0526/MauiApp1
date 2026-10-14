@@ -4,14 +4,15 @@ param(
 
     [string] $DataDirectory = "$env:ProgramData\Miscelanea Ari\Coordinator",
     [string] $WindowsAppUser,
+    [switch] $SetHostMode,
 
     [ValidateRange(1024, 65535)]
     [int] $Port = 5080
 )
 
 $ErrorActionPreference = 'Stop'
-if ($PSVersionTable.PSVersion.Major -lt 7) {
-    throw 'Ejecuta este instalador con PowerShell 7 o posterior.'
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    throw 'Se requiere Windows PowerShell 5.1 o posterior.'
 }
 
 $serviceName = 'MiscelaneaAriCoordinator'
@@ -43,10 +44,12 @@ $desktopSettingsPath = Join-Path $desktopSettingsDirectory 'windows-app-mode.jso
 if (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) {
     try { $desktopSettings = Get-Content -LiteralPath $desktopSettingsPath -Raw | ConvertFrom-Json }
     catch { throw "La configuración del modo de la aplicación Windows no es válida: $desktopSettingsPath" }
-    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase)) {
+    if (-not [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase) -and
+        -not ($SetHostMode -and [string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Client', [StringComparison]::OrdinalIgnoreCase))) {
         throw "La aplicación Windows está configurada como Client. Revisa o cambia explícitamente $desktopSettingsPath antes de instalar el coordinador."
     }
-    if (-not [string]::Equals(
+    if ([string]::Equals([string]$desktopSettings.Coordinator.Mode, 'Host', [StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::Equals(
             [IO.Path]::GetFullPath([string]$desktopSettings.Coordinator.DataDirectory),
             $DataDirectory,
             [StringComparison]::OrdinalIgnoreCase)) {
@@ -71,7 +74,11 @@ $certificate = New-SelfSignedCertificate `
     -NotAfter (Get-Date).AddYears(5)
 
 try {
-    $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($certificate.RawData))
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fingerprint = ([BitConverter]::ToString($sha256.ComputeHash($certificate.RawData))).Replace('-', '')
+    }
+    finally { $sha256.Dispose() }
     New-Item -ItemType Directory -Path $DataDirectory -Force | Out-Null
     $directoryAcl = Get-Acl -LiteralPath $DataDirectory
     $directoryRule = [Security.AccessControl.FileSystemAccessRule]::new(
@@ -120,7 +127,7 @@ try {
         -Profile Private | Out-Null
 
     Start-Service -Name $serviceName
-    if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) -or $SetHostMode) {
         New-Item -ItemType Directory -Path $desktopSettingsDirectory -Force | Out-Null
         @{ Coordinator = @{ Mode = 'Host'; DataDirectory = $DataDirectory } } |
             ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $desktopSettingsPath -Encoding utf8

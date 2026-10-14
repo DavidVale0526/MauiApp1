@@ -1,9 +1,13 @@
 using System.ComponentModel;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Lan;
+using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
 using Microsoft.Maui.Storage;
 
@@ -13,14 +17,19 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
 {
     private readonly ICoordinatorPairingClient _client;
     private readonly IAuthenticationService _authentication;
+    private readonly DesktopCoordinatorModeOptions _desktopMode;
     private string _address = string.Empty, _fingerprint = string.Empty, _userName = string.Empty;
     private string _password = string.Empty, _code = string.Empty, _message = string.Empty, _generatedCode = string.Empty, _generatedQrPayload = string.Empty;
     private bool _busy, _ready, _confirmed, _hasSavedLink;
 
-    public DevicePairingViewModel(ICoordinatorPairingClient client, IAuthenticationService authentication)
+    public DevicePairingViewModel(
+        ICoordinatorPairingClient client,
+        IAuthenticationService authentication,
+        DesktopCoordinatorModeOptions desktopMode)
     {
         _client = client;
         _authentication = authentication;
+        _desktopMode = desktopMode;
         UserName = authentication.CurrentUser?.UserName ?? string.Empty;
         GenerateCodeCommand = new Command(async () => await GenerateCodeAsync(), () => CanGenerateCode && !IsBusy && _ready);
         LoadFingerprintCommand = new Command(async () => await LoadFingerprintAsync(), () => CanLoadFingerprintFromFile && CanEditConnection && !IsBusy);
@@ -73,6 +82,18 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                 Address = status.Address;
                 Fingerprint = status.CertificateFingerprint;
                 Code = status.PendingCode ?? string.Empty;
+            }
+            else if (_desktopMode.IsHost && OperatingSystem.IsWindows())
+            {
+                Address = GetDefaultCoordinatorAddress();
+                var fingerprintPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "Miscelanea Ari", "Coordinator", "coordinator-certificate-fingerprint.txt");
+                if (File.Exists(fingerprintPath))
+                {
+                    var fingerprint = await File.ReadAllTextAsync(fingerprintPath);
+                    Fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
+                }
             }
             _ready = true;
         }
@@ -191,6 +212,45 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         try { Message = (await _client.PairAsync(Address, Fingerprint, Code)).Message; }
         catch { Message = "No fue posible vincular el dispositivo. Inténtalo de nuevo."; }
         finally { IsBusy = false; await LoadAsync(); }
+    }
+
+    private static string GetDefaultCoordinatorAddress()
+    {
+        try
+        {
+            var address = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
+                    adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211)
+                .SelectMany(adapter =>
+                {
+                    var properties = adapter.GetIPProperties();
+                    var hasGateway = properties.GatewayAddresses.Any(gateway =>
+                        gateway.Address.AddressFamily == AddressFamily.InterNetwork &&
+                        !IPAddress.Any.Equals(gateway.Address));
+                    return properties.UnicastAddresses
+                        .Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork)
+                        .Select(item => (Address: item.Address, HasGateway: hasGateway));
+                })
+                .Where(item => !IPAddress.IsLoopback(item.Address) &&
+                    IsPrivateIpv4(item.Address))
+                .OrderByDescending(item => item.HasGateway)
+                .Select(item => item.Address)
+                .FirstOrDefault();
+
+            return address is null ? string.Empty : $"https://{address}:5080";
+        }
+        catch (Exception exception) when (exception is NetworkInformationException or InvalidOperationException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static bool IsPrivateIpv4(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10 ||
+            bytes[0] == 192 && bytes[1] == 168 ||
+            bytes[0] == 172 && bytes[1] is >= 16 and <= 31;
     }
 
     public async Task<PairingActionResult> UnlinkAsync()
