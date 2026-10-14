@@ -57,6 +57,9 @@
                             <Label Text="Código de seguridad (SHA-256)" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                             <Entry Placeholder="Huella del certificado de Windows" Text="{Binding Fingerprint}" IsEnabled="{Binding CanEditConnection}" MaxLength="95" Style="{StaticResource Input}" />
                         </VerticalStackLayout>
+                        <Button Text="Cargar huella desde archivo" Command="{Binding LoadFingerprintCommand}"
+                                IsVisible="{Binding CanLoadFingerprintFromFile}" IsEnabled="{Binding CanEditConnection}"
+                                Style="{StaticResource SecondaryButton}" />
                         <Label Text="La huella permite reconocer el equipo autorizado al conectarse." FontSize="13" TextColor="#61738A" />
                     </VerticalStackLayout>
                 </Border>

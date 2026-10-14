@@ -13,7 +13,7 @@ internal sealed class LocalAuthenticationService(
     Pbkdf2PasswordHasher passwordHasher,
     ILogger<LocalAuthenticationService> logger) : IAuthenticationService
 {
-    private const int MinimumPasswordLength = 15;
+    private const int MinimumPasswordLength = 5;
     private const int MaximumPasswordLength = 1024;
     private const int MaximumUserNameLength = 80;
     private AuthenticatedUser? _currentUser;

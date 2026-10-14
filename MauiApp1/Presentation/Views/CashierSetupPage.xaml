@@ -46,7 +46,7 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="7">
                             <Label Text="Contraseña" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
-                            <Entry Placeholder="Mínimo 15 caracteres" Text="{Binding Password}" IsPassword="True" ReturnType="Next" Style="{StaticResource Input}" />
+                            <Entry Placeholder="Mínimo 5 caracteres" Text="{Binding Password}" IsPassword="True" ReturnType="Next" Style="{StaticResource Input}" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="7">
                             <Label Text="Confirmar contraseña" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />

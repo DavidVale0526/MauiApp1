@@ -5,6 +5,7 @@ using System.Windows.Input;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Lan;
 using MauiApp1.Domain.Users;
+using Microsoft.Maui.Storage;
 
 namespace MauiApp1.Presentation.ViewModels;
 
@@ -22,6 +23,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         _authentication = authentication;
         UserName = authentication.CurrentUser?.UserName ?? string.Empty;
         GenerateCodeCommand = new Command(async () => await GenerateCodeAsync(), () => CanGenerateCode && !IsBusy && _ready);
+        LoadFingerprintCommand = new Command(async () => await LoadFingerprintAsync(), () => CanLoadFingerprintFromFile && CanEditConnection && !IsBusy);
         PairCommand = new Command(async () => await PairAsync(), () => ShowPairForm && !IsBusy && _ready);
     }
 
@@ -42,6 +44,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         }
     }
     public bool CanGenerateCode => OperatingSystem.IsWindows() && _authentication.CurrentUser?.Role == UserRole.Administrator;
+    public bool CanLoadFingerprintFromFile => OperatingSystem.IsWindows();
     public bool CanShowGeneratedQr => CanGenerateCode && !string.IsNullOrWhiteSpace(GeneratedQrPayload);
     public bool CanScanQr => OperatingSystem.IsAndroid() && !_confirmed;
     public bool ShowPairForm => !_confirmed;
@@ -54,6 +57,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         : "Este dispositivo todavía no está vinculado.";
     public bool IsBusy { get => _busy; private set { if (Set(ref _busy, value)) RefreshState(); } }
     public ICommand GenerateCodeCommand { get; }
+    public ICommand LoadFingerprintCommand { get; }
     public ICommand PairCommand { get; }
 
     public async Task LoadAsync()
@@ -99,6 +103,58 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         }
         catch { Message = "No fue posible generar el código. Inténtalo de nuevo."; }
         finally { Password = string.Empty; IsBusy = false; }
+    }
+
+    private async Task LoadFingerprintAsync()
+    {
+        if (IsBusy || !CanLoadFingerprintFromFile || !CanEditConnection) return;
+        IsBusy = true;
+        Message = string.Empty;
+        try
+        {
+            var fingerprintPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Miscelanea Ari", "Coordinator", "coordinator-certificate-fingerprint.txt");
+
+            string fingerprint;
+            if (File.Exists(fingerprintPath))
+            {
+                fingerprint = await File.ReadAllTextAsync(fingerprintPath);
+            }
+            else
+            {
+                var file = await FilePicker.Default.PickAsync(new PickOptions
+                {
+                    PickerTitle = "Selecciona el archivo de huella del coordinador"
+                });
+                if (file is null) return;
+
+                await using var stream = await file.OpenReadAsync();
+                using var reader = new StreamReader(stream);
+                fingerprint = await reader.ReadToEndAsync();
+            }
+
+            fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray());
+            if (fingerprint.Length != 64)
+            {
+                Message = "El archivo no contiene una huella SHA-256 válida de 64 caracteres hexadecimales.";
+                return;
+            }
+
+            Fingerprint = fingerprint.ToUpperInvariant();
+        }
+        catch (OperationCanceledException)
+        {
+            // El usuario canceló el selector de archivos.
+        }
+        catch
+        {
+            Message = "No se pudo leer el archivo de huella. Comprueba que sea el archivo del coordinador.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public bool ApplyScannedQr(string rawValue)
@@ -168,9 +224,10 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     }
     private void RefreshState()
     {
-        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanShowGeneratedQr), nameof(LinkStatus) })
+        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();
+        ((Command)LoadFingerprintCommand).ChangeCanExecute();
         ((Command)PairCommand).ChangeCanExecute();
     }
 

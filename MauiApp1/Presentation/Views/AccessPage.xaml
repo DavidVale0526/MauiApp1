@@ -131,6 +131,10 @@
                                                 SemanticProperties.Description="Mostrar u ocultar contraseña" />
                                     </Grid>
                                 </Border>
+                                <Label Text="La contraseña de la cuenta inicial debe tener al menos 5 caracteres."
+                                       IsVisible="{Binding IsSetupMode}"
+                                       FontSize="11"
+                                       TextColor="#61738A" />
                             </VerticalStackLayout>
 
                             <VerticalStackLayout IsVisible="{Binding IsSetupMode}" Spacing="6">

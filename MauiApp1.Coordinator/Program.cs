@@ -322,8 +322,8 @@ internal static class Program
             var admin = await context.UserAccounts.SingleOrDefaultAsync(item => item.UserId == userId.Value && item.IsEnabled, cancellationToken);
             if (admin?.Role != (int)UserRole.Administrator) return Results.Json(new ApiMessageResponse("Solo el Administrador puede crear cuentas de Cajero."), statusCode: StatusCodes.Status403Forbidden);
             var userName = request.UserName?.Trim();
-            if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 || string.IsNullOrEmpty(request.Password) || request.Password.Length is < 15 or > 1024)
-                return Results.BadRequest(new ApiMessageResponse("El usuario debe tener entre 1 y 80 caracteres y la contraseña al menos 15."));
+            if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 || string.IsNullOrEmpty(request.Password) || request.Password.Length is < 5 or > 1024)
+                return Results.BadRequest(new ApiMessageResponse("El usuario debe tener entre 1 y 80 caracteres y la contraseña entre 5 y 1024."));
             var normalized = userName.ToUpperInvariant();
             if (await context.UserAccounts.AnyAsync(item => item.NormalizedUserName == normalized, cancellationToken))
                 return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado."));
