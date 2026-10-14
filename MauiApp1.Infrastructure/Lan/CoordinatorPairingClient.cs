@@ -16,7 +16,7 @@ public sealed class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,
-    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient
+    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient, IInitialDataImportClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public string? LastChangeError { get; private set; }
@@ -92,6 +92,95 @@ public sealed class CoordinatorPairingClient(
         {
             var result = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
             return response.IsSuccessStatusCode ? null : result?.Message ?? "El coordinador no pudo resolver el conflicto.";
+        }
+    }
+
+    public async Task<InitialImportClientResult<InitialImportPreview>> PreviewAsync(
+        InitialDataImportSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return new(false, null, "Vincula este dispositivo e inicia sesión central como Administrador con el coordinador disponible.");
+        client.Timeout = TimeSpan.FromMinutes(5);
+        using (client)
+        {
+            try
+            {
+                using var response = await client.PostAsJsonAsync("api/sync/initial-import/preview", snapshot, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var preview = await response.Content.ReadFromJsonAsync<InitialImportPreview>(cancellationToken);
+                    return preview is null
+                        ? new(false, null, "El coordinador devolvió una vista previa vacía.")
+                        : new(true, preview, null);
+                }
+
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+                return new(false, null, error?.Message ?? response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized => "La sesión del Administrador venció. Inicia sesión nuevamente.",
+                    HttpStatusCode.Forbidden => "Solo el Administrador puede importar datos previos.",
+                    HttpStatusCode.NotFound => "Actualiza el coordinador para habilitar la importación de datos previos.",
+                    HttpStatusCode.RequestEntityTooLarge => "El historial es demasiado grande para analizarlo en un solo envío. No se modificó ninguna base.",
+                    _ => "El coordinador no pudo analizar los datos de este dispositivo. No se importó nada."
+                });
+            }
+            catch (HttpRequestException)
+            {
+                return new(false, null, "No se pudo contactar al coordinador en la red local. No se modificaron los datos.");
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new(false, null, "El coordinador tardó demasiado. Puedes volver a analizar los datos; aún no se importó nada.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return new(false, null, "La respuesta del coordinador no es válida. Actualiza el coordinador y la aplicación.");
+            }
+        }
+    }
+
+    public async Task<InitialImportClientResult<InitialImportApplyResult>> ApplyAsync(
+        InitialImportApplyRequest request, CancellationToken cancellationToken = default)
+    {
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return new(false, null, "Vincula este dispositivo e inicia sesión central como Administrador con el coordinador disponible.");
+        client.Timeout = TimeSpan.FromMinutes(5);
+        using (client)
+        {
+            try
+            {
+                using var response = await client.PostAsJsonAsync("api/sync/initial-import/apply", request, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<InitialImportApplyResult>(cancellationToken);
+                    return result is null
+                        ? new(false, null, "El coordinador devolvió un resultado de importación vacío.")
+                        : new(result.Completed, result, result.Completed ? null : result.Message);
+                }
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+                return new(false, null, error?.Message ?? response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized => "La sesión del Administrador venció. Inicia sesión nuevamente.",
+                    HttpStatusCode.Forbidden => "Solo el Administrador puede confirmar la importación.",
+                    HttpStatusCode.NotFound => "No se encontró la vista previa. Analiza nuevamente los datos.",
+                    HttpStatusCode.Conflict => "La base central cambió desde la vista previa. Analiza nuevamente antes de confirmar.",
+                    _ => "El coordinador no pudo completar la importación. Revisa el detalle y vuelve a intentar."
+                });
+            }
+            catch (HttpRequestException)
+            {
+                return new(false, null, "Se perdió la conexión durante la importación. Puedes reintentar la misma vista previa; no se duplicarán los registros confirmados.");
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new(false, null, "La importación tardó demasiado. Reintenta la misma vista previa para continuar sin duplicar registros.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return new(false, null, "La respuesta del coordinador no es válida. Actualiza el coordinador y la aplicación.");
+            }
         }
     }
 

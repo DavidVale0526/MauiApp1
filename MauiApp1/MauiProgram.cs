@@ -48,11 +48,16 @@ namespace MauiApp1
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorChangeClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.IInitialDataImportClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Sync.ILocalInitialDataImportService,
+                MauiApp1.Infrastructure.Sync.LocalInitialDataImportService>();
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatedSignInService, MauiApp1.Infrastructure.Authentication.CoordinatedSignInService>();
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorOperationSender, MauiApp1.Infrastructure.Lan.CoordinatorOperationSender>();
             builder.Services.AddTransient<DevicePairingViewModel>();
             builder.Services.AddTransient<DevicePairingPage>();
             builder.Services.AddTransient<SyncManagementPage>();
+            builder.Services.AddTransient<InitialDataImportPage>();
             builder.Services.AddTransient<MauiApp1.Presentation.Views.ConflictReviewPage>();
             builder.Services.AddTransient<AccessPage>();
             builder.Services.AddTransient<AccessPageViewModel>();

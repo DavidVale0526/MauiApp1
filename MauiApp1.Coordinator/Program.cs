@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
+using MauiApp1.Application.Sync;
 using MauiApp1.Coordinator.Persistence;
 using MauiApp1.Coordinator.Pairing;
 using MauiApp1.Coordinator.Sync;
@@ -144,6 +145,12 @@ internal static class Program
         builder.Services.AddLocalPersistence(centralDatabasePath, registerLocalSyncServices: false);
         builder.Services.AddSingleton<CoordinatorConnectionRegistry>();
         builder.Services.AddSingleton(_ => new CoordinatorPairingStore(centralDatabasePath));
+        builder.Services.AddSingleton(_ => new CoordinatorOperationStore(centralDatabasePath));
+        builder.Services.AddSingleton(serviceProvider => new CoordinatorInitialDataImportService(
+            centralDatabasePath,
+            serviceProvider.GetRequiredService<IDbContextFactory<LocalDbContext>>(),
+            serviceProvider.GetRequiredService<CoordinatorOperationStore>(),
+            serviceProvider.GetRequiredService<CoordinatorBusinessOperationApplier>()));
         builder.Services.AddSingleton(serviceProvider => new CoordinatorChangeBroadcaster(
             centralDatabasePath,
             serviceProvider.GetRequiredService<CoordinatorConnectionRegistry>(),
@@ -164,9 +171,11 @@ internal static class Program
         await app.Services.GetRequiredService<ILocalDatabaseInitializer>().InitializeAsync();
         var pairingStore = app.Services.GetRequiredService<CoordinatorPairingStore>();
         await pairingStore.InitializeAsync();
-        var operationStore = new CoordinatorOperationStore(centralDatabasePath);
-        var businessOperationApplier = new CoordinatorBusinessOperationApplier();
+        var operationStore = app.Services.GetRequiredService<CoordinatorOperationStore>();
+        var businessOperationApplier = app.Services.GetRequiredService<CoordinatorBusinessOperationApplier>();
         await operationStore.InitializeAsync();
+        var initialDataImportService = app.Services.GetRequiredService<CoordinatorInitialDataImportService>();
+        await initialDataImportService.InitializeAsync();
 
         // This liveness endpoint exposes no account, inventory, or transaction data.
         app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
@@ -333,6 +342,50 @@ internal static class Program
             return Results.Ok(new SyncOperationResponse(true, stored.AlreadyAccepted, stored.Sequence,
                 stored.AlreadyAccepted ? "La operación ya estaba confirmada." : "Operación guardada por el coordinador."));
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1_100_000));
+
+        app.MapPost("/api/sync/initial-import/preview", async (
+            InitialDataImportSnapshot request,
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La importación requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            if (!await context.UserAccounts.AnyAsync(item => item.UserId == userId.Value && item.IsEnabled &&
+                    item.Role == (int)UserRole.Administrator, cancellationToken))
+                return Results.Forbid();
+            var result = await initialDataImportService.PreviewAsync(request, deviceId.Value, userId.Value, cancellationToken);
+            return result.Succeeded
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new ApiMessageResponse(result.ErrorMessage ?? "No se pudo analizar el paquete."));
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(40L * 1024 * 1024));
+
+        app.MapPost("/api/sync/initial-import/apply", async (
+            InitialImportApplyRequest request,
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La importación requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            if (!await context.UserAccounts.AnyAsync(item => item.UserId == userId.Value && item.IsEnabled &&
+                    item.Role == (int)UserRole.Administrator, cancellationToken))
+                return Results.Forbid();
+            var result = await initialDataImportService.ApplyAsync(request, deviceId.Value, userId.Value, cancellationToken);
+            return result.Value is not null
+                ? Results.Ok(result.Value)
+                : Results.Conflict(new ApiMessageResponse(result.ErrorMessage ?? "No se pudo confirmar la importación."));
+        });
 
         app.MapPost("/api/users/cashiers", async (
             CreateCashierRequest request,

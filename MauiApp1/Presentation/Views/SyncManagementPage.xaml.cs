@@ -38,6 +38,11 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         _desktopMode = desktopMode;
         _isAdministrator = authenticationService.CurrentUser?.Role == UserRole.Administrator;
         ReviewConflictsButton.IsVisible = _isAdministrator;
+#if WINDOWS
+        InitialImportButton.IsVisible = _isAdministrator && !_desktopMode.IsHost;
+#else
+        InitialImportButton.IsVisible = _isAdministrator;
+#endif
     }
 
     protected override async void OnAppearing()
@@ -94,6 +99,13 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
     private async void OnDevicePairingClicked(object? sender, EventArgs args)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<DevicePairingPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async void OnInitialImportClicked(object? sender, EventArgs args)
+    {
+        if (!_isAdministrator) return;
+        if (Handler?.MauiContext?.Services.GetRequiredService<InitialDataImportPage>() is not { } page) return;
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 

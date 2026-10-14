@@ -5,6 +5,7 @@ using MauiApp1.Application.Inventory;
 using MauiApp1.Application.Products;
 using MauiApp1.Application.Purchases;
 using MauiApp1.Application.Sales;
+using MauiApp1.Application.Sync;
 using MauiApp1.Domain.Inventory;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
@@ -71,6 +72,33 @@ public sealed class CoordinatorBusinessOperationApplier
                     break;
                 case "Credit.PaymentRecorded":
                     await ApplyPaymentAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Import.Category":
+                    await ApplyImportedCategoryAsync(context, payloadJson, cancellationToken);
+                    break;
+                case "Import.Product":
+                    await ApplyImportedProductAsync(context, payloadJson, cancellationToken);
+                    break;
+                case "Import.Customer":
+                    await ApplyImportedCustomerAsync(context, payloadJson, cancellationToken);
+                    break;
+                case "Import.Purchase":
+                    await ApplyImportedPurchaseAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Import.Sale":
+                    await ApplyImportedSaleAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Import.Receivable":
+                    await ApplyImportedReceivableAsync(context, payloadJson, cancellationToken);
+                    break;
+                case "Import.Movement":
+                    await ApplyImportedMovementAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Import.Payment":
+                    await ApplyImportedPaymentAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Import.Discrepancy":
+                    await ApplyImportedDiscrepancyAsync(context, payloadJson, actorUserId, cancellationToken);
                     break;
                 default:
                     return $"Tipo de operación no admitido: {operationType}.";
@@ -352,6 +380,254 @@ public sealed class CoordinatorBusinessOperationApplier
             throw new BusinessOperationConflictException("El abono supera el saldo central o contiene un monto inválido.");
         receivable.OutstandingMinorUnits -= amount;
         context.Payments.Add(new PaymentEntity { PaymentId = paymentId, OperationId = operationId, ActorUserId = actor, AmountMinorUnits = amount, OccurredAtUtc = occurred });
+    }
+
+    private static async Task ApplyImportedCategoryAsync(LocalDbContext context, string json, CancellationToken ct)
+    {
+        var payload = Read<InitialImportCategory>(json);
+        var name = payload.Name.Trim();
+        if (payload.CategoryId == Guid.Empty || name.Length == 0)
+            throw new BusinessOperationConflictException("La categoría importada contiene datos inválidos.");
+        var existing = await context.Categories.SingleOrDefaultAsync(item => item.CategoryId == payload.CategoryId, ct);
+        if (existing is not null)
+        {
+            if (existing.Name != name)
+                throw new BusinessOperationConflictException("La categoría importada ya existe con el mismo identificador y otro nombre.");
+            return;
+        }
+        var normalized = name.ToUpperInvariant();
+        if (await context.Categories.AnyAsync(item => item.NormalizedName == normalized, ct))
+            throw new BusinessOperationConflictException("Ya existe una categoría con ese nombre y otro identificador.");
+        context.Categories.Add(new CategoryEntity { CategoryId = payload.CategoryId, Name = name, NormalizedName = normalized });
+    }
+
+    private static async Task ApplyImportedProductAsync(LocalDbContext context, string json, CancellationToken ct)
+    {
+        var payload = Read<InitialImportProduct>(json);
+        if (payload.ProductId == Guid.Empty || payload.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Name) ||
+            string.IsNullOrWhiteSpace(payload.Unit) || payload.SalePriceMinorUnits < 0 || payload.StockMilliUnits < 0 ||
+            payload.MinimumStockMilliUnits < 0)
+            throw new BusinessOperationConflictException("El producto importado contiene datos inválidos.");
+        if (!await context.Categories.AnyAsync(item => item.CategoryId == payload.CategoryId, ct))
+            throw new BusinessOperationConflictException("La categoría del producto importado no existe.");
+        var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == payload.ProductId, ct);
+        if (product is null)
+        {
+            context.Products.Add(new ProductEntity { ProductId = payload.ProductId, Name = payload.Name.Trim(),
+                SalePriceMinorUnits = payload.SalePriceMinorUnits, StockMilliUnits = payload.StockMilliUnits,
+                Unit = payload.Unit.Trim(), CategoryId = payload.CategoryId,
+                MinimumStockMilliUnits = payload.MinimumStockMilliUnits, IsActive = payload.IsActive });
+            return;
+        }
+        if (product.Name != payload.Name.Trim() || product.SalePriceMinorUnits != payload.SalePriceMinorUnits ||
+            product.Unit != payload.Unit.Trim() || product.CategoryId != payload.CategoryId ||
+            product.MinimumStockMilliUnits != payload.MinimumStockMilliUnits || product.IsActive != payload.IsActive)
+            throw new BusinessOperationConflictException("El producto importado ya existe con el mismo identificador y otros datos de catálogo.");
+
+        // This event carries the administrator-approved stock snapshot, so clients converge
+        // on the same balance while imported movement rows below remain historical only.
+        product.StockMilliUnits = payload.StockMilliUnits;
+    }
+
+    private static async Task ApplyImportedCustomerAsync(LocalDbContext context, string json, CancellationToken ct)
+    {
+        var payload = Read<InitialImportCustomer>(json);
+        var name = payload.Name.Trim();
+        if (payload.CustomerId == Guid.Empty || name.Length == 0 || payload.CreatedAtUtc.Kind != DateTimeKind.Utc)
+            throw new BusinessOperationConflictException("El cliente importado contiene datos inválidos.");
+        var existing = await context.Customers.SingleOrDefaultAsync(item => item.CustomerId == payload.CustomerId, ct);
+        if (existing is not null)
+        {
+            if (existing.Name != name || existing.Phone != payload.Phone || existing.CreatedAtUtc != payload.CreatedAtUtc)
+                throw new BusinessOperationConflictException("El cliente importado ya existe con el mismo identificador y otros datos.");
+            return;
+        }
+        var normalized = name.ToUpperInvariant();
+        if (await context.Customers.AnyAsync(item => item.NormalizedName == normalized, ct))
+            throw new BusinessOperationConflictException("Ya existe un cliente con ese nombre y otro identificador.");
+        context.Customers.Add(new CustomerEntity { CustomerId = payload.CustomerId, Name = name,
+            NormalizedName = normalized, Phone = payload.Phone, CreatedAtUtc = payload.CreatedAtUtc });
+    }
+
+    private static async Task ApplyImportedPurchaseAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportPurchasePayload>(json);
+        if (payload.OperationId == Guid.Empty || payload.OccurredAtUtc.Kind != DateTimeKind.Utc ||
+            payload.Lines.Count == 0 || payload.Lines.Select(item => item.LineNumber).Distinct().Count() != payload.Lines.Count ||
+            payload.Lines.Any(item => item.LineNumber < 0 || item.ProductId == Guid.Empty || item.QuantityMilliUnits <= 0))
+            throw new BusinessOperationConflictException("La compra importada está incompleta o contiene cantidades inválidas.");
+        if (!await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct))
+            throw new BusinessOperationConflictException("No existe la cuenta central elegida como responsable de esta compra.");
+        var existing = await context.Purchases.SingleOrDefaultAsync(item => item.OperationId == payload.OperationId, ct);
+        if (existing is not null)
+        {
+            var lines = await context.PurchaseLines.AsNoTracking().Where(item => item.OperationId == payload.OperationId).ToListAsync(ct);
+            if (existing.OccurredAtUtc != payload.OccurredAtUtc || existing.ActorUserId != actor ||
+                lines.Count != payload.Lines.Count || payload.Lines.Any(incoming => !lines.Any(saved =>
+                    saved.LineNumber == incoming.LineNumber && saved.ProductId == incoming.ProductId &&
+                    saved.ProductNameSnapshot == incoming.ProductNameSnapshot && saved.UnitSnapshot == incoming.UnitSnapshot &&
+                    saved.QuantityMilliUnits == incoming.QuantityMilliUnits)))
+                throw new BusinessOperationConflictException("La compra ya existe con el mismo identificador y otros datos.");
+            return;
+        }
+        foreach (var line in payload.Lines)
+            if (!await context.Products.AnyAsync(item => item.ProductId == line.ProductId, ct))
+                throw new BusinessOperationConflictException("Un producto de la compra importada no existe.");
+        context.Purchases.Add(new PurchaseEntity { OperationId = payload.OperationId,
+            OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor });
+        context.PurchaseLines.AddRange(payload.Lines.Select(line => new PurchaseLineEntity
+        {
+            OperationId = payload.OperationId, LineNumber = line.LineNumber, ProductId = line.ProductId,
+            ProductNameSnapshot = line.ProductNameSnapshot, UnitSnapshot = line.UnitSnapshot,
+            QuantityMilliUnits = line.QuantityMilliUnits
+        }));
+    }
+
+    private static async Task ApplyImportedSaleAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportSalePayload>(json);
+        if (payload.OperationId == Guid.Empty || payload.OccurredAtUtc.Kind != DateTimeKind.Utc ||
+            payload.TotalMinorUnits < 0 || payload.Lines.Count == 0 ||
+            payload.Lines.Select(item => item.LineNumber).Distinct().Count() != payload.Lines.Count ||
+            payload.Lines.Any(item => item.LineNumber < 0 || item.ProductId == Guid.Empty || item.QuantityMilliUnits <= 0 ||
+                item.SalePriceMinorUnits < 0 || item.LineTotalMinorUnits < 0) ||
+            payload.Lines.Sum(item => item.LineTotalMinorUnits) != payload.TotalMinorUnits)
+            throw new BusinessOperationConflictException("La venta importada está incompleta o contiene importes inválidos.");
+        if (!await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct))
+            throw new BusinessOperationConflictException("No existe la cuenta central elegida como responsable de esta venta.");
+        if (payload.CustomerId is Guid customerId && !await context.Customers.AnyAsync(item => item.CustomerId == customerId, ct))
+            throw new BusinessOperationConflictException("El cliente de la venta importada no existe.");
+        var existing = await context.Sales.SingleOrDefaultAsync(item => item.OperationId == payload.OperationId, ct);
+        if (existing is not null)
+        {
+            var lines = await context.SaleLines.AsNoTracking().Where(item => item.OperationId == payload.OperationId).ToListAsync(ct);
+            if (existing.OccurredAtUtc != payload.OccurredAtUtc || existing.ActorUserId != actor ||
+                existing.TotalMinorUnits != payload.TotalMinorUnits || existing.IsCredit != payload.IsCredit ||
+                existing.CustomerId != payload.CustomerId || lines.Count != payload.Lines.Count ||
+                payload.Lines.Any(incoming => !lines.Any(saved => saved.LineNumber == incoming.LineNumber &&
+                    saved.ProductId == incoming.ProductId && saved.ProductNameSnapshot == incoming.ProductNameSnapshot &&
+                    saved.UnitSnapshot == incoming.UnitSnapshot && saved.QuantityMilliUnits == incoming.QuantityMilliUnits &&
+                    saved.SalePriceMinorUnits == incoming.SalePriceMinorUnits && saved.LineTotalMinorUnits == incoming.LineTotalMinorUnits)))
+                throw new BusinessOperationConflictException("La venta ya existe con el mismo identificador y otros datos.");
+            return;
+        }
+        foreach (var line in payload.Lines)
+            if (!await context.Products.AnyAsync(item => item.ProductId == line.ProductId, ct))
+                throw new BusinessOperationConflictException("Un producto de la venta importada no existe.");
+        context.Sales.Add(new SaleEntity { OperationId = payload.OperationId, OccurredAtUtc = payload.OccurredAtUtc,
+            ActorUserId = actor, TotalMinorUnits = payload.TotalMinorUnits, IsCredit = payload.IsCredit,
+            CustomerId = payload.CustomerId });
+        context.SaleLines.AddRange(payload.Lines.Select(line => new SaleLineEntity
+        {
+            OperationId = payload.OperationId, LineNumber = line.LineNumber, ProductId = line.ProductId,
+            ProductNameSnapshot = line.ProductNameSnapshot, UnitSnapshot = line.UnitSnapshot,
+            QuantityMilliUnits = line.QuantityMilliUnits, SalePriceMinorUnits = line.SalePriceMinorUnits,
+            LineTotalMinorUnits = line.LineTotalMinorUnits
+        }));
+    }
+
+    private static async Task ApplyImportedReceivableAsync(LocalDbContext context, string json, CancellationToken ct)
+    {
+        var payload = Read<InitialImportReceivable>(json);
+        if (payload.OperationId == Guid.Empty || payload.CustomerId == Guid.Empty || payload.OriginalAmountMinorUnits < 0 ||
+            payload.OutstandingMinorUnits < 0 || payload.OutstandingMinorUnits > payload.OriginalAmountMinorUnits ||
+            payload.DueAtUtc.Kind != DateTimeKind.Utc)
+            throw new BusinessOperationConflictException("La cuenta por cobrar importada contiene datos inválidos.");
+        var existing = await context.Receivables.SingleOrDefaultAsync(item => item.OperationId == payload.OperationId, ct);
+        if (existing is not null)
+        {
+            if (existing.CustomerId != payload.CustomerId || existing.OriginalAmountMinorUnits != payload.OriginalAmountMinorUnits ||
+                existing.OutstandingMinorUnits != payload.OutstandingMinorUnits || existing.DueAtUtc != payload.DueAtUtc)
+                throw new BusinessOperationConflictException("La cuenta por cobrar ya existe con datos diferentes.");
+            return;
+        }
+        if (!await context.Sales.AnyAsync(item => item.OperationId == payload.OperationId, ct) ||
+            !await context.Customers.AnyAsync(item => item.CustomerId == payload.CustomerId, ct))
+            throw new BusinessOperationConflictException("Falta la venta o el cliente relacionado con la cuenta por cobrar.");
+        context.Receivables.Add(new ReceivableEntity { OperationId = payload.OperationId, CustomerId = payload.CustomerId,
+            OriginalAmountMinorUnits = payload.OriginalAmountMinorUnits, OutstandingMinorUnits = payload.OutstandingMinorUnits,
+            DueAtUtc = payload.DueAtUtc });
+    }
+
+    private static async Task ApplyImportedMovementAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportMovementPayload>(json);
+        if (payload.MovementId == Guid.Empty || payload.OperationId == Guid.Empty || payload.LineNumber < 0 ||
+            payload.QuantityMilliUnits <= 0 || payload.OccurredAtUtc.Kind != DateTimeKind.Utc ||
+            !Enum.IsDefined(typeof(InventoryMovementType), payload.Type))
+            throw new BusinessOperationConflictException("El movimiento importado contiene datos inválidos.");
+        if (!await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct))
+            throw new BusinessOperationConflictException("No existe la cuenta central elegida como responsable del movimiento.");
+        if (payload.ProductId is Guid productId && !await context.Products.AnyAsync(item => item.ProductId == productId, ct))
+            throw new BusinessOperationConflictException("El producto del movimiento importado no existe.");
+        var sameLine = await context.InventoryMovements.SingleOrDefaultAsync(item =>
+            item.OperationId == payload.OperationId && item.LineNumber == payload.LineNumber, ct);
+        if (sameLine is not null)
+        {
+            if (sameLine.ProductId != payload.ProductId || sameLine.ProductNameSnapshot != payload.ProductNameSnapshot ||
+                sameLine.UnitSnapshot != payload.UnitSnapshot || sameLine.Type != payload.Type ||
+                sameLine.QuantityMilliUnits != payload.QuantityMilliUnits || sameLine.Reason != payload.Reason ||
+                sameLine.OccurredAtUtc != payload.OccurredAtUtc || sameLine.ActorUserId != actor)
+                throw new BusinessOperationConflictException("Ya existe un movimiento para la misma operación y renglón con datos diferentes.");
+            if (sameLine.MovementId != payload.MovementId)
+            {
+                if (await context.InventoryMovements.AnyAsync(item => item.MovementId == payload.MovementId, ct))
+                    throw new BusinessOperationConflictException("El identificador original del movimiento ya pertenece a otro registro.");
+                await context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE \"InventoryMovements\" SET \"MovementId\" = {payload.MovementId} WHERE \"MovementId\" = {sameLine.MovementId}", ct);
+            }
+            return;
+        }
+        if (await context.InventoryMovements.AnyAsync(item => item.MovementId == payload.MovementId, ct))
+            throw new BusinessOperationConflictException("El identificador del movimiento ya pertenece a otro registro.");
+        context.InventoryMovements.Add(new InventoryMovementEntity { MovementId = payload.MovementId,
+            OperationId = payload.OperationId, LineNumber = payload.LineNumber, ProductId = payload.ProductId,
+            ProductNameSnapshot = payload.ProductNameSnapshot, UnitSnapshot = payload.UnitSnapshot,
+            Type = payload.Type, QuantityMilliUnits = payload.QuantityMilliUnits, Reason = payload.Reason,
+            OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor });
+    }
+
+    private static async Task ApplyImportedPaymentAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportPaymentPayload>(json);
+        if (payload.PaymentId == Guid.Empty || payload.OperationId == Guid.Empty || payload.AmountMinorUnits <= 0 ||
+            payload.OccurredAtUtc.Kind != DateTimeKind.Utc ||
+            !await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct))
+            throw new BusinessOperationConflictException("El pago importado contiene datos inválidos o un responsable inexistente.");
+        var existing = await context.Payments.SingleOrDefaultAsync(item => item.PaymentId == payload.PaymentId, ct);
+        if (existing is not null)
+        {
+            if (existing.OperationId != payload.OperationId || existing.ActorUserId != actor ||
+                existing.AmountMinorUnits != payload.AmountMinorUnits || existing.OccurredAtUtc != payload.OccurredAtUtc)
+                throw new BusinessOperationConflictException("El pago ya existe con el mismo identificador y otros datos.");
+            return;
+        }
+        if (!await context.Receivables.AnyAsync(item => item.OperationId == payload.OperationId, ct))
+            throw new BusinessOperationConflictException("La cuenta por cobrar del pago importado no existe.");
+        context.Payments.Add(new PaymentEntity { PaymentId = payload.PaymentId, OperationId = payload.OperationId,
+            ActorUserId = actor, AmountMinorUnits = payload.AmountMinorUnits, OccurredAtUtc = payload.OccurredAtUtc });
+    }
+
+    private static async Task ApplyImportedDiscrepancyAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportDiscrepancyPayload>(json);
+        if (payload.DiscrepancyId == Guid.Empty || payload.OperationId == Guid.Empty || payload.ProductId == Guid.Empty ||
+            payload.ShortageMilliUnits <= 0 || payload.CreatedAtUtc.Kind != DateTimeKind.Utc ||
+            !await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct) ||
+            !await context.Products.AnyAsync(item => item.ProductId == payload.ProductId, ct))
+            throw new BusinessOperationConflictException("La diferencia de inventario importada contiene datos inválidos o referencias faltantes.");
+        var existing = await context.InventoryDiscrepancies.SingleOrDefaultAsync(item => item.DiscrepancyId == payload.DiscrepancyId, ct);
+        if (existing is not null)
+        {
+            if (existing.OperationId != payload.OperationId || existing.ProductId != payload.ProductId ||
+                existing.ActorUserId != actor || existing.ShortageMilliUnits != payload.ShortageMilliUnits ||
+                existing.CreatedAtUtc != payload.CreatedAtUtc || existing.IsResolved != payload.IsResolved)
+                throw new BusinessOperationConflictException("La diferencia de inventario ya existe con datos diferentes.");
+            return;
+        }
+        context.InventoryDiscrepancies.Add(new InventoryDiscrepancyEntity { DiscrepancyId = payload.DiscrepancyId,
+            OperationId = payload.OperationId, ProductId = payload.ProductId, ActorUserId = actor,
+            ShortageMilliUnits = payload.ShortageMilliUnits, CreatedAtUtc = payload.CreatedAtUtc, IsResolved = payload.IsResolved });
     }
 
     private static T Read<T>(string json) => JsonSerializer.Deserialize<T>(json, JsonOptions)

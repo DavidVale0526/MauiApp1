@@ -53,6 +53,7 @@
                         <Button x:Name="SynchronizeButton" Text="Sincronizar ahora" Clicked="OnSynchronizeClicked" Style="{StaticResource PrimaryButton}" />
                         <Button Text="Actualizar estado" Clicked="OnRefreshClicked" Style="{StaticResource SecondaryButton}" />
                         <Button x:Name="ReviewConflictsButton" Text="Revisar conflictos" Clicked="OnReviewConflictsClicked" Style="{StaticResource SecondaryButton}" />
+                        <Button x:Name="InitialImportButton" Text="Importar datos previos de este dispositivo" Clicked="OnInitialImportClicked" Style="{StaticResource SecondaryButton}" />
                         <Button Text="Vincular o desvincular dispositivo" Clicked="OnDevicePairingClicked" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
