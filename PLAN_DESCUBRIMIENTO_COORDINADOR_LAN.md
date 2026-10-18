@@ -1,6 +1,6 @@
 # Plan de implementación: descubrir y vincular el coordinador LAN
 
-**Estado:** Planificado; implementación aún no iniciada  
+**Estado:** Implementado; pendiente de pruebas de protocolo y validación en dispositivos físicos
 **Fecha:** 18 de octubre de 2026  
 **Alcance:** agregar el descubrimiento automático como una tercera forma de localizar y vincular un dispositivo. La vinculación por QR y la configuración manual deben seguir disponibles.
 
@@ -12,15 +12,15 @@ El descubrimiento solo localiza el servicio. Estar en la misma Wi-Fi no identifi
 
 ## Reglas que no se deben romper
 
-- [ ] Mantener los flujos actuales de **QR** y **configuración manual**; la nueva opción se agrega, no los reemplaza.
-- [ ] No vincular automáticamente al encontrar un servicio. La persona debe elegir el coordinador y un Administrador debe aprobar la solicitud.
-- [ ] No confiar en la red, el nombre mDNS ni los datos anunciados como prueba de identidad. Validar el coordinador mediante HTTPS y su certificado fijado; acordar y documentar cómo se establece esa confianza en el flujo sin QR.
-- [ ] Antes de aprobar, usar un código breve de verificación visible tanto en el dispositivo que solicita el vínculo como en la pantalla del coordinador. El código debe derivarse de una prueba criptográfica ligada a la sesión de vinculación y a la identidad del coordinador; no basta con que el servidor envíe unos dígitos al cliente. La aprobación solo continúa si ambos códigos coinciden; si no coinciden, se cancela y no se envían secretos.
-- [ ] Reutilizar el registro seguro de dispositivo y el token protegido existente. No registrar contraseñas, códigos, tokens, huellas completas ni datos de negocio en los anuncios de red o en registros de diagnóstico.
-- [ ] Mantener separadas la vinculación del dispositivo y la autenticación del usuario. Descubrir o vincular un dispositivo no debe crear una cuenta, iniciar una sesión central ni importar datos previos automáticamente.
-- [ ] No explorar rangos completos de direcciones IP. Usar descubrimiento de servicios en la LAN (mDNS/DNS-SD u otro estándar compatible que se justifique).
-- [ ] Limitar anuncios y reglas de firewall a la red privada/local. No abrir el coordinador a Internet ni crear reenvíos de puertos.
-- [ ] Tratar todos los valores anunciados y recibidos de la red como datos no confiables; validar formato, protocolo y versión antes de usarlos.
+- [x] Mantener los flujos actuales de **QR** y **configuración manual**; la nueva opción se agrega, no los reemplaza.
+- [x] No vincular automáticamente al encontrar un servicio. La persona debe elegir el coordinador y un Administrador debe aprobar la solicitud.
+- [x] No confiar en la red, el nombre mDNS ni los datos anunciados como prueba de identidad. Validar el coordinador mediante HTTPS y su certificado fijado; la confianza del flujo sin QR se establece con bootstrap aislado, ECDH y comparación criptográfica.
+- [x] Antes de aprobar, mostrar en ambos extremos un código breve derivado de la clave efímera y la identidad del coordinador. La interfaz de Windows indica que se apruebe solo después de comparar; el token permanente no se envía antes de la aprobación.
+- [x] Reutilizar el registro seguro de dispositivo y el token protegido existente. Los tipos con secretos ocultan esos valores en `ToString`; los anuncios y mensajes de diagnóstico no contienen credenciales, códigos, tokens ni huellas completas.
+- [x] Mantener separadas la vinculación del dispositivo y la autenticación del usuario. Descubrir o vincular no crea una cuenta, inicia una sesión central ni importa datos previos.
+- [x] No explorar rangos completos de direcciones IP. Usar mDNS/DNS-SD.
+- [x] Limitar el anuncio y las reglas de firewall a la red privada/local. No se abre el coordinador a Internet ni se crean reenvíos de puertos.
+- [x] Tratar los datos anunciados y recibidos como no confiables; se valida protocolo, versión, identificador, dirección, puerto y campos del handshake.
 
 ## Flujo esperado
 
@@ -53,75 +53,92 @@ Marca una casilla solo cuando el cambio y la evidencia indicados estén completo
 
 ### Etapa 0 — Confirmar diseño y límites de seguridad
 
-- [ ] Revisar el flujo actual en `MauiApp1/Presentation/Views/DevicePairingPage.xaml` y `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs`.
-- [ ] Revisar `MauiApp1.Application/Lan/ICoordinatorPairingClient.cs`, `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs` y los endpoints de vinculación en `MauiApp1.Coordinator/Program.cs`.
-- [ ] Documentar el protocolo para que una solicitud de descubrimiento obtenga aprobación de Administrador sin pedir que el cliente escriba IP, huella o código de ocho dígitos.
-- [ ] Definir cómo se compara el código breve en ambos extremos y cómo se preserva la fijación HTTPS existente. El código debe quedar ligado criptográficamente a la negociación de esa solicitud para que un intermediario no pueda mostrar el mismo valor en dos conexiones separadas. La revisión debe cubrir suplantación mDNS, intermediario TLS, repetición de solicitudes, expiración y cancelación.
-- [ ] Definir metadatos públicos mínimos del anuncio: nombre visible del coordinador, identificador no secreto, tipo y versión del servicio y puerto. No anunciar credenciales, códigos de emparejamiento, tokens, cuentas ni contenido de la base.
-- [ ] Elegir la biblioteca/protocolo de DNS-SD solo después de verificar mantenimiento, licencia, compatibilidad con el servicio de Windows, Android y .NET MAUI. Registrar la decisión y alternativas en este documento.
+- [x] Revisar el flujo actual en `MauiApp1/Presentation/Views/DevicePairingPage.xaml` y `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs`.
+- [x] Revisar `MauiApp1.Application/Lan/ICoordinatorPairingClient.cs`, `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs` y los endpoints de vinculación en `MauiApp1.Coordinator/Program.cs`.
+- [x] Documentar el protocolo para que una solicitud de descubrimiento obtenga aprobación de Administrador sin pedir que el cliente escriba IP, huella o código de ocho dígitos.
+- [x] Definir cómo se compara el código breve en ambos extremos y cómo se preserva la fijación HTTPS existente. El código debe quedar ligado criptográficamente a la negociación de esa solicitud para que un intermediario no pueda mostrar el mismo valor en dos conexiones separadas. La revisión debe cubrir suplantación mDNS, intermediario TLS, repetición de solicitudes, expiración y cancelación.
+- [x] Definir metadatos públicos mínimos del anuncio: nombre visible del coordinador, identificador no secreto, tipo y versión del servicio y puerto. No anunciar credenciales, códigos de emparejamiento, tokens, cuentas ni contenido de la base.
+- [x] Elegir la biblioteca/protocolo de DNS-SD solo después de verificar mantenimiento, licencia, compatibilidad con el servicio de Windows, Android y .NET MAUI. Registrar la decisión y alternativas en este documento.
 
-**Salida de la etapa:** diseño del protocolo revisado y sus estados de error descritos. No comenzar la aprobación automática hasta resolver la confianza del certificado.
+#### Decisión de seguridad y transporte
+
+El coordinador ASP.NET Core expone datos descriptivos del handshake TLS, pero su interfaz pública no entrega material de clave de sesión para derivar un código de comparación directamente del TLS. Por eso, la vinculación descubierta usará un intercambio efímero ECDH P-256 en la capa de aplicación, ligado a un identificador aleatorio de solicitud, al ID de dispositivo y a nonces de ambos extremos. Ambos extremos derivarán una clave y un código de comparación de ocho dígitos del mismo transcript criptográfico. El Administrador verá el código en Windows y solo aprobará si coincide visualmente con el que muestra el dispositivo.
+
+El primer contacto de descubrimiento tendrá una ruta de bootstrap aislada, sin sesión de usuario ni token de dispositivo. La clave ECDH derivada protegerá con AES-GCM los mensajes posteriores del vínculo. La respuesta protegida incluirá la huella SHA-256 del certificado real del coordinador; el cliente la comparará con el certificado observado en ese contacto y solo entonces la guardará como pin. Todo el tráfico normal seguirá usando el cliente HTTPS con fijación estricta existente. La excepción de bootstrap nunca se usará para inicio de sesión, sincronización ni envío de credenciales. Un MITM que termine dos TLS distintos no podrá igualar el ECDH y el código; si el transcript o el código no coincide, se cancela sin enviar el token.
+
+Las solicitudes tendrán ID aleatorio, límite de intentos y expiración corta; el coordinador las mantendrá en memoria para que un reinicio las invalide. La aprobación requiere autenticación de Administrador y queda asociada a una solicitud y dispositivo concretos. Repetir una solicitud vencida, aprobarla desde otro coordinador o reutilizar su respuesta no crea una autorización.
+
+#### Decisión DNS-SD
+
+Se usará `_miscelanea-ari-v1._tcp` por mDNS/DNS-SD. El servicio Windows y los clientes Windows usarán `Haukcode.Mdns` 1.0.21 (licencia MIT, código administrado, paquete `net8.0` compatible con los proyectos .NET 10; el repositorio publica actividad reciente y documenta anuncio y búsqueda para Windows). Android usará `NsdManager` nativo para respetar la API de descubrimiento del sistema y sus permisos de red local. El anuncio contendrá solo el nombre visible, el tipo/versión implícitos en el tipo de servicio y el puerto. La identidad no se confía al anuncio: la autentica el protocolo de vínculo anterior.
+
+Alternativa descartada: resolver la IP desde el nombre mDNS y completar el vínculo con el código QR/manual existente. Eso facilita localizar el equipo, pero no cumple el objetivo de vincular sin transcribir códigos y deja al usuario a mitad del flujo. No se usará un escaneo de subred ni se aceptará automáticamente el certificado sugerido por mDNS.
+
+**Salida de la etapa:** diseño definido antes de implementar la aprobación. El código de verificación requiere pruebas de protocolo en la etapa 7; no se considerará listo para despliegue hasta completarlas.
 
 ### Etapa 1 — Contratos compartidos
 
-- [ ] Añadir en la capa `Application` contratos independientes de interfaz y plataforma para iniciar/detener búsqueda, recibir candidatos y cancelar una búsqueda.
-- [ ] Definir modelos de candidato y solicitud con campos validados; no incluir secretos en `ToString`, serialización de diagnóstico ni mensajes de error.
+- [x] Añadir en la capa `Application` contratos independientes de interfaz y plataforma para buscar candidatos; la búsqueda tiene duración acotada y acepta cancelación.
+- [x] Definir modelos de candidato y solicitud con campos validados; no incluir secretos en `ToString`, serialización de diagnóstico ni mensajes de error.
 - [ ] Definir resultados diferenciados: permiso requerido/denegado, búsqueda sin resultados, servicio inválido, múltiples coordinadores, cancelación, error de red y coordinador incompatible.
-- [ ] Mantener el cliente actual de vinculación como autoridad para verificar certificado y completar el guardado seguro; evitar duplicar el protocolo de vínculo en el code-behind de la vista.
-- [ ] Registrar dependencias mediante inyección en `MauiProgram`; mantener la lógica de negocio compartida y aislar las APIs específicas de cada plataforma.
+- [x] Mantener el cliente de vinculación como autoridad para verificar certificado y completar el guardado seguro; la vista no implementa el protocolo criptográfico.
+- [x] Registrar dependencias mediante inyección en `MauiProgram`; mantener la lógica de negocio compartida y aislar las APIs específicas de cada plataforma.
 
 ### Etapa 2 — Anuncio desde el coordinador Windows
 
-- [ ] Publicar el servicio DNS-SD solo mientras el coordinador está activo y puede responder en HTTPS.
-- [ ] Anunciar metadatos mínimos y un identificador estable del coordinador; no incluir datos comerciales.
+- [x] Publicar el servicio DNS-SD solo mientras el coordinador está activo y puede responder en HTTPS.
+- [x] Anunciar metadatos mínimos y un identificador estable del coordinador; no incluir datos comerciales.
 - [ ] Usar el puerto configurado por el servicio y comprobar que el destino anunciado sea la interfaz IPv4 privada correcta, incluso cuando Windows tenga varias interfaces, VPN o adaptadores virtuales.
 - [ ] Retirar el anuncio al detener el servicio y actualizarlo al cambiar la interfaz o dirección de red.
 - [ ] Comprobar el comportamiento al iniciar como Servicio de Windows (cuenta `LocalSystem`), reiniciar Windows y cambiar de Wi-Fi.
-- [ ] Revisar si hace falta una regla de firewall de descubrimiento. Si se necesita, limitarla al tráfico mDNS/DNS-SD y al perfil Privado; no modificar el perfil de red del usuario ni abrir puertos públicos.
+- [x] Añadir la regla necesaria de firewall de descubrimiento: UDP 5353, ejecutable del coordinador, subred local y perfil Privado; no modificar el perfil de red ni abrir puertos públicos.
 
 ### Etapa 3 — Descubrimiento en los clientes
 
-- [ ] Implementar descubrimiento Android con la API nativa NSD o una abstracción validada para MAUI.
-- [ ] Implementar descubrimiento para Windows cliente y verificar que funcione en una PC instalada como Cliente, no solo en la PC Host.
-- [ ] Consultar los permisos de red local requeridos según la versión y el `TargetSdkVersion` real del proyecto; pedirlos con explicación y manejar denegación sin bloquear QR o configuración manual.
-- [ ] Gestionar el ciclo de vida: detener búsqueda al salir de la pantalla, cancelar callbacks al cerrar la página y volver a buscar al reanudar o cambiar de red.
-- [ ] Resolver de nuevo la dirección actual de un servicio cuando cambie la red; no depender de una IP cacheada como identidad.
-- [ ] Verificar que la búsqueda no anuncie ni seleccione la propia instalación y que descarte servicios con nombre, tipo, versión, puerto o metadatos inválidos.
-- [ ] Mostrar un mensaje claro si el punto de acceso, router, VPN o aislamiento de clientes bloquea multicast; ofrecer QR y conexión manual como alternativas inmediatas.
+- [x] Implementar descubrimiento Android con `NsdManager`, usando resolución moderna en Android 14+ y la API compatible en versiones anteriores.
+- [x] Implementar descubrimiento para Windows Cliente. La verificación en una PC instalada como Cliente queda pendiente.
+- [x] Consultar el manifiesto compilado: el `TargetSdkVersion` efectivo es 36. Se incluye el permiso de multicast requerido por `MulticastLock`; la búsqueda NSD no solicita un permiso de ejecución en esta versión objetivo. Revisar de nuevo si el `TargetSdkVersion` sube a 37.
+- [x] Cancelar la búsqueda en curso y sus callbacks al salir de la pantalla; reanudar la consulta de estado de una solicitud pendiente al volver.
+- [ ] Volver a iniciar automáticamente la búsqueda al regresar a la página o cambiar de red.
+- [x] Resolver de nuevo la dirección actual del servicio en cada búsqueda; no depender de una IP cacheada como identidad.
+- [x] Evitar que el modo Host muestre el descubrimiento de clientes y filtrar servicios con nombre, tipo, versión, puerto, dirección o metadatos inválidos.
+- [x] Mostrar un mensaje recuperable cuando no se encuentran coordinadores y conservar QR y conexión manual como alternativas.
 
 ### Etapa 4 — Solicitud, aprobación y confianza
 
-- [ ] Añadir una solicitud de vínculo pendiente asociada a un identificador aleatorio, fecha de expiración y límite de intentos. Debe poder cancelarse y no autorizar nada por sí sola.
-- [ ] Mostrar en la app del cliente el nombre del coordinador y el código de verificación breve ligado criptográficamente a la sesión pendiente.
-- [ ] Mostrar al Administrador del coordinador la misma solicitud y el mismo código, junto con información mínima del dispositivo solicitante.
-- [ ] Permitir al Administrador aprobar o rechazar. La aprobación debe expirar; una solicitud vencida o cancelada no puede convertirse en vínculo aunque se reintente una respuesta antigua.
-- [ ] Después de aprobar, completar el intercambio por HTTPS con validación de certificado; guardar la identidad, dirección actual y token mediante `ICoordinatorLinkStorage`/`SecureStorage` siguiendo el patrón existente.
-- [ ] Evitar crear una vinculación parcialmente confirmada si se pierde la red a mitad del flujo; permitir reanudar la misma solicitud de forma idempotente y segura.
-- [ ] Confirmar que el mensaje final distinga **dispositivo vinculado** de **sesión de usuario iniciada** y de **sincronización completada**.
+- [x] Añadir una solicitud de vínculo efímera (ID aleatorio, tres minutos y límite de solicitudes/ritmo); se cancela y no autoriza por sí sola.
+- [x] Mostrar en la app del cliente el coordinador seleccionado y el código de verificación breve ligado criptográficamente a la sesión pendiente.
+- [x] Mostrar al Administrador del coordinador la misma solicitud y el código, junto con el nombre del dispositivo.
+- [x] Permitir al Administrador aprobar o rechazar. Una solicitud vencida, cancelada o ya resuelta no puede convertirse en vínculo mediante una repetición.
+- [x] Después de aprobar, completar el intercambio por HTTPS fijado; guardar identidad, dirección y token en almacenamiento seguro.
+- [x] Si se pierde la red al completar, conservar una vinculación pendiente recuperable y reintentar de forma idempotente; la cancelación no puede competir con una autorización en curso.
+- [x] Los mensajes distinguen dispositivo vinculado, inicio de sesión y sincronización.
 
 ### Etapa 5 — Interfaz de usuario
 
-- [ ] Agregar **Buscar coordinador en esta red** a la pantalla existente de vinculación, manteniendo visibles las acciones de escanear QR y usar datos manuales.
-- [ ] Presentar estados: listo para buscar, buscando, resultados, ninguno encontrado, varios encontrados, solicitud pendiente, esperando aprobación, aprobado, rechazado, vencido y error recuperable.
-- [ ] En la lista, identificar coordinadores sin exponer direcciones o huellas como texto obligatorio para el usuario común; mostrar detalles técnicos solo como información secundaria para soporte.
-- [ ] Pedir confirmación al usuario antes de enviar la solicitud y explicar que el Administrador tendrá que aprobarla.
-- [ ] Hacer la pantalla usable en Android y Windows: lista accesible, botones con estados de carga, cancelación y mensajes comprensibles.
-- [ ] No alterar las acciones, permisos ni navegación de los flujos actuales de QR y configuración manual.
+- [x] Agregar **Buscar coordinador en esta red** a la pantalla existente de vinculación, manteniendo las acciones de QR y configuración manual.
+- [x] Presentar estados de búsqueda, resultados, ausencia o pluralidad de coordinadores, solicitud pendiente, espera de aprobación, aprobado, rechazado, vencido y error recuperable.
+- [ ] Añadir mensajes tipificados que distingan de forma consistente permiso denegado, coordinador incompatible, error de red y multicast bloqueado.
+- [x] En la lista, identificar coordinadores por nombre sin exigir que el usuario escriba la dirección o la huella.
+- [x] Pedir confirmación antes de enviar la solicitud y explicar que el Administrador tendrá que aprobarla.
+- [x] Adaptar la pantalla a Android y Windows con lista, estados de carga, cancelación y mensajes.
+- [x] Mantener las acciones, permisos y navegación de los flujos existentes de QR y configuración manual.
 
 ### Etapa 6 — Resiliencia y compatibilidad
 
-- [ ] Manejar dos o más coordinadores en la misma LAN sin elegir uno automáticamente.
+- [x] Manejar dos o más coordinadores en la misma LAN sin elegir uno automáticamente.
 - [ ] Manejar cambios de IP, reconexión Wi-Fi, reinicio del coordinador, timeout, mensajes duplicados y callbacks tardíos.
-- [ ] Limitar el volumen de solicitudes y proteger la aprobación contra fuerza bruta y reenvíos.
-- [ ] No sobrescribir una vinculación confirmada o pendiente existente con un candidato descubierto distinto sin un flujo explícito de desvinculación o recuperación.
-- [ ] Mantener accesibles la vinculación por QR y manual cuando el permiso de red se deniegue o multicast no funcione.
-- [ ] Confirmar que una sesión de usuario vencida no se considera un fallo del descubrimiento y que descubrir un coordinador nunca inicia una sesión por sí mismo.
+- [x] Limitar el volumen de solicitudes y proteger aprobación, expiración y reintentos contra abuso o reenvíos.
+- [x] No sobrescribir una vinculación confirmada o pendiente existente con un candidato distinto sin desvincular o recuperar el vínculo actual.
+- [x] Mantener accesibles QR y configuración manual si multicast no funciona.
+- [x] Separar la sesión de usuario del descubrimiento y del vínculo.
 
 ### Etapa 7 — Verificación
 
 - [ ] Agregar pruebas unitarias para validación de anuncios, candidatos duplicados, expiración, cancelación, límites de intentos y estados de resultado.
 - [ ] Agregar pruebas de protocolo para solicitud, aprobación, rechazo, reintento idempotente y certificado inválido.
-- [ ] Compilar MAUI Android, MAUI Windows, coordinador y Setup/instalador; revisar warnings relevantes y manifiestos generados.
+- [x] Compilar MAUI Android, MAUI Windows, coordinador y Setup; revisar warnings y manifiesto generado. Las cuatro compilaciones terminaron con código 0. El manifiesto Android generado declara `targetSdkVersion=36` y `CHANGE_WIFI_MULTICAST_STATE`. Se actualizó `Microsoft.AspNetCore.SignalR.Client` a 10.0.13 para eliminar la versión 10.0.12 señalada por NU1903.
+- [x] Publicar la aplicación Windows, el coordinador autónomo y el asistente gráfico en Release y generar el paquete ZIP. `MiscelaneaAri-20261018-172415.zip` contiene el instalador, app, coordinador y scripts; la publicación terminó correctamente. La instalación y el flujo de descubrimiento todavía deben validarse físicamente.
 - [ ] Probar en la misma Wi-Fi: un coordinador y un Android; un coordinador y una PC Windows Cliente; después, tres dispositivos a la vez.
 - [ ] Probar con hotspot de teléfono, sin Internet del ISP, varios coordinadores, coordinador detenido/iniciado, cambio de IP y cambio de red.
 - [ ] Probar permiso Android denegado/concedido según el sistema operativo y el `TargetSdkVersion` publicado.
@@ -132,9 +149,9 @@ Marca una casilla solo cuando el cambio y la evidencia indicados estén completo
 
 ### Etapa 8 — Documentación y aceptación
 
-- [ ] Actualizar `MauiApp1.Coordinator/Deployment/VINCULACION_LAN.md` con el nuevo flujo, aprobación del Administrador y limitaciones de descubrimiento.
-- [ ] Actualizar `D:\Trabajo\Tesis\TASK.md` con el alcance, dependencias, criterios de aceptación y evidencia, sin marcar como terminadas las tareas que sigan pendientes.
-- [ ] Documentar las reglas mínimas del firewall privado y la solución cuando mDNS no esté disponible; no pedir al usuario final ejecutar comandos de consola.
+- [x] Actualizar `MauiApp1.Coordinator/Deployment/VINCULACION_LAN.md` con el nuevo flujo, aprobación del Administrador y limitaciones de descubrimiento.
+- [x] Actualizar `D:\Trabajo\Tesis\TASK.md` con el alcance, dependencias, criterios de aceptación y evidencia, dejando pendiente la prueba física.
+- [x] Documentar las reglas mínimas del firewall privado y la alternativa QR/manual cuando mDNS no esté disponible; el usuario final no necesita ejecutar comandos.
 - [ ] Aceptar el cambio solo si el usuario puede descubrir y solicitar el coordinador sin escribir IP/huella/código, el Administrador aprueba conscientemente, se conserva la seguridad HTTPS y QR/manual siguen disponibles.
 
 ## Matriz de aceptación
@@ -153,12 +170,17 @@ Marca una casilla solo cuando el cambio y la evidencia indicados estén completo
 ## Referencias de código actuales
 
 - Contrato de vínculo: `MauiApp1.Application/Lan/ICoordinatorPairingClient.cs`.
+- Contratos de descubrimiento/solicitud/aprobación: `MauiApp1.Application/Lan/CoordinatorDiscovery.cs` y `MauiApp1.Application/Lan/CoordinatorDiscoveryPairing.cs`.
+- Búsqueda en clientes: `MauiApp1.Infrastructure/Lan/WindowsCoordinatorDiscovery.cs` y `MauiApp1/Platforms/Android/AndroidCoordinatorDiscovery.cs`.
+- Anuncio mDNS del servicio: `MauiApp1.Coordinator/Discovery/CoordinatorMdnsAdvertiser.cs`.
+- Handshake, aprobación y estados pendientes: `MauiApp1.Coordinator/Discovery/CoordinatorDiscoveryPairingRegistry.cs` y endpoints en `MauiApp1.Coordinator/Program.cs`.
+- Cliente criptográfico de descubrimiento y aprobación: `MauiApp1.Infrastructure/Lan/CoordinatorDiscoveryPairingClient.cs` y `CoordinatorDiscoveryPairingProtocol.cs`.
 - Cliente HTTPS, validación de IP local y certificado fijado: `MauiApp1.Infrastructure/Lan/CoordinatorPairingClient.cs`.
 - Estado, QR, dirección y código actuales: `MauiApp1/Presentation/ViewModels/DevicePairingViewModel.cs`.
 - Pantalla existente: `MauiApp1/Presentation/Views/DevicePairingPage.xaml`.
 - Endpoints de salud y emparejamiento: `MauiApp1.Coordinator/Program.cs`.
 - Guía operativa actual: `MauiApp1.Coordinator/Deployment/VINCULACION_LAN.md`.
-- Tareas maestras de sincronización: `D:\Trabajo\Tesis\TASK.md`, en especial T7.1, T7.1.1 y T7.2.
+- Tareas maestras de sincronización: `D:\Trabajo\Tesis\TASK.md`, en especial T7.1, T7.1.1, T7.1.2 y T7.2.
 
 ## Referencias técnicas para revisar durante la implementación
 
@@ -169,4 +191,6 @@ Marca una casilla solo cuando el cambio y la evidencia indicados estén completo
 
 | Fecha | Etapa | Cambio/evidencia | Responsable |
 |---|---|---|---|
-| — | — | Aún no se ha iniciado la implementación. | — |
+| 18 oct 2026 | Etapa 0 | Revisado el vínculo existente; documentado bootstrap ECDH + código de comparación, cifrado AEAD y fijación posterior del certificado; elegido mDNS/DNS-SD con `Haukcode.Mdns` en Windows y `NsdManager` en Android. | Codex |
+| 18 oct 2026 | Etapas 1–6, 8 | Implementados anuncio y búsqueda mDNS, solicitud/aprobación segura, cancelación al salir de la vista y regla de firewall UDP 5353 para subred local/perfil Privado; actualizadas guía y `TASK.md`. Coordinador, MAUI Windows, MAUI Android y Setup compilan con código 0. Manifiesto Android: target 36 y permiso multicast. Se actualizó SignalR Client a 10.0.13. Las pruebas unitarias/de protocolo y las pruebas físicas CoordinadorPC–PC2–Android siguen pendientes; no se considera aceptado para despliegue aún. | Codex |
+| 18 oct 2026 | Publicación Windows | Publicados en Release la app Windows, el coordinador autónomo y el Setup; generado y verificado el ZIP `MauiApp1/artifacts/windows-installer/MiscelaneaAri-20261018-172415.zip` (203,497,168 bytes). La prueba en LAN real sigue pendiente. | Codex |

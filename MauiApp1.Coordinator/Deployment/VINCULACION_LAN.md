@@ -1,13 +1,28 @@
 # Vincular Windows y Android por la red local
 
-Este flujo prepara la autorización de dispositivos. El coordinador está instalado como Servicio de Windows y usa la base central importada desde Windows; la sincronización de cuentas y datos se incorporará después.
+Este flujo autoriza dispositivos para conectarse al coordinador LAN. El coordinador está instalado como Servicio de Windows y usa la base central del negocio. Vincular un dispositivo no crea una cuenta ni inicia sesión: después del vínculo, la persona inicia sesión con su cuenta central para sincronizar.
 
 ## Antes de usar la vinculación
 
-1. El servicio automático debe estar activo, con la base central y HTTPS funcionando en el puerto 5080.
-2. Conecta Windows y Android a la misma red del negocio. El perfil de red de Windows debe ser **Privada** para que la regla de firewall del coordinador permita conexiones entrantes. La regla del servicio solo se habilita para el perfil Privado. No se requiere Internet del proveedor.
-3. Usa la dirección IPv4 privada del equipo Windows, por ejemplo `https://192.168.1.10:5080`. El puerto debe coincidir con el configurado para el servicio. Reserva la IP en el router para mantener esa dirección.
-4. Copia la huella SHA-256 desde `coordinator-certificate-fingerprint.txt`, guardado junto a la base del coordinador (por defecto `C:\ProgramData\Miscelanea Ari\Coordinator`). Tiene 64 caracteres. No es el código temporal de ocho dígitos.
+1. El servicio automático debe estar activo, con la base central y HTTPS funcionando en el puerto configurado (5080 por defecto).
+2. Conecta Windows y los dispositivos a la misma red privada del negocio. El perfil de red de Windows debe ser **Privada**. El instalador habilita HTTPS del coordinador por TCP y descubrimiento mDNS por UDP 5353, ambos limitados al perfil Privado; mDNS también se restringe a la subred local. No se requiere Internet del proveedor.
+3. Si el router o punto de acceso bloquea multicast, o activa aislamiento entre clientes, la búsqueda puede no encontrar el coordinador. Usa QR o configuración manual como alternativa inmediata. No abras el coordinador a Internet ni configures reenvío de puertos.
+
+## Descubrir y solicitar el vínculo
+
+1. En Android o en una PC Windows instalada como **Cliente**, abre **Sincronización y conexión** y luego **Vincular dispositivo**.
+2. Pulsa **Buscar coordinador en esta red**, elige el coordinador del negocio y pulsa **Solicitar vínculo seguro**.
+3. Compara el código de ocho dígitos que aparece en ese dispositivo con el que aparece en la sección de solicitudes de Windows. La solicitud vence en tres minutos.
+4. En el coordinador, inicia sesión en la aplicación como Administrador. En **Vinculación por red local**, actualiza las solicitudes y aprueba solo después de comprobar que el código coincide. Si no coincide, rechaza la solicitud.
+5. El dispositivo completa el vínculo al recibir la aprobación. Después debe iniciar sesión con una cuenta central; la vinculación por sí sola no crea usuarios ni sincroniza.
+
+La búsqueda usa DNS-SD/mDNS para localizar el servicio. El anuncio solo contiene el nombre público, versión, puerto e identificador derivado del certificado; no contiene cuentas, contraseñas, códigos, tokens ni datos del negocio. La aplicación valida el coordinador por HTTPS y vincula el código de comparación a una negociación criptográfica efímera. La red y el nombre anunciado no se consideran prueba de confianza.
+
+Si Windows está configurado con el perfil **Público**, el firewall no permitirá el acceso LAN. Confirma en Configuración de Windows que es la red confiable del negocio y cámbiala a **Privada**; la aplicación no cambia ese ajuste automáticamente.
+
+## Alternativa: QR o configuración manual
+
+La búsqueda no reemplaza las formas existentes. Si mDNS no está disponible, puede usarse el QR o ingresarse la dirección y huella manualmente. Para esta alternativa, usa la dirección IPv4 privada del coordinador, por ejemplo `https://192.168.1.10:5080`, y la huella SHA-256 guardada en `coordinator-certificate-fingerprint.txt`, normalmente dentro de `C:\ProgramData\Miscelanea Ari\Coordinator`. La huella tiene 64 caracteres y no es el código temporal de ocho dígitos.
 
 ## Generar el código en Windows
 
@@ -40,12 +55,12 @@ Este flujo prepara la autorización de dispositivos. El coordinador está instal
 ## Preparar el coordinador sin usar la consola
 
 - Distribuye el paquete generado por `MauiApp1.Setup/build-windows-installer.ps1`. La persona elige **Usar esta PC como coordinador del negocio** y confirma la solicitud estándar de permisos de Windows. El asistente prepara la base vacía o importa una base existente, instala el servicio, crea el certificado HTTPS y habilita la regla de entrada solo para redes privadas. No se abre PowerShell ni se pide escribir comandos.
-- En cada PC secundaria se elige **Conectar esta PC a un coordinador existente**. Después, el Administrador vincula desde **Sincronización y conexión**. Android se instala como cliente y escanea el QR generado en Windows.
-- Esta PC está actualmente clasificada por Windows como perfil `Public`; por eso el firewall no acepta aún conexiones desde Android por esa Wi-Fi. Para usar el coordinador allí, confirma que es la red confiable del negocio y cambia su perfil en Configuración de Windows a `Privada` antes de emparejar dispositivos.
+- En cada PC secundaria se elige **Conectar esta PC a un coordinador existente**. Después, el dispositivo puede descubrir el coordinador desde **Sincronización y conexión** y solicitar aprobación; QR y conexión manual siguen disponibles. Android se instala como cliente.
+- Si Windows clasifica la red como `Public`, el firewall no acepta conexiones entrantes desde los otros dispositivos. Confirma que sea una red confiable y cambia su perfil en Configuración de Windows a `Private` antes de vincular.
 - No configures reenvío de puertos en el router ni expongas el coordinador a Internet.
 
 ## Actualizar una instalación existente
 
 - Para una instalación manual, publica primero la versión que se instalará y ejecuta `MauiApp1.Coordinator/Deployment/update-coordinator.ps1` desde Windows PowerShell 5.1 o posterior como Administrador (puerto predeterminado 5080; se puede indicar otro con `-Port`). Para el flujo normal, usa el asistente gráfico de Windows: solicita los permisos de Administrador y conserva la base con un respaldo automático.
 - El actualizador guarda una copia coherente SQLite de la base central y los binarios actuales antes de detener el servicio. Después reemplaza el paquete, inicia el servicio y comprueba `/health`; si falla, restaura los binarios anteriores e intenta reactivar el servicio.
-- Este equipo tiene preparada la publicación y una copia preventiva, pero el servicio todavía no se ha actualizado porque la sesión de desarrollo no tiene privilegios para controlarlo. No uses las nuevas rutas de sesión hasta ejecutar el actualizador y confirmar su mensaje de éxito.
+- Después de publicar una versión nueva, usa el asistente gráfico para actualizar el servicio con respaldo previo. El instalador añade o conserva la regla mDNS de UDP 5353 solo para la subred local y el perfil Privado. No uses la búsqueda automática hasta actualizar el coordinador y comprobar que el servicio inicia correctamente.

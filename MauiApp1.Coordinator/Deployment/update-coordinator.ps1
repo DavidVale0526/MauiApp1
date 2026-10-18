@@ -23,6 +23,7 @@ $appDirectory = [IO.Path]::GetFullPath($AppDirectory)
 $publishDirectory = [IO.Path]::GetFullPath($PublishDirectory)
 $dataDirectory = [IO.Path]::GetFullPath($DataDirectory)
 $serviceExecutable = Join-Path $appDirectory 'MauiApp1.Coordinator.exe'
+$discoveryFirewallRuleName = 'Miscelanea Ari Coordinator Discovery'
 $publishExecutable = Join-Path $publishDirectory 'MauiApp1.Coordinator.exe'
 $databasePath = Join-Path $dataDirectory 'miscelanea-ari-central.db'
 $desktopSettingsDirectory = Join-Path $env:ProgramData 'Miscelanea Ari\Desktop'
@@ -162,6 +163,18 @@ try {
         Start-Sleep -Seconds 1
     }
     if ($health.status -ne 'ok') { throw 'El coordinador no respondió correctamente en /health.' }
+
+    if (-not (Get-NetFirewallRule -DisplayName $discoveryFirewallRuleName -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule `
+            -DisplayName $discoveryFirewallRuleName `
+            -Direction Inbound `
+            -Action Allow `
+            -Program $serviceExecutable `
+            -Protocol UDP `
+            -LocalPort 5353 `
+            -RemoteAddress LocalSubnet `
+            -Profile Private | Out-Null
+    }
 
     if (-not $desktopSettingsExists -or $SetHostMode) {
         # The graphical setup explicitly selected Host mode for this machine.

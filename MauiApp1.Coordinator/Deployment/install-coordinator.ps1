@@ -17,6 +17,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 
 $serviceName = 'MiscelaneaAriCoordinator'
 $firewallRuleName = 'Miscelanea Ari Coordinator LAN'
+$discoveryFirewallRuleName = 'Miscelanea Ari Coordinator Discovery'
 $certificateFriendlyName = 'Miscelanea Ari Coordinator HTTPS'
 $executablePath = [System.IO.Path]::GetFullPath((Join-Path $AppDirectory 'MauiApp1.Coordinator.exe'))
 $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
@@ -126,6 +127,16 @@ try {
         -LocalPort $Port `
         -Profile Private | Out-Null
 
+    New-NetFirewallRule `
+        -DisplayName $discoveryFirewallRuleName `
+        -Direction Inbound `
+        -Action Allow `
+        -Program $executablePath `
+        -Protocol UDP `
+        -LocalPort 5353 `
+        -RemoteAddress LocalSubnet `
+        -Profile Private | Out-Null
+
     Start-Service -Name $serviceName
     if (-not (Test-Path -LiteralPath $desktopSettingsPath -PathType Leaf) -or $SetHostMode) {
         New-Item -ItemType Directory -Path $desktopSettingsDirectory -Force | Out-Null
@@ -143,6 +154,8 @@ catch {
         & sc.exe delete $serviceName | Out-Null
     }
     Get-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction SilentlyContinue |
+        Remove-NetFirewallRule -ErrorAction SilentlyContinue
+    Get-NetFirewallRule -DisplayName $discoveryFirewallRuleName -ErrorAction SilentlyContinue |
         Remove-NetFirewallRule -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $certificate.PSPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $DataDirectory 'coordinator-certificate-fingerprint.txt') `

@@ -87,6 +87,7 @@ internal static class Program
         var allowEmptyDevelopmentDatabase = isDevelopment &&
             builder.Configuration.GetValue<bool>("Coordinator:AllowEmptyDevelopmentDatabase");
         var endpointUrl = builder.Configuration["Coordinator:Url"] ?? "https://0.0.0.0:5080";
+        X509Certificate2? coordinatorCertificate = null;
         if (!Uri.TryCreate(endpointUrl, UriKind.Absolute, out var endpoint))
         {
             throw new InvalidOperationException("Coordinator:Url debe ser una URL absoluta.");
@@ -94,10 +95,10 @@ internal static class Program
 
         if (endpoint.Scheme == Uri.UriSchemeHttps)
         {
-            var certificate = LoadCoordinatorCertificate(
+            coordinatorCertificate = LoadCoordinatorCertificate(
                 builder.Configuration["Coordinator:CertificateThumbprint"], isDevelopment);
             builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(endpoint.Port,
-                listenOptions => listenOptions.UseHttps(certificate)));
+                listenOptions => listenOptions.UseHttps(coordinatorCertificate)));
         }
         else if (isDevelopment && endpoint.Scheme == Uri.UriSchemeHttp &&
                  IPAddress.TryParse(endpoint.Host, out var listenAddress) && IPAddress.IsLoopback(listenAddress))
@@ -111,6 +112,9 @@ internal static class Program
         }
 
         builder.Services.AddSignalR();
+        builder.Services.AddHostedService<MauiApp1.Coordinator.Discovery.CoordinatorMdnsAdvertiser>();
+        var coordinatorFingerprint = coordinatorCertificate?.GetCertHashString(HashAlgorithmName.SHA256);
+        builder.Services.AddSingleton(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry(coordinatorFingerprint));
         builder.Services.AddRateLimiter(options =>
         {
             options.AddPolicy("device-pairing", context =>
@@ -119,6 +123,16 @@ internal static class Program
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+            options.AddPolicy("discovery-pairing", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                         AutoReplenishment = true
@@ -182,6 +196,188 @@ internal static class Program
         app.MapHub<CoordinatorChangesHub>("/hubs/changes");
 
         app.UseRateLimiter();
+        app.MapPost("/api/devices/discovery/start", (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryStartRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La solicitud de vínculo requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            if (!discoveryRegistry.IsEnabled)
+                return Results.Problem("El coordinador no tiene una identidad HTTPS disponible.", statusCode: StatusCodes.Status503ServiceUnavailable);
+            var created = discoveryRegistry.CreateRequest(request);
+            return created is null
+                ? Results.BadRequest(new ApiMessageResponse("La solicitud no es válida o el coordinador alcanzó el límite de solicitudes pendientes."))
+                : Results.Ok(created);
+        }).RequireRateLimiting("device-pairing");
+
+        app.MapPost("/api/devices/discovery/status", (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryStatusRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps || request.ProtectedPayload is null) return Results.BadRequest();
+            var pending = discoveryRegistry.FindRequest(request.RequestId);
+            if (pending is null) return Results.NotFound();
+            try
+            {
+                var plaintext = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Decrypt(
+                    pending.SessionKey, request.RequestId, "status-request", request.ProtectedPayload);
+                MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryChallengePayload? challenge;
+                try { challenge = System.Text.Json.JsonSerializer.Deserialize<MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryChallengePayload>(plaintext, System.Text.Json.JsonSerializerOptions.Web); }
+                finally { CryptographicOperations.ZeroMemory(plaintext); }
+                if (!IsValidDiscoveryChallenge(challenge?.Challenge)) return Results.BadRequest();
+                var protectedPayload = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Encrypt(
+                    pending.SessionKey, request.RequestId, "status-response",
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                        new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryStatusPayload(challenge!.Challenge, pending.GetStatus())));
+                return Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryProtectedResponse(protectedPayload));
+            }
+            catch (Exception exception) when (exception is CryptographicException or FormatException or System.Text.Json.JsonException)
+            { return Results.BadRequest(); }
+        }).RequireRateLimiting("discovery-pairing");
+
+        app.MapPost("/api/devices/discovery/cancel", (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryStatusRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps || request.ProtectedPayload is null) return Results.BadRequest();
+            var pending = discoveryRegistry.FindRequest(request.RequestId);
+            if (pending is null) return Results.NotFound();
+            try
+            {
+                var plaintext = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Decrypt(
+                    pending.SessionKey, request.RequestId, "cancel-request", request.ProtectedPayload);
+                MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryChallengePayload? challenge;
+                try { challenge = System.Text.Json.JsonSerializer.Deserialize<MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryChallengePayload>(plaintext, System.Text.Json.JsonSerializerOptions.Web); }
+                finally { CryptographicOperations.ZeroMemory(plaintext); }
+                if (!IsValidDiscoveryChallenge(challenge?.Challenge)) return Results.BadRequest();
+                var canceled = discoveryRegistry.Cancel(request.RequestId);
+                var protectedPayload = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Encrypt(
+                    pending.SessionKey, request.RequestId, "cancel-response",
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryActionPayload(
+                        challenge!.Challenge, canceled, canceled ? "Solicitud cancelada." : "La solicitud ya no está pendiente.", pending.GetStatus())));
+                return Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryProtectedResponse(protectedPayload));
+            }
+            catch (Exception exception) when (exception is CryptographicException or FormatException or System.Text.Json.JsonException)
+            { return Results.BadRequest(); }
+        }).RequireRateLimiting("discovery-pairing");
+
+        app.MapPost("/api/devices/discovery/complete", async (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryCompletionRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps || request.ProtectedPayload is null) return Results.BadRequest();
+            var pending = discoveryRegistry.FindRequest(request.RequestId);
+            if (pending is null) return Results.NotFound();
+            try
+            {
+                var plaintext = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Decrypt(
+                    pending.SessionKey, request.RequestId, "complete-request", request.ProtectedPayload);
+                MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryCompletionPayload? completion;
+                try { completion = System.Text.Json.JsonSerializer.Deserialize<MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryCompletionPayload>(plaintext, System.Text.Json.JsonSerializerOptions.Web); }
+                finally { CryptographicOperations.ZeroMemory(plaintext); }
+                if (completion is null || completion.DeviceId != pending.DeviceId ||
+                    !IsValidDiscoveredDeviceToken(completion.DeviceToken) ||
+                    !pending.TryBeginCompletion())
+                    return Results.Conflict();
+
+                MauiApp1.Coordinator.Pairing.DevicePairingResult pairingResult;
+                try
+                {
+                    pairingResult = await pairingStore.AuthorizeDiscoveredDeviceAsync(
+                        completion.DeviceId, completion.DeviceToken!, cancellationToken);
+                }
+                catch
+                {
+                    pending.MarkCompletionFailed();
+                    throw;
+                }
+                var succeeded = pairingResult.IsAuthorized && pending.MarkCompleted();
+                if (!succeeded) pending.MarkCompletionFailed();
+                var encryptedResponse = MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingProtocol.Encrypt(
+                    pending.SessionKey, request.RequestId, "complete-response",
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryCompletionResponse(
+                        succeeded, succeeded ? "Dispositivo vinculado." : "El coordinador no pudo autorizar este dispositivo.")));
+                if (pairingResult.IsAlreadyAuthorized) return Results.Conflict();
+                return Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryProtectedResponse(encryptedResponse));
+            }
+            catch (Exception exception) when (exception is CryptographicException or FormatException or System.Text.Json.JsonException)
+            { return Results.BadRequest(); }
+        }).RequireRateLimiting("discovery-pairing");
+
+        app.MapPost("/api/devices/discovery/admin/session", async (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminSessionRequest request,
+            HttpContext httpContext,
+            IAuthenticationService authenticationService,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 80 ||
+                string.IsNullOrEmpty(request.Password) || request.Password.Length > 1024) return Results.Unauthorized();
+            await PairingCredentialLock.WaitAsync(cancellationToken);
+            try
+            {
+                var authentication = await authenticationService.SignInAsync(request.UserName, request.Password, cancellationToken);
+                if (!authentication.Succeeded || authentication.User?.Role != UserRole.Administrator ||
+                    authentication.User.Id.Value == Guid.Empty) return Results.Unauthorized();
+                var token = discoveryRegistry.CreateAdminSession(authentication.User.Id.Value);
+                return Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminSessionResponse(
+                    token, discoveryRegistry.GetAdminSessionExpiry(token)));
+            }
+            finally
+            {
+                authenticationService.SignOut();
+                PairingCredentialLock.Release();
+            }
+        }).RequireRateLimiting("device-pairing");
+
+        app.MapGet("/api/devices/discovery/admin/pending", (
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            var token = ReadBearerToken(httpContext);
+            if (token is null || discoveryRegistry.ValidateAdminSession(token) is null) return Results.Unauthorized();
+            return Results.Ok(discoveryRegistry.GetPendingRequests());
+        }).RequireRateLimiting("discovery-pairing");
+
+        app.MapPost("/api/devices/discovery/admin/approve", (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            var token = ReadBearerToken(httpContext);
+            if (token is null || discoveryRegistry.ValidateAdminSession(token) is null) return Results.Unauthorized();
+            var approved = discoveryRegistry.Approve(request.RequestId);
+            return approved
+                ? Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionResponse(true,
+                    "Solicitud aprobada. El dispositivo puede completar el vínculo."))
+                : Results.Conflict(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionResponse(false,
+                    "La solicitud venció o ya no está pendiente."));
+        }).RequireRateLimiting("discovery-pairing");
+
+        app.MapPost("/api/devices/discovery/admin/reject", (
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionRequest request,
+            HttpContext httpContext,
+            MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryPairingRegistry discoveryRegistry) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            var token = ReadBearerToken(httpContext);
+            if (token is null || discoveryRegistry.ValidateAdminSession(token) is null) return Results.Unauthorized();
+            var rejected = discoveryRegistry.Reject(request.RequestId);
+            return rejected
+                ? Results.Ok(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionResponse(true,
+                    "Solicitud rechazada."))
+                : Results.Conflict(new MauiApp1.Coordinator.Discovery.CoordinatorDiscoveryAdminActionResponse(false,
+                    "La solicitud venció o ya no está pendiente."));
+        }).RequireRateLimiting("discovery-pairing");
+
         app.MapPost("/api/auth/session", async (
             CreateUserSessionRequest request,
             HttpContext httpContext,
@@ -516,6 +712,26 @@ internal static class Program
         return optionIndex >= 0 && optionIndex + 1 < arguments.Length
             ? arguments[optionIndex + 1]
             : null;
+    }
+
+    private static bool IsValidDiscoveryChallenge(string? challenge)
+    {
+        if (string.IsNullOrWhiteSpace(challenge)) return false;
+        try { return Convert.FromBase64String(challenge).Length == 24; }
+        catch (FormatException) { return false; }
+    }
+
+    private static bool IsValidDiscoveredDeviceToken(string? token) => token is { Length: 43 } &&
+        token.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+
+    private static string? ReadBearerToken(HttpContext context)
+    {
+        var authorization = context.Request.Headers.Authorization.FirstOrDefault();
+        if (authorization is null || !authorization.Contains(' ') ||
+            !string.Equals(authorization.Split(' ', 2)[0], "Bearer", StringComparison.OrdinalIgnoreCase))
+            return null;
+        var token = authorization[(authorization.IndexOf(' ') + 1)..].Trim();
+        return IsValidDiscoveredDeviceToken(token) ? token : null;
     }
 
     private static async Task<Guid?> GetAuthorizedDeviceIdAsync(

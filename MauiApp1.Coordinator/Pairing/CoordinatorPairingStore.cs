@@ -316,6 +316,64 @@ internal sealed class CoordinatorPairingStore(string databasePath)
         return DevicePairingResult.Authorized;
     }
 
+    public async Task<DevicePairingResult> AuthorizeDiscoveredDeviceAsync(
+        Guid deviceId,
+        string deviceToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (deviceId == Guid.Empty || deviceToken.Length != 43 || deviceToken.Any(character =>
+                !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_')))
+            return DevicePairingResult.Rejected;
+
+        var tokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(deviceToken));
+        var now = DateTime.UtcNow.Ticks;
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction(deferred: false);
+        byte[]? currentHash = null;
+        bool? isRevoked = null;
+        await using (var find = connection.CreateCommand())
+        {
+            find.Transaction = transaction;
+            find.CommandText = "SELECT TokenHash, IsRevoked FROM AuthorizedDevices WHERE DeviceId = $deviceId LIMIT 1;";
+            find.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+            await using var reader = await find.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                currentHash = reader[0] as byte[];
+                isRevoked = reader.GetInt64(1) == 1;
+            }
+        }
+
+        if (currentHash is not null && isRevoked == false)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return CryptographicOperations.FixedTimeEquals(currentHash, tokenHash)
+                ? DevicePairingResult.Authorized
+                : DevicePairingResult.AlreadyAuthorized;
+        }
+
+        await using (var authorize = connection.CreateCommand())
+        {
+            authorize.Transaction = transaction;
+            authorize.CommandText = """
+                INSERT INTO AuthorizedDevices (DeviceId, TokenHash, AuthorizedAtUtc, IsRevoked)
+                VALUES ($deviceId, $tokenHash, $now, 0)
+                ON CONFLICT(DeviceId) DO UPDATE SET
+                    TokenHash = excluded.TokenHash,
+                    AuthorizedAtUtc = excluded.AuthorizedAtUtc,
+                    IsRevoked = 0;
+                """;
+            authorize.Parameters.AddWithValue("$deviceId", deviceId.ToString("D"));
+            authorize.Parameters.AddWithValue("$tokenHash", tokenHash);
+            authorize.Parameters.AddWithValue("$now", now);
+            await authorize.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return DevicePairingResult.Authorized;
+    }
+
     private static byte[] HashCode(byte[] salt, string code)
     {
         var codeBytes = Encoding.ASCII.GetBytes(code);

@@ -38,6 +38,16 @@ namespace MauiApp1
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ILocalCoordinatorChangeMonitor>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Sync.LocalCoordinatorDatabaseChangeMonitor>());
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorLinkStorage, MauiApp1.Services.SecureCoordinatorLinkStorage>();
+            builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingClient>();
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDiscoveryPairingClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDiscoveryApprovalClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorDiscoveryPairingClient>());
+            #if ANDROID
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDiscovery, MauiApp1.Platforms.Android.AndroidCoordinatorDiscovery>();
+            #elif WINDOWS
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDiscovery, MauiApp1.Infrastructure.Lan.WindowsCoordinatorDiscovery>();
+            #endif
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserSessionStorage, MauiApp1.Services.SecureCoordinatorUserSessionStorage>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient>(services =>

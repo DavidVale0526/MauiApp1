@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:MauiApp1.Presentation.ViewModels"
+             xmlns:lan="clr-namespace:MauiApp1.Application.Lan"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="MauiApp1.Presentation.Views.DevicePairingPage"
              x:DataType="vm:DevicePairingViewModel" Title="Vinculación por red local" BackgroundColor="#F7F9FB">
@@ -41,6 +42,82 @@
                         <Label Text="Conecta ambos dispositivos al Wi-Fi del negocio. El coordinador debe estar instalado y encendido en Windows." FontSize="13" TextColor="#61738A" />
                         <Button Text="Desvincular este dispositivo" Clicked="OnUnlinkClicked" IsVisible="{Binding CanUnlink}" Style="{StaticResource SecondaryButton}" />
                         <Label Text="Al desvincular, se revoca el acceso al coordinador. Los datos locales se conservan." IsVisible="{Binding CanUnlink}" FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding CanDiscover}">
+                    <VerticalStackLayout Spacing="12">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Buscar coordinador" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Busca el equipo Windows que coordina el negocio en esta red local." FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <Button Text="Buscar coordinador en esta red" Command="{Binding DiscoverCommand}"
+                                IsVisible="{Binding CanDiscover}" Style="{StaticResource PrimaryButton}" />
+                        <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" HorizontalOptions="Center" Color="#008060" />
+                        <CollectionView ItemsSource="{Binding DiscoveredCoordinators}" IsVisible="{Binding HasDiscoveredCoordinators}"
+                                        SelectionMode="Single" SelectionChanged="OnCoordinatorSelected" HeightRequest="180">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="lan:CoordinatorCandidate">
+                                    <Border Margin="0,3" Padding="12" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
+                                            StrokeThickness="1" StrokeShape="RoundRectangle 10">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Label Text="{Binding DisplayName}" FontAttributes="Bold" TextColor="#111D31" />
+                                                <Label Text="Coordinador Miscelánea Ari" FontSize="12" TextColor="#61738A" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="›" FontSize="24" TextColor="#61738A" VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                        <Button Text="Solicitar vínculo seguro" Clicked="OnRequestDiscoveredPairingClicked"
+                                IsVisible="{Binding HasSelectedCoordinator}"
+                                IsEnabled="{Binding CanRequestDiscoveredPairing}" Style="{StaticResource PrimaryButton}" />
+                        <Label Text="Al solicitarlo, el Administrador verá un código de comparación y tendrá que aprobar el vínculo." FontSize="12" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16"
+                        IsVisible="{Binding ShowDiscoveryRequest}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Confirmar vínculo" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Compara este código con el que aparece en Windows. Solo continúa si ambos son idénticos." FontSize="13" TextColor="#61738A" />
+                        <Label Text="{Binding DiscoveryVerificationCode}" FontSize="32" FontAttributes="Bold" TextColor="#008060" HorizontalTextAlignment="Center" CharacterSpacing="5" />
+                        <Label Text="{Binding DiscoveryRequestStatus}" FontSize="14" TextColor="#52657D" HorizontalTextAlignment="Center" />
+                        <Label Text="La solicitud vence en tres minutos. El vínculo no inicia sesión ni sincroniza datos hasta que el usuario inicie sesión." FontSize="12" TextColor="#61738A" />
+                        <Button Text="Cancelar solicitud" Command="{Binding CancelDiscoveredPairingCommand}"
+                                IsEnabled="{Binding CanCancelDiscoveredPairing}" Style="{StaticResource SecondaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16"
+                        IsVisible="{Binding CanManageDiscoveredPairings}">
+                    <VerticalStackLayout Spacing="12">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Solicitudes de vínculo en esta red" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Inicia sesión como Administrador y compara el código que muestra el dispositivo antes de aprobarlo." FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <Entry Placeholder="Usuario Administrador" Text="{Binding UserName}" IsEnabled="{Binding CanEditForm}" Style="{StaticResource Input}" />
+                        <Entry Placeholder="Contraseña del Administrador" Text="{Binding Password}" IsPassword="True" IsEnabled="{Binding CanEditForm}" Style="{StaticResource Input}" />
+                        <Button Text="Actualizar solicitudes" Command="{Binding RefreshApprovalRequestsCommand}" Style="{StaticResource SecondaryButton}" />
+                        <CollectionView ItemsSource="{Binding PendingDiscoveredPairings}" HeightRequest="320">
+                            <CollectionView.EmptyView>
+                                <Label Text="No hay solicitudes pendientes. Pulsa «Actualizar solicitudes» para consultar." Padding="8" TextColor="#61738A" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="lan:CoordinatorPendingPairing">
+                                    <Border Margin="0,4" Padding="12" BackgroundColor="#F7F9FB" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 12">
+                                        <VerticalStackLayout Spacing="7">
+                                            <Label Text="{Binding DeviceName}" FontAttributes="Bold" TextColor="#111D31" />
+                                            <Label Text="{Binding VerificationCode}" FontSize="25" FontAttributes="Bold" CharacterSpacing="4" TextColor="#008060" />
+                                            <Label Text="Compara este código con el del dispositivo antes de aprobar." FontSize="12" TextColor="#61738A" />
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                <Button Text="Aprobar" Clicked="OnApproveDiscoveredPairingClicked" Style="{StaticResource PrimaryButton}" />
+                                                <Button Grid.Column="1" Text="Rechazar" Clicked="OnRejectDiscoveredPairingClicked" Style="{StaticResource SecondaryButton}" />
+                                            </Grid>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
                     </VerticalStackLayout>
                 </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
