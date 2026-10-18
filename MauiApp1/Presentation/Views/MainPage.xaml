@@ -169,11 +169,11 @@
 
                 <Label Text="Operaciones" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
 
-                <Grid x:Name="MenuCardsGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="16">
+                <Grid x:Name="MenuCardsGrid" HorizontalOptions="Fill" ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="16">
                     <Border x:Name="SalesCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
                         <VerticalStackLayout Spacing="10">
                             <Label Text="Ventas" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Registra ventas y consulta su historial." FontSize="12" TextColor="#718198" />
+                            <Label Text="Registra ventas y consulta su historial." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
                             <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" Style="{StaticResource DashboardButtonStyle}" />
                             <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                         </VerticalStackLayout>
@@ -182,7 +182,7 @@
                     <Border x:Name="InventoryCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
                         <VerticalStackLayout Spacing="10">
                             <Label Text="Catálogo e inventario" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Administra productos y revisa existencias." FontSize="12" TextColor="#718198" />
+                            <Label Text="Administra productos y revisa existencias." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
                             <Button Text="Administrar productos" Clicked="OnManageProductsClicked" Style="{StaticResource DashboardButtonStyle}" />
                             <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                             <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
@@ -192,7 +192,7 @@
                     <Border x:Name="PurchasesCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
                         <VerticalStackLayout Spacing="10">
                             <Label Text="Compras y movimientos" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Registra entradas y consulta el historial." FontSize="12" TextColor="#718198" />
+                            <Label Text="Registra entradas y consulta el historial." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
                             <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" Style="{StaticResource DashboardButtonStyle}" />
                             <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                             <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
@@ -203,11 +203,11 @@
                     <Border x:Name="OtherCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
                         <VerticalStackLayout Spacing="10">
                             <Label Text="Clientes y seguimiento" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Consulta clientes, pagos e información del negocio." FontSize="12" TextColor="#718198" />
+                            <Label Text="Consulta clientes, pagos e información del negocio." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
                             <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" Style="{StaticResource DashboardButtonStyle}" />
-                            <Button Text="Registrar pagos y consultar saldos" Clicked="OnPaymentsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button Text="Registrar pagos y consultar saldos" LineBreakMode="WordWrap" Clicked="OnPaymentsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                             <Button Text="Reportes" Clicked="OnReportsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Crear cuenta de Cajero" IsVisible="{Binding IsAdministrator}"
+                            <Button Text="Crear cuenta de Cajero" LineBreakMode="WordWrap" IsVisible="{Binding IsAdministrator}"
                                     Clicked="OnCreateCashierAccountClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                         </VerticalStackLayout>
                     </Border>

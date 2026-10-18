@@ -9,17 +9,28 @@ public partial class MainPage : CoordinatorRefreshPage
 {
     private void OnRootLayoutSizeChanged(object? sender, EventArgs args)
     {
-        var useDesktopLayout = RootLayout.Width >= 950;
-        RootLayout.ColumnDefinitions[0].Width = new GridLength(useDesktopLayout ? 250 : 0);
-        Sidebar.IsVisible = useDesktopLayout;
+        var windowWidth = RootLayout.Width;
+        if (windowWidth <= 0)
+        {
+            return;
+        }
+
+        var showSidebar = windowWidth >= 950;
+        var availableDashboardWidth = Math.Max(0, windowWidth - (showSidebar ? 250 : 0));
+        var dashboardWidth = Math.Min(availableDashboardWidth, 1440);
+        DashboardContent.WidthRequest = dashboardWidth;
+        RootLayout.ColumnDefinitions[0].Width = new GridLength(showSidebar ? 250 : 0);
+        Sidebar.IsVisible = showSidebar;
         BottomActionsGrid.IsVisible = false;
-        DashboardContent.Padding = useDesktopLayout
+        DashboardContent.Padding = showSidebar
             ? new Thickness(36, 30)
             : new Thickness(16, 24);
 
+        var cardContentWidth = dashboardWidth - DashboardContent.Padding.Left - DashboardContent.Padding.Right;
+        var useTwoColumnCards = cardContentWidth >= 820;
         MenuCardsGrid.ColumnDefinitions.Clear();
         MenuCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
-        if (useDesktopLayout)
+        if (useTwoColumnCards)
         {
             MenuCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
         }
@@ -27,8 +38,8 @@ public partial class MainPage : CoordinatorRefreshPage
         var cards = new Border[] { SalesCard, InventoryCard, PurchasesCard, OtherCard };
         for (var index = 0; index < cards.Length; index++)
         {
-            Grid.SetColumn(cards[index], useDesktopLayout ? index % 2 : 0);
-            Grid.SetRow(cards[index], useDesktopLayout ? index / 2 : index);
+            Grid.SetColumn(cards[index], useTwoColumnCards ? index % 2 : 0);
+            Grid.SetRow(cards[index], useTwoColumnCards ? index / 2 : index);
         }
     }
 
