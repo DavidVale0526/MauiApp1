@@ -4,16 +4,19 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class CashierSetupPage : ContentPage
 {
+    private readonly CashierSetupViewModel _viewModel;
+
     public CashierSetupPage(CashierSetupViewModel viewModel)
     {
         InitializeComponent();
+        _viewModel = viewModel;
         BindingContext = viewModel;
-        viewModel.AccountCreated += OnAccountCreated;
     }
 
-    private async void OnAccountCreated(object? sender, EventArgs eventArgs)
+    protected override async void OnAppearing()
     {
-        await Navigation.PopModalAsync();
+        base.OnAppearing();
+        await _viewModel.LoadCashiersAsync();
     }
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs)

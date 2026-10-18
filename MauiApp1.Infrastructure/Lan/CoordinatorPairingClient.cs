@@ -224,6 +224,52 @@ public sealed class CoordinatorPairingClient(
         { return AuthenticationResult.Failure("El coordinador no respondió. La cuenta no se creó."); }
         catch (System.Text.Json.JsonException) { return AuthenticationResult.Failure("La respuesta del coordinador no es válida."); }
     }
+
+    public async Task<CashierAccountListResult> GetCashiersAsync(CancellationToken cancellationToken = default)
+    {
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return CashierAccountListResult.Failure(
+                "Vincula este dispositivo e inicia sesión central como Administrador para consultar los cajeros.");
+
+        using (client)
+        {
+            try
+            {
+                using var response = await client.GetAsync("api/users/cashiers", cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var accounts = await response.Content.ReadFromJsonAsync<IReadOnlyList<CashierAccountSummary>>(cancellationToken);
+                    return accounts is null
+                        ? CashierAccountListResult.Failure("El coordinador devolvió una lista vacía no válida.")
+                        : CashierAccountListResult.Success(accounts);
+                }
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                    return CashierAccountListResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
+                if (response.StatusCode == HttpStatusCode.Forbidden)
+                    return CashierAccountListResult.Failure("Solo el Administrador puede consultar las cuentas de cajero.");
+
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+                return CashierAccountListResult.Failure(
+                    error?.Message ?? "El coordinador no pudo consultar las cuentas de cajero.");
+            }
+            catch (HttpRequestException)
+            {
+                return CashierAccountListResult.Failure(
+                    "No se pudo contactar al coordinador por la red local. Comprueba la conexión e inténtalo de nuevo.");
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return CashierAccountListResult.Failure("El coordinador no respondió a tiempo. Inténtalo de nuevo.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return CashierAccountListResult.Failure("La respuesta del coordinador no tiene un formato válido.");
+            }
+        }
+    }
+
     public async Task<CoordinatorLinkStatus?> GetStatusAsync()
     {
         var link = await ReadLinkAsync();

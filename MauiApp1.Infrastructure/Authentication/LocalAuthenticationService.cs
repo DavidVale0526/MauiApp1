@@ -141,6 +141,26 @@ internal sealed class LocalAuthenticationService(
         return AuthenticationResult.Success(ToAuthenticatedUser(account));
     }
 
+    public async Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser?.Role != UserRole.Administrator)
+        {
+            throw new UnauthorizedAccessException("Solo una sesión de Administrador puede consultar las cuentas de cajero.");
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.UserAccounts
+            .AsNoTracking()
+            .Where(account => account.Role == (int)UserRole.Cashier)
+            .OrderBy(account => account.NormalizedUserName)
+            .Select(account => new CashierAccountSummary(
+                account.UserName,
+                account.IsEnabled,
+                account.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<AuthenticationResult> SignInAsync(
         string userName,
         string password,

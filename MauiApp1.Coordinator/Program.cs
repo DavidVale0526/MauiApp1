@@ -420,6 +420,37 @@ internal static class Program
             return Results.Ok(new ApiMessageResponse("Cuenta de Cajero creada en el coordinador."));
         });
 
+        app.MapGet("/api/users/cashiers", async (
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La consulta de cuentas requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var isAdministrator = await context.UserAccounts.AnyAsync(
+                account => account.UserId == userId.Value && account.IsEnabled &&
+                    account.Role == (int)UserRole.Administrator,
+                cancellationToken);
+            if (!isAdministrator) return Results.Forbid();
+
+            var accounts = await context.UserAccounts
+                .AsNoTracking()
+                .Where(account => account.Role == (int)UserRole.Cashier)
+                .OrderBy(account => account.NormalizedUserName)
+                .Select(account => new CashierAccountSummary(
+                    account.UserName,
+                    account.IsEnabled,
+                    account.CreatedAtUtc))
+                .ToListAsync(cancellationToken);
+            return Results.Ok(accounts);
+        });
+
         app.MapGet("/api/sync/changes", async (
             long? afterSequence,
             int? limit,

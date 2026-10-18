@@ -20,6 +20,9 @@ public interface IAuthenticationService
         string password,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(
+        CancellationToken cancellationToken = default);
+
     Task<AuthenticationResult> SignInAsync(
         string userName,
         string password,
