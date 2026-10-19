@@ -14,6 +14,9 @@ namespace MauiApp1.Platforms.Android;
 internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
 {
     private const string ServiceType = "_miscelanea-ari-v1._tcp";
+    private static readonly ConcurrentDictionary<Guid, DiscoveryListener> ActiveDiscoveries = new();
+    private static readonly ConcurrentDictionary<Guid, ServiceInfoCallbackLease> ActiveServiceInfoCallbacks = new();
+    private static readonly ConcurrentDictionary<Guid, ResolveListener> ActiveResolutions = new();
 
     public async Task<IReadOnlyList<CoordinatorCandidate>> FindAsync(
         TimeSpan timeout,
@@ -45,14 +48,19 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
         var candidates = new ConcurrentDictionary<string, CoordinatorCandidate>(StringComparer.OrdinalIgnoreCase);
         var resolutions = new ConcurrentBag<Task>();
         var discoveryStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var discoveryStopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var listenerId = Guid.NewGuid();
         var listener = new DiscoveryListener(service =>
-            resolutions.Add(ResolveAsync(manager, service, candidates, cancellationToken)), discoveryStarted);
+            resolutions.Add(ResolveAsync(manager, service, candidates, cancellationToken)), discoveryStarted,
+            discoveryStopped, () => ActiveDiscoveries.TryRemove(listenerId, out _));
+        ActiveDiscoveries[listenerId] = listener;
 
         try
         {
             try { manager.DiscoverServices(ServiceType, NsdProtocol.DnsSd, listener); }
             catch (Java.Lang.SecurityException exception)
             {
+                ActiveDiscoveries.TryRemove(listenerId, out _);
                 throw new UnauthorizedAccessException("Android no permitió buscar servicios en la red local.", exception);
             }
             await discoveryStarted.Task.WaitAsync(TimeSpan.FromSeconds(4), cancellationToken);
@@ -60,11 +68,20 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
         }
         finally
         {
-            try { manager.StopServiceDiscovery(listener); }
-            catch (Java.Lang.IllegalArgumentException) { }
+            try
+            {
+                manager.StopServiceDiscovery(listener);
+                try { await discoveryStopped.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+                catch (TimeoutException) { /* Keep the listener rooted until Android sends its terminal callback. */ }
+            }
+            catch (Java.Lang.IllegalArgumentException)
+            {
+                discoveryStopped.TrySetResult(true);
+                ActiveDiscoveries.TryRemove(listenerId, out _);
+            }
             multicastLock?.Release();
             multicastLock?.Dispose();
-            listener.Dispose();
+            GC.KeepAlive(listener);
         }
 
         await Task.WhenAll(resolutions.ToArray());
@@ -94,9 +111,13 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
         CancellationToken cancellationToken)
     {
         var resolved = new TaskCompletionSource<NsdServiceInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var callback = new ServiceInfoListener(resolved);
+        var unregistered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbackId = Guid.NewGuid();
+        var callback = new ServiceInfoListener(resolved, unregistered,
+            () => ActiveServiceInfoCallbacks.TryRemove(callbackId, out _));
         var executor = Java.Util.Concurrent.Executors.NewSingleThreadExecutor()
             ?? throw new InvalidOperationException("Android no pudo crear el ejecutor de descubrimiento.");
+        ActiveServiceInfoCallbacks[callbackId] = new ServiceInfoCallbackLease(callback, executor);
         try
         {
             manager.RegisterServiceInfoCallback(discovered, executor, callback);
@@ -111,11 +132,23 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
         }
         finally
         {
-            try { manager.UnregisterServiceInfoCallback(callback); }
-            catch (Java.Lang.IllegalArgumentException) { }
-            try { executor.ShutdownNow(); } catch (Java.Lang.IllegalStateException) { }
-            executor?.Dispose();
-            callback.Dispose();
+            try
+            {
+                manager.UnregisterServiceInfoCallback(callback);
+                try { await unregistered.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+                catch (TimeoutException) { /* Keep callback and executor rooted until Android confirms unregistration. */ }
+            }
+            catch (Java.Lang.IllegalArgumentException)
+            {
+                unregistered.TrySetResult(true);
+                ActiveServiceInfoCallbacks.TryRemove(callbackId, out _);
+            }
+            if (unregistered.Task.IsCompleted)
+            {
+                try { executor.Shutdown(); } catch (Java.Lang.IllegalStateException) { }
+            }
+            GC.KeepAlive(callback);
+            GC.KeepAlive(executor);
         }
     }
 
@@ -127,12 +160,18 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
         CancellationToken cancellationToken)
     {
         var resolved = new TaskCompletionSource<NsdServiceInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var listener = new ResolveListener(resolved);
+        var resolutionStopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var listenerId = Guid.NewGuid();
+        var listener = new ResolveListener(resolved, resolutionStopped,
+            () => ActiveResolutions.TryRemove(listenerId, out _));
+        ActiveResolutions[listenerId] = listener;
+        var resolutionSubmitted = false;
         try
         {
 #pragma warning disable CA1422 // Required on Android versions below API 34.
             manager.ResolveService(discovered, listener);
 #pragma warning restore CA1422
+            resolutionSubmitted = true;
             using var registration = cancellationToken.Register(() => resolved.TrySetCanceled(cancellationToken));
             var service = await resolved.Task.WaitAsync(TimeSpan.FromSeconds(4), cancellationToken);
             if (service is not null) AddLegacyCandidate(service, candidates);
@@ -141,10 +180,17 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
                                               ArgumentException or TimeoutException or System.OperationCanceledException)
         {
             // A service can disappear or change networks while resolution is in flight.
+            if (!resolutionSubmitted)
+            {
+                resolutionStopped.TrySetResult(true);
+                ActiveResolutions.TryRemove(listenerId, out _);
+            }
         }
         finally
         {
-            listener.Dispose();
+            // On older Android versions the one-shot resolution callback has no stop API.
+            // Keep it rooted until Android reports success or failure instead of disposing it early.
+            GC.KeepAlive(listener);
         }
     }
 
@@ -219,7 +265,8 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
             bytes[0] == 172 && bytes[1] is >= 16 and <= 31;
     }
 
-    private sealed class DiscoveryListener(Action<NsdServiceInfo> found, TaskCompletionSource<bool> discoveryStarted)
+    private sealed class DiscoveryListener(Action<NsdServiceInfo> found, TaskCompletionSource<bool> discoveryStarted,
+        TaskCompletionSource<bool> discoveryStopped, Action onTerminal)
         : Java.Lang.Object, NsdManager.IDiscoveryListener
     {
         public void OnDiscoveryStarted(string? serviceType) => discoveryStarted.TrySetResult(true);
@@ -228,34 +275,73 @@ internal sealed class AndroidCoordinatorDiscovery : ICoordinatorDiscovery
             if (serviceInfo is not null) found(serviceInfo);
         }
         public void OnServiceLost(NsdServiceInfo? serviceInfo) { }
-        public void OnDiscoveryStopped(string? serviceType) { }
+        public void OnDiscoveryStopped(string? serviceType)
+        {
+            discoveryStopped.TrySetResult(true);
+            onTerminal();
+        }
         public void OnStartDiscoveryFailed(string? serviceType, NsdFailure errorCode)
         {
             var isPermissionError = errorCode.ToString().Contains("Permission", StringComparison.OrdinalIgnoreCase);
             discoveryStarted.TrySetException(isPermissionError
                 ? new UnauthorizedAccessException("Android denegó el acceso al descubrimiento de la red local.")
                 : new InvalidOperationException($"Android no pudo iniciar la búsqueda local ({errorCode})."));
+            discoveryStopped.TrySetResult(true);
+            onTerminal();
         }
-        public void OnStopDiscoveryFailed(string? serviceType, NsdFailure errorCode) { }
+        public void OnStopDiscoveryFailed(string? serviceType, NsdFailure errorCode)
+        {
+            discoveryStopped.TrySetResult(true);
+            onTerminal();
+        }
     }
 
-    private sealed class ResolveListener(TaskCompletionSource<NsdServiceInfo?> completion)
+    private sealed class ResolveListener(TaskCompletionSource<NsdServiceInfo?> completion,
+        TaskCompletionSource<bool> resolutionStopped, Action onTerminal)
         : Java.Lang.Object, NsdManager.IResolveListener
     {
-        public void OnResolutionStopped(NsdServiceInfo? serviceInfo) => completion.TrySetResult(null);
-        public void OnResolveFailed(NsdServiceInfo? serviceInfo, NsdFailure errorCode) => completion.TrySetResult(null);
-        public void OnServiceResolved(NsdServiceInfo? serviceInfo) => completion.TrySetResult(serviceInfo);
+        public void OnResolutionStopped(NsdServiceInfo? serviceInfo)
+        {
+            completion.TrySetResult(null);
+            resolutionStopped.TrySetResult(true);
+            onTerminal();
+        }
+        public void OnResolveFailed(NsdServiceInfo? serviceInfo, NsdFailure errorCode)
+        {
+            completion.TrySetResult(null);
+            resolutionStopped.TrySetResult(true);
+            onTerminal();
+        }
+        public void OnServiceResolved(NsdServiceInfo? serviceInfo)
+        {
+            completion.TrySetResult(serviceInfo);
+            resolutionStopped.TrySetResult(true);
+            onTerminal();
+        }
         public void OnStopResolutionFailed(NsdServiceInfo? serviceInfo, NsdFailure errorCode) { }
     }
 
     [SupportedOSPlatform("android34.0")]
-    private sealed class ServiceInfoListener(TaskCompletionSource<NsdServiceInfo?> completion)
+    private sealed class ServiceInfoListener(TaskCompletionSource<NsdServiceInfo?> completion,
+        TaskCompletionSource<bool> unregistered, Action onTerminal)
         : Java.Lang.Object, NsdManager.IServiceInfoCallback
     {
-        public void OnServiceInfoCallbackRegistrationFailed(NsdFailure errorCode) =>
+        public void OnServiceInfoCallbackRegistrationFailed(NsdFailure errorCode)
+        {
             completion.TrySetException(new InvalidOperationException($"Android no pudo resolver el servicio local ({errorCode})."));
-        public void OnServiceInfoCallbackUnregistered() => completion.TrySetResult(null);
+            unregistered.TrySetResult(true);
+            onTerminal();
+        }
+        public void OnServiceInfoCallbackUnregistered()
+        {
+            completion.TrySetResult(null);
+            unregistered.TrySetResult(true);
+            onTerminal();
+        }
         public void OnServiceLost() => completion.TrySetResult(null);
         public void OnServiceUpdated(NsdServiceInfo? serviceInfo) => completion.TrySetResult(serviceInfo);
     }
+
+    private sealed record ServiceInfoCallbackLease(ServiceInfoListener Listener,
+        object Executor);
 }
