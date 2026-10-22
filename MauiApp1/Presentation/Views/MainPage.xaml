@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <views:CoordinatorRefreshPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:views="clr-namespace:MauiApp1.Presentation.Views"
@@ -64,6 +64,12 @@
                        FontAttributes="Bold" CharacterSpacing="1" TextColor="#93A4B8" />
 
                 <VerticalStackLayout Grid.Row="2" Spacing="8">
+                    <Border BackgroundColor="#193459" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="14,10">
+                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
+                            <Label Text="⌂" FontSize="20" TextColor="White" />
+                            <Label Grid.Column="1" Text="Inicio / Dashboard" FontSize="13" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
                     <Border Style="{StaticResource SidebarButtonStyle}">
                         <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnRegisterSaleClicked" /></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
@@ -127,17 +133,136 @@
             </Grid>
         </Border>
 
-        <ScrollView Grid.Column="1" VerticalScrollBarVisibility="Never">
+        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+        <ScrollView Grid.Row="0" VerticalScrollBarVisibility="Never">
             <VerticalStackLayout x:Name="DashboardContent"
                                  Padding="18,24"
                                  Spacing="22"
                                  HorizontalOptions="Center"
                                  MaximumWidthRequest="1440">
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*">
-                    <Label Text="Panel principal" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
-                    <Label Grid.Row="1" Text="Resumen y accesos de Miscelánea Ari" FontSize="14" TextColor="#61738A" />
+                <!-- Encabezado principal adaptado desde Figma -->
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout Spacing="3">
+                        <Label Text="Inicio" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Resumen de operaciones del día y estado general de la tienda" FontSize="13" TextColor="#57616F" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="+ Nueva venta" Clicked="OnRegisterSaleClicked"
+                            Style="{StaticResource DashboardButtonStyle}" VerticalOptions="Center" />
                 </Grid>
 
+                <!-- Datos aún no conectados: no representar cifras de Figma como reales. -->
+                <Grid x:Name="KpiCardsGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                    <Border x:Name="SalesKpiCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="VENTAS DE HOY" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
+                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Ver ventas →" TextColor="#007A56" FontSize="12">
+                                <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnSaleHistoryClicked" /></Label.GestureRecognizers>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="LowStockKpiCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="STOCK BAJO" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
+                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Ver stock →" TextColor="#BA7200" FontSize="12">
+                                <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnConsultStockClicked" /></Label.GestureRecognizers>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="ExpiryKpiCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="PRÓXIMOS VENCIMIENTOS" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
+                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Revisar →" TextColor="#BD2727" FontSize="12" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="CashKpiCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="9">
+                            <Label Text="EFECTIVO EN CAJA" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
+                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Pendiente de integración" FontSize="12" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="SalesAndAlertsGrid" ColumnDefinitions="*,0" RowDefinitions="Auto,Auto" RowSpacing="22">
+                <Border Style="{StaticResource DashboardCardStyle}" VerticalOptions="Start">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Ventas de los últimos 7 días" FontSize="18" FontAttributes="Bold"
+                                       TextColor="#111D31" LineBreakMode="WordWrap" />
+                                <Label Text="Comportamiento semanal de ventas" FontSize="12" TextColor="#57616F" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                <Label Text="PROMEDIO DIARIO" FontSize="9" TextColor="#57616F" HorizontalTextAlignment="End" />
+                                <Label Text="{Binding WeeklySalesAverage}" FontSize="20" FontAttributes="Bold"
+                                       TextColor="#111D31" HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <ActivityIndicator IsVisible="{Binding IsWeeklySalesLoading}"
+                                           IsRunning="{Binding IsWeeklySalesLoading}" Color="#007A56" />
+                        <Label Text="{Binding WeeklySalesMessage}" IsVisible="{Binding HasWeeklySalesMessage}"
+                               FontSize="13" TextColor="#57616F" HorizontalTextAlignment="Center" />
+                        <views:WeeklySalesChart Days="{Binding WeeklySalesDays}" />
+                        <FlexLayout Wrap="Wrap" JustifyContent="Center" AlignItems="Center">
+                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                                <BoxView Color="#007A56" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
+                                <Label Text="Hoy" FontSize="11" TextColor="#57616F" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                                <BoxView Color="#D6E2FF" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
+                                <Label Text="Días anteriores" FontSize="11" TextColor="#57616F" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                                <BoxView Color="#1D293D" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
+                                <Label Text="Mayor venta anterior" FontSize="11" TextColor="#57616F" />
+                            </HorizontalStackLayout>
+                        </FlexLayout>
+                        <Button Text="Actualizar ventas" Clicked="OnRefreshWeeklySalesClicked"
+                                Style="{StaticResource DashboardSecondaryButtonStyle}" HorizontalOptions="End" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="OperationalAlertsCard" Grid.Row="1" Style="{StaticResource DashboardCardStyle}" VerticalOptions="Start">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Label Text="Alertas operativas" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <Border Grid.Column="1" BackgroundColor="#FFE0DE" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="8,4" VerticalOptions="Center">
+                                <Label Text="{Binding OperationalAlertsCount}" TextColor="#BD2727" FontSize="11" FontAttributes="Bold" />
+                            </Border>
+                        </Grid>
+                        <ActivityIndicator IsVisible="{Binding IsOperationalAlertsLoading}"
+                                           IsRunning="{Binding IsOperationalAlertsLoading}" Color="#007A56" />
+                        <Label Text="{Binding OperationalAlertsMessage}" IsVisible="{Binding HasOperationalAlertsMessage}"
+                               FontSize="13" TextColor="#57616F" />
+                        <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding OperationalAlerts}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:OperationalStockAlert">
+                                    <Border BackgroundColor="#F3F5F7" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
+                                        <VerticalStackLayout Spacing="5">
+                                            <Label Text="{Binding Name}" TextColor="#111D31" FontSize="13" FontAttributes="Bold" />
+                                            <Border BackgroundColor="{Binding BadgeColor}" StrokeThickness="0" StrokeShape="RoundRectangle 4"
+                                                    Padding="6,2" HorizontalOptions="Start">
+                                                <Label Text="{Binding AlertType}" TextColor="{Binding AccentColor}" FontSize="10" FontAttributes="Bold" />
+                                            </Border>
+                                            <Label Text="{Binding Description}" TextColor="#57616F" FontSize="12" />
+                                            <Label Text="{Binding Status}" TextColor="{Binding AccentColor}" FontSize="11" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Button Text="Ver todas las alertas →" Clicked="OnConsultStockClicked"
+                                Style="{StaticResource DashboardSecondaryButtonStyle}" LineBreakMode="WordWrap" />
+                        <Button Text="Actualizar alertas" Clicked="OnRefreshOperationalAlertsClicked"
+                                Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                    </VerticalStackLayout>
+                </Border>
+                </Grid>
+
+                <Label Text="Accesos a módulos existentes" FontSize="17" FontAttributes="Bold" TextColor="#111D31" />
                 <Border BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
                         StrokeShape="RoundRectangle 14" Padding="18">
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
@@ -146,15 +271,6 @@
                         <Label Grid.Row="1" Grid.Column="1" Text="{Binding CurrentRole}" FontSize="14"
                                TextColor="#52657D" VerticalOptions="Center" />
                     </Grid>
-                </Border>
-
-                <Border IsVisible="{Binding HasLowStockAlert}"
-                        BackgroundColor="#FFF8F3" Stroke="#F0A35E" StrokeThickness="1"
-                        StrokeShape="RoundRectangle 12" Padding="16">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="Atención: existencias bajas" FontSize="16" FontAttributes="Bold" TextColor="#A3440B" />
-                        <Label Text="{Binding LowStockAlertMessage}" FontSize="13" TextColor="#873B13" />
-                    </VerticalStackLayout>
                 </Border>
 
                 <Border BackgroundColor="#0D1B2A" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="18">
@@ -221,5 +337,6 @@
                 </Grid>
             </VerticalStackLayout>
         </ScrollView>
+        </Grid>
     </Grid>
 </views:CoordinatorRefreshPage>

@@ -5,6 +5,8 @@ namespace MauiApp1.Presentation.Views;
 
 public abstract class CoordinatorRefreshPage : ContentPage
 {
+    protected const double DesktopNavigationMinWidth = 950;
+
     private readonly ILocalDataChangeNotifier _changeNotifier;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private Grid? _mobileRoot;
@@ -44,7 +46,7 @@ public abstract class CoordinatorRefreshPage : ContentPage
         _mobileRoot.Add(navBar);
         _mobileRoot.SizeChanged += (_, _) =>
         {
-            var isMobile = _mobileRoot.Width < 900;
+            var isMobile = _mobileRoot.Width < DesktopNavigationMinWidth;
             navBar.IsVisible = isMobile;
             _mobileRoot.RowDefinitions[1].Height = isMobile ? GridLength.Auto : new GridLength(0);
         };

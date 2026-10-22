@@ -1,4 +1,4 @@
-using MauiApp1.Presentation.ViewModels;
+﻿using MauiApp1.Presentation.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Networking;
 using MauiApp1.Application.Sync;
@@ -15,13 +15,29 @@ public partial class MainPage : CoordinatorRefreshPage
             return;
         }
 
-        var showSidebar = windowWidth >= 950;
+        var showSidebar = windowWidth >= DesktopNavigationMinWidth;
         var availableDashboardWidth = Math.Max(0, windowWidth - (showSidebar ? 250 : 0));
         var dashboardWidth = Math.Min(availableDashboardWidth, 1440);
         DashboardContent.WidthRequest = dashboardWidth;
         RootLayout.ColumnDefinitions[0].Width = new GridLength(showSidebar ? 250 : 0);
         Sidebar.IsVisible = showSidebar;
+        SalesAndAlertsGrid.ColumnDefinitions[0].Width = new GridLength(showSidebar ? 2 : 1, GridUnitType.Star);
+        SalesAndAlertsGrid.ColumnDefinitions[1].Width = showSidebar ? GridLength.Star : new GridLength(0);
+        SalesAndAlertsGrid.ColumnSpacing = showSidebar ? 22 : 0;
+        SalesAndAlertsGrid.RowSpacing = showSidebar ? 0 : 22;
+        Grid.SetColumn(OperationalAlertsCard, showSidebar ? 1 : 0);
+        Grid.SetRow(OperationalAlertsCard, showSidebar ? 0 : 1);
         BottomActionsGrid.IsVisible = false;
+        // Los indicadores forman una fila en escritorio y una cuadrícula 2×2 en móvil.
+        KpiCardsGrid.ColumnDefinitions.Clear();
+        for (var index = 0; index < (showSidebar ? 4 : 2); index++)
+            KpiCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        var kpiCards = new Border[] { SalesKpiCard, LowStockKpiCard, ExpiryKpiCard, CashKpiCard };
+        for (var index = 0; index < kpiCards.Length; index++)
+        {
+            Grid.SetColumn(kpiCards[index], showSidebar ? index : index % 2);
+            Grid.SetRow(kpiCards[index], showSidebar ? 0 : index / 2);
+        }
         DashboardContent.Padding = showSidebar
             ? new Thickness(36, 30)
             : new Thickness(16, 24);
@@ -71,6 +87,7 @@ public partial class MainPage : CoordinatorRefreshPage
         base.OnAppearing();
         _connectivity.ConnectivityChanged += OnConnectivityChanged;
         await _viewModel.LoadLowStockAlertsAsync();
+        await _viewModel.LoadWeeklySalesAsync();
         await TrySynchronizeInBackgroundAsync();
         await _realtimeClient.StartAsync();
     }
@@ -81,7 +98,17 @@ public partial class MainPage : CoordinatorRefreshPage
         base.OnDisappearing();
     }
 
-    protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.LoadLowStockAlertsAsync();
+    protected override async Task RefreshAfterCoordinatorChangesAsync()
+    {
+        await _viewModel.LoadLowStockAlertsAsync();
+        await _viewModel.LoadWeeklySalesAsync();
+    }
+
+    private async void OnRefreshWeeklySalesClicked(object? sender, EventArgs args) =>
+        await _viewModel.LoadWeeklySalesAsync();
+
+    private async void OnRefreshOperationalAlertsClicked(object? sender, EventArgs args) =>
+        await _viewModel.LoadLowStockAlertsAsync();
 
     private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args) =>
         await TrySynchronizeInBackgroundAsync();
