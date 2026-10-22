@@ -27,12 +27,6 @@
             <Setter Property="BackgroundColor" Value="Transparent" />
             <Setter Property="HorizontalOptions" Value="Fill" />
         </Style>
-        <Style TargetType="DatePicker">
-            <Setter Property="TextColor" Value="#26384C" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="BackgroundColor" Value="Transparent" />
-            <Setter Property="HorizontalOptions" Value="Fill" />
-        </Style>
         <Style x:Key="SecondaryTextStyle" TargetType="Label">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="TextColor" Value="#61738A" />
@@ -114,7 +108,7 @@
                 </Label.Triggers>
             </Label>
             <Grid Grid.Row="3">
-                <CollectionView IsVisible="{Binding IsSalesSection}" ItemsSource="{Binding Sales}" SelectionMode="None">
+                <CollectionView x:Name="SalesResultsCollection" IsVisible="{Binding IsSalesSection}" ItemsSource="{Binding Sales}" SelectionMode="None">
                     <CollectionView.Header>
                         <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
                             <Border Style="{StaticResource PanelStyle}">
@@ -129,15 +123,11 @@
                                     <Grid x:Name="SalesFiltersGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
                                         <VerticalStackLayout x:Name="SalesFromField" Grid.Column="0" Spacing="6">
                                             <Label Text="Desde" Style="{StaticResource FilterLabelStyle}" />
-                                            <Border Style="{StaticResource FieldStyle}">
-                                                <DatePicker Date="{Binding DateFrom}" />
-                                            </Border>
+                                            <Button Text="{Binding DateFromText}" ImageSource="calendar.png" ContentLayout="Right,10" Clicked="OnSalesFromDateClicked" BackgroundColor="#F8FAFC" TextColor="#26384C" BorderColor="#E3EAF2" BorderWidth="1" FontSize="14" CornerRadius="9" Padding="12,0" HeightRequest="48" HorizontalOptions="Fill" SemanticProperties.Description="Elegir fecha inicial de ventas" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout x:Name="SalesToField" Grid.Column="1" Spacing="6">
                                             <Label Text="Hasta (inclusive)" Style="{StaticResource FilterLabelStyle}" />
-                                            <Border Style="{StaticResource FieldStyle}">
-                                                <DatePicker Date="{Binding DateTo}" />
-                                            </Border>
+                                            <Button Text="{Binding DateToText}" ImageSource="calendar.png" ContentLayout="Right,10" Clicked="OnSalesToDateClicked" BackgroundColor="#F8FAFC" TextColor="#26384C" BorderColor="#E3EAF2" BorderWidth="1" FontSize="14" CornerRadius="9" Padding="12,0" HeightRequest="48" HorizontalOptions="Fill" SemanticProperties.Description="Elegir fecha final de ventas" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout x:Name="SalesModeField" Grid.Column="2" Spacing="6">
                                             <Label Text="Modalidad" Style="{StaticResource FilterLabelStyle}" />
@@ -155,7 +145,10 @@
                                     <Button Text="Consultar ventas" Clicked="OnRefreshClicked" Style="{StaticResource ConsultButtonStyle}" />
                                 </VerticalStackLayout>
                             </Border>
-                            <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="{Binding SalesAppliedPeriodText}" Style="{StaticResource SecondaryTextStyle}" />
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                     </CollectionView.Header>
                     <CollectionView.EmptyView>
@@ -193,7 +186,7 @@
                         <Label Text="Los importes son ventas registradas; no representan cobros recibidos ni ganancia." Style="{StaticResource SecondaryTextStyle}" Margin="0,12,0,16" />
                     </CollectionView.Footer>
                 </CollectionView>
-                <CollectionView IsVisible="{Binding IsInventorySection}" ItemsSource="{Binding Inventory}" SelectionMode="None">
+                <CollectionView x:Name="InventoryResultsCollection" IsVisible="{Binding IsInventorySection}" ItemsSource="{Binding Inventory}" SelectionMode="None">
                     <CollectionView.Header>
                         <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
                             <Border Style="{StaticResource PanelStyle}">
@@ -222,7 +215,10 @@
                                     <Button Text="Consultar inventario" Clicked="OnRefreshClicked" Style="{StaticResource ConsultButtonStyle}" />
                                 </VerticalStackLayout>
                             </Border>
-                            <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Resultados de la consulta" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="{Binding MovementsAppliedPeriodText}" Style="{StaticResource SecondaryTextStyle}" />
+                            </VerticalStackLayout>
                             <Label Text="{Binding InventoryAsOfText}" Style="{StaticResource SecondaryTextStyle}" />
                         </VerticalStackLayout>
                     </CollectionView.Header>
@@ -255,7 +251,7 @@
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>
-                <CollectionView IsVisible="{Binding IsMovementsSection}" ItemsSource="{Binding Movements}" SelectionMode="None">
+                <CollectionView x:Name="MovementsResultsCollection" IsVisible="{Binding IsMovementsSection}" ItemsSource="{Binding Movements}" SelectionMode="None">
                     <CollectionView.Header>
                         <VerticalStackLayout Spacing="18" Margin="0,0,0,12">
                             <Border Style="{StaticResource PanelStyle}">
@@ -270,15 +266,11 @@
                                     <Grid x:Name="MovementsFiltersGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
                                         <VerticalStackLayout x:Name="MovementsFromField" Grid.Column="0" Spacing="6">
                                             <Label Text="Desde" Style="{StaticResource FilterLabelStyle}" />
-                                            <Border Style="{StaticResource FieldStyle}">
-                                                <DatePicker Date="{Binding DateFrom}" />
-                                            </Border>
+                                            <Button Text="{Binding DateFromText}" ImageSource="calendar.png" ContentLayout="Right,10" Clicked="OnMovementsFromDateClicked" BackgroundColor="#F8FAFC" TextColor="#26384C" BorderColor="#E3EAF2" BorderWidth="1" FontSize="14" CornerRadius="9" Padding="12,0" HeightRequest="48" HorizontalOptions="Fill" SemanticProperties.Description="Elegir fecha inicial de movimientos" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout x:Name="MovementsToField" Grid.Column="1" Spacing="6">
                                             <Label Text="Hasta (inclusive)" Style="{StaticResource FilterLabelStyle}" />
-                                            <Border Style="{StaticResource FieldStyle}">
-                                                <DatePicker Date="{Binding DateTo}" />
-                                            </Border>
+                                            <Button Text="{Binding DateToText}" ImageSource="calendar.png" ContentLayout="Right,10" Clicked="OnMovementsToDateClicked" BackgroundColor="#F8FAFC" TextColor="#26384C" BorderColor="#E3EAF2" BorderWidth="1" FontSize="14" CornerRadius="9" Padding="12,0" HeightRequest="48" HorizontalOptions="Fill" SemanticProperties.Description="Elegir fecha final de movimientos" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout x:Name="MovementsProductField" Grid.Column="2" Spacing="6">
                                             <Label Text="Producto" Style="{StaticResource FilterLabelStyle}" />

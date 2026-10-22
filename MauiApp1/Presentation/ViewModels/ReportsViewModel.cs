@@ -28,6 +28,8 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
     private ProductFilterOption? _selectedProduct;
     private MovementTypeFilterOption? _selectedMovementType;
     private DateTime _inventoryAsOfLocal;
+    private string _salesAppliedPeriodText = string.Empty;
+    private string _movementsAppliedPeriodText = string.Empty;
     private string _errorMessage = string.Empty;
     private bool _isBusy;
 
@@ -85,8 +87,34 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
     public bool IsSalesSection => ActiveSection == ReportSection.Sales;
     public bool IsInventorySection => ActiveSection == ReportSection.Inventory;
     public bool IsMovementsSection => ActiveSection == ReportSection.Movements;
-    public DateTime DateFrom { get => _dateFrom; set => SetProperty(ref _dateFrom, value.Date); }
-    public DateTime DateTo { get => _dateTo; set => SetProperty(ref _dateTo, value.Date); }
+    public DateTime DateFrom
+    {
+        get => _dateFrom;
+        set
+        {
+            if (SetProperty(ref _dateFrom, value.Date))
+            {
+                OnPropertyChanged(nameof(DateFromText));
+            }
+        }
+    }
+
+    public DateTime DateTo
+    {
+        get => _dateTo;
+        set
+        {
+            if (SetProperty(ref _dateTo, value.Date))
+            {
+                OnPropertyChanged(nameof(DateToText));
+            }
+        }
+    }
+
+    public string DateFromText => DateFrom.ToString("d", CultureInfo.CurrentCulture);
+    public string DateToText => DateTo.ToString("d", CultureInfo.CurrentCulture);
+    public string SalesAppliedPeriodText { get => _salesAppliedPeriodText; private set => SetProperty(ref _salesAppliedPeriodText, value); }
+    public string MovementsAppliedPeriodText { get => _movementsAppliedPeriodText; private set => SetProperty(ref _movementsAppliedPeriodText, value); }
     public SalesModeOption? SelectedSalesMode { get => _selectedSalesMode; set => SetProperty(ref _selectedSalesMode, value); }
     public CustomerFilterOption? SelectedCustomer { get => _selectedCustomer; set => SetProperty(ref _selectedCustomer, value); }
     public CategoryFilterOption? SelectedCategory { get => _selectedCategory; set => SetProperty(ref _selectedCategory, value); }
@@ -160,6 +188,7 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
                     foreach (var row in await _reportService.GetSalesAsync(
                                  salesFrom, salesTo, SelectedSalesMode?.IsCredit, SelectedCustomer?.CustomerId))
                         Sales.Add(new SalesReportCard(row));
+                    SalesAppliedPeriodText = FormatAppliedPeriod(DateFrom, DateTo);
                     break;
                 case ReportSection.Inventory:
                     Inventory.Clear();
@@ -174,6 +203,7 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
                     foreach (var row in await _reportService.GetMovementsAsync(
                                  movementFrom, movementTo, SelectedProduct?.ProductId, SelectedMovementType?.Type))
                         Movements.Add(new MovementReportCard(row));
+                    MovementsAppliedPeriodText = FormatAppliedPeriod(DateFrom, DateTo);
                     break;
             }
         }
@@ -212,6 +242,9 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
             return false;
         }
     }
+
+    private static string FormatAppliedPeriod(DateTime from, DateTime to) =>
+        $"Periodo consultado: {from.ToString("d", CultureInfo.CurrentCulture)} – {to.ToString("d", CultureInfo.CurrentCulture)}";
 
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
