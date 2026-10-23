@@ -25,11 +25,17 @@ var directory = Path.Combine(Path.GetTempPath(), "MiscelaneaSyncVerification", G
 Directory.CreateDirectory(directory);
 var password = Guid.NewGuid().ToString("N");
 await using var windows = await Runtime.CreateAsync(Path.Combine(directory, "central.db"));
-var admin = await windows.Auth.CreateInitialAdministratorAsync("Admin", password);
+var recoveryCodes = new RecoveryCodeGenerator();
+var admin = await windows.Auth.CreateInitialAdministratorAsync("Admin", password, recoveryCodes.Generate());
 Require(admin.Succeeded, "central administrator creation");
-var cashier1 = await windows.Auth.CreateCashierAccountAsync("Michaell", password);
-var cashier2 = await windows.Auth.CreateCashierAccountAsync("David", password);
+var cashier1 = await windows.Auth.CreateCashierAccountAsync("Michaell", password, recoveryCodes.Generate());
+var cashier2 = await windows.Auth.CreateCashierAccountAsync("David", password, recoveryCodes.Generate());
 Require(cashier1.Succeeded && cashier2.Succeeded, "central cashier creation");
+var cashier1Authentication = await windows.Auth.SignInAsync("Michaell", password);
+var cashier2Authentication = await windows.Auth.SignInAsync("David", password);
+Require(cashier1Authentication.Succeeded && cashier2Authentication.Succeeded,
+    "central cashier authentication");
+await windows.Auth.SignInAsync("Admin", password);
 var store = new CoordinatorOperationStore(windows.Path);
 await store.InitializeAsync();
 var pairing = new CoordinatorPairingStore(windows.Path);
@@ -80,8 +86,8 @@ var address = server.Urls.Single().TrimEnd('/') + "/";
 var fingerprint = certificate.GetCertHashString(HashAlgorithmName.SHA256);
 await using var phone1 = await Runtime.CreateAsync(Path.Combine(directory, "michaell.db"));
 await using var phone2 = await Runtime.CreateAsync(Path.Combine(directory, "david.db"));
-await ConnectPhoneAsync(phone1, cashier1.User!.Id.Value, "Michaell");
-await ConnectPhoneAsync(phone2, cashier2.User!.Id.Value, "David");
+await ConnectPhoneAsync(phone1, cashier1Authentication.User!.Id.Value, "Michaell");
+await ConnectPhoneAsync(phone2, cashier2Authentication.User!.Id.Value, "David");
 
 for (var index = 0; index < 105; index++)
     Require((await windows.Categories.CreateAsync($"Initial {index:D3}")).Succeeded, "initial category creation");
@@ -220,7 +226,7 @@ Console.WriteLine("All isolated three-device checks passed.");
 
 async Task ConnectPhoneAsync(Runtime phone, Guid userId, string name)
 {
-    Require((await phone.Auth.CreateInitialAdministratorAsync(name, password)).Succeeded, "phone local account setup");
+    Require((await phone.Auth.CreateInitialAdministratorAsync(name, password, recoveryCodes.Generate())).Succeeded, "phone local account setup");
     Require((await phone.Auth.SignInWithCoordinatorUserAsync(userId, name, UserRole.Cashier, password)).Succeeded, "local-central account association");
     var deviceId = await phone.Services.GetRequiredService<ILocalDeviceIdentity>().GetDeviceIdAsync();
     var token = Secret();

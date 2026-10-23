@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp1.Presentation.Views.AccountRecoveryPage"
+             Title="Seguridad de la cuenta" BackgroundColor="#F7F9FB">
+    <ScrollView>
+        <Grid Padding="20">
+            <VerticalStackLayout Spacing="18" MaximumWidthRequest="620" HorizontalOptions="Center">
+                <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start"
+                        BackgroundColor="#E8EEF5" TextColor="#111D31" CornerRadius="12" Padding="18,12" />
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Seguridad de la cuenta" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label x:Name="UserNameLabel" FontSize="14" TextColor="#61738A" />
+                </VerticalStackLayout>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
+                        StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="14">
+                        <Label Text="Código de recuperación" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Genera un código para recuperar esta cuenta si olvidas la contraseña. Al generar uno nuevo, el anterior deja de servir."
+                               FontSize="14" TextColor="#61738A" />
+                        <Label Text="Confirma tu contraseña actual" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                        <Entry x:Name="CurrentPasswordEntry" Placeholder="Contraseña actual" IsPassword="True"
+                               HeightRequest="50" BackgroundColor="#F7F9FB" TextColor="#111D31"
+                               PlaceholderColor="#8291A5" />
+                        <Label x:Name="ErrorLabel" IsVisible="False" TextColor="#B42318" FontSize="13" />
+                        <Button x:Name="GenerateButton" Text="Generar código" Clicked="OnGenerateClicked"
+                                BackgroundColor="#008060" TextColor="White" FontAttributes="Bold"
+                                CornerRadius="10" HeightRequest="50" />
+                        <Border x:Name="RecoveryCodeCard" IsVisible="False" Padding="16"
+                                BackgroundColor="#E8FBF2" Stroke="#A7EACD" StrokeThickness="1"
+                                StrokeShape="RoundRectangle 12">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="Guárdalo ahora; no se puede volver a consultar." FontSize="13" TextColor="#52657D" />
+                                <Label x:Name="RecoveryCodeLabel" FontSize="20" FontAttributes="Bold"
+                                       FontFamily="monospace" CharacterSpacing="1" TextColor="#111D31"
+                                       HorizontalTextAlignment="Center" />
+                                <Button Text="Copiar código" Clicked="OnCopyClicked" BackgroundColor="White"
+                                        TextColor="#006B50" CornerRadius="9" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+</ContentPage>

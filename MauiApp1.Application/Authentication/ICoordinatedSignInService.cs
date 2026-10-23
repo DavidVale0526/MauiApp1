@@ -7,6 +7,8 @@ public interface ICoordinatedSignInService
     string? LastSignInStatus { get; }
     void ReportSessionProblem(string message);
     Task<CoordinatedSignInResult> SignInAsync(string userName, string password, CancellationToken cancellationToken = default);
+    Task<PasswordRecoveryResult> ResetPasswordAsync(string userName, string recoveryCode, string newPassword, CancellationToken cancellationToken = default);
+    Task<PasswordRecoveryResult> ConfigureRecoveryCodeAsync(string currentPassword, CancellationToken cancellationToken = default);
     Task SignOutAsync();
 }
 

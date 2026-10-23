@@ -21,6 +21,11 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
         _authenticationService = authenticationService;
         _signInService = signInService;
 
+        AddOptions(AccountOptions,
+        [
+            new("♙", "Seguridad de la cuenta", "Configurar o renovar el código de recuperación", typeof(AccountRecoveryPage))
+        ]);
+
         AddOptions(OperationsOptions,
         [
             new("▣", "Registrar venta", "Iniciar una nueva venta", typeof(SaleRegistrationPage)),

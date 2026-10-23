@@ -54,6 +54,22 @@
                         </VerticalStackLayout>
                         <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
                         <Label Text="{Binding SuccessMessage}" TextColor="#008060" FontSize="14" FontAttributes="Bold" />
+                        <Border IsVisible="{Binding HasRecoveryCode}" Padding="14" BackgroundColor="#E8FBF2"
+                                Stroke="#A7EACD" StrokeThickness="1" StrokeShape="RoundRectangle 12">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="Código de recuperación del cajero" FontSize="15" FontAttributes="Bold" TextColor="#006B50" />
+                                <Label Text="{Binding RecoveryCode}" FontSize="20" FontAttributes="Bold" TextColor="#111D31"
+                                       FontFamily="monospace" CharacterSpacing="1" />
+                                <Label Text="Se muestra una sola vez. Entrégaselo al cajero; podrá usarlo si olvida su contraseña."
+                                       FontSize="13" TextColor="#52657D" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                    <Button Text="Copiar código" Command="{Binding CopyRecoveryCodeCommand}"
+                                            BackgroundColor="#008060" TextColor="White" CornerRadius="9" />
+                                    <Button Grid.Column="1" Text="Ya lo guardé" Command="{Binding DismissRecoveryCodeCommand}"
+                                            BackgroundColor="#E8EEF5" TextColor="#111D31" CornerRadius="9" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
                         <Button Text="Crear cuenta" Command="{Binding CreateAccountCommand}" Style="{StaticResource PrimaryButton}" />
                     </VerticalStackLayout>
                 </Border>

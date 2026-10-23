@@ -8,6 +8,7 @@ using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Sync;
 using MauiApp1.Domain.Users;
+using MauiApp1.Infrastructure.Authentication;
 using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Lan;
@@ -16,7 +17,7 @@ public sealed class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,
-    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorChangeClient, IInitialDataImportClient
+    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public string? LastChangeError { get; private set; }
@@ -197,32 +198,132 @@ public sealed class CoordinatorPairingClient(
         return client;
     }
 
-    public async Task<AuthenticationResult> CreateCashierAsync(string userName, string password, CancellationToken cancellationToken = default)
+    public async Task<AccountProvisioningResult> CreateCashierAsync(
+        string userName, string password, string recoveryCode, CancellationToken cancellationToken = default)
     {
         var link = await ReadLinkAsync();
         var session = await sessionStorage.ReadAsync();
         if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow ||
             session.LocalUserId == Guid.Empty || session.CoordinatorUserId == Guid.Empty)
-            return AuthenticationResult.Failure("Conecta este dispositivo al coordinador e inicia sesión central como Administrador para crear cuentas.");
+            return AccountProvisioningResult.Failure("Conecta este dispositivo al coordinador e inicia sesión central como Administrador para crear cuentas.");
         if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out var error))
-            return AuthenticationResult.Failure(error ?? "La conexión del coordinador no es válida.");
+            return AccountProvisioningResult.Failure(error ?? "La conexión del coordinador no es válida.");
+        if (!RecoveryCodeGenerator.TryNormalize(recoveryCode, out _))
+            return AccountProvisioningResult.Failure("El código de recuperación no es válido.");
         try
         {
             using var client = CreatePinnedClient(uri!, fingerprint);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
             client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
             client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
-            using var response = await client.PostAsJsonAsync("api/users/cashiers", new { userName, password }, cancellationToken);
-            if (response.IsSuccessStatusCode) return new AuthenticationResult(true, null, null);
+            using var response = await client.PostAsJsonAsync(
+                "api/users/cashiers", new { userName, password, recoveryCode }, cancellationToken);
+            if (response.IsSuccessStatusCode) return AccountProvisioningResult.Success(recoveryCode);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
-                return AuthenticationResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
+                return AccountProvisioningResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
             var errorResult = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
-            return AuthenticationResult.Failure(errorResult?.Message ?? "El coordinador no pudo crear la cuenta.");
+            return AccountProvisioningResult.Failure(errorResult?.Message ?? "El coordinador no pudo crear la cuenta.");
         }
-        catch (HttpRequestException) { return AuthenticationResult.Failure("El coordinador no está disponible por LAN. La cuenta no se creó."); }
+        catch (HttpRequestException) { return AccountProvisioningResult.Unknown(recoveryCode, "No se recibió confirmación del coordinador. Conserva el código y actualiza la lista de cajeros antes de volver a crear la cuenta."); }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        { return AuthenticationResult.Failure("El coordinador no respondió. La cuenta no se creó."); }
-        catch (System.Text.Json.JsonException) { return AuthenticationResult.Failure("La respuesta del coordinador no es válida."); }
+        { return AccountProvisioningResult.Unknown(recoveryCode, "El coordinador no confirmó el resultado. Conserva el código y actualiza la lista antes de volver a crear la cuenta."); }
+        catch (System.Text.Json.JsonException) { return AccountProvisioningResult.Unknown(recoveryCode, "La respuesta del coordinador no es válida. Conserva el código y actualiza la lista antes de volver a crear la cuenta."); }
+    }
+
+    public async Task<CoordinatorPasswordRecoveryResult> ResetPasswordAsync(
+        string userName,
+        string recoveryCode,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        CoordinatorDeviceLink? link;
+        try { link = await ReadLinkAsync(); }
+        catch (Exception exception) when (exception is InvalidDataException or IOException)
+        { return CoordinatorPasswordRecoveryResult.Rejected("La vinculación guardada no es válida. Vuelve a vincular este dispositivo."); }
+
+        if (link is null || !link.IsConfirmed) return CoordinatorPasswordRecoveryResult.NotLinked();
+        if (!TryValidateConnection(link.Address, link.CertificateFingerprint, out var uri, out var fingerprint, out var error))
+            return CoordinatorPasswordRecoveryResult.Rejected(error);
+
+        try
+        {
+            using var client = CreatePinnedClient(uri!, fingerprint);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
+            client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
+            using var response = await client.PostAsJsonAsync("api/auth/recovery/reset",
+                new { userName, recoveryCode, newPassword }, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<RecoveryCodeResponse>(cancellationToken);
+                return !string.IsNullOrWhiteSpace(result?.RecoveryCode)
+                    ? CoordinatorPasswordRecoveryResult.Completed(result.RecoveryCode)
+                    : CoordinatorPasswordRecoveryResult.OutcomeUnknown("El coordinador pudo cambiar la contraseña, pero no se recibió el código nuevo. Intenta iniciar sesión con la contraseña nueva y, al entrar, genera otro código desde Seguridad de la cuenta.");
+            }
+
+            var errorResult = await ReadApiMessageAsync(response, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.ServiceUnavailable)
+                return CoordinatorPasswordRecoveryResult.Unavailable(errorResult?.Message ?? "Actualiza o inicia el coordinador del negocio y vuelve a intentarlo.");
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                return CoordinatorPasswordRecoveryResult.Rejected(errorResult?.Message ?? "Se hicieron demasiados intentos. Espera un minuto y vuelve a intentarlo.");
+            return response.StatusCode is >= HttpStatusCode.InternalServerError
+                ? CoordinatorPasswordRecoveryResult.OutcomeUnknown(errorResult?.Message ?? "El coordinador no confirmó el resultado. El cambio pudo completarse; intenta iniciar sesión con la contraseña nueva.")
+                : CoordinatorPasswordRecoveryResult.Rejected(errorResult?.Message ??
+                    "El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada.");
+        }
+        catch (HttpRequestException) { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("Se perdió la conexión antes de confirmar el resultado. El cambio pudo completarse; intenta iniciar sesión con la contraseña nueva. Si logras entrar, genera otro código desde Seguridad de la cuenta."); }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("El coordinador tardó demasiado para confirmar. El cambio pudo completarse; intenta iniciar sesión con la contraseña nueva. Si logras entrar, genera otro código desde Seguridad de la cuenta."); }
+        catch (System.Text.Json.JsonException)
+        { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("La respuesta del coordinador no se pudo leer. El cambio pudo completarse; intenta iniciar sesión con la contraseña nueva. Si logras entrar, genera otro código desde Seguridad de la cuenta."); }
+    }
+
+    public async Task<CoordinatorPasswordRecoveryResult> ConfigureRecoveryCodeAsync(
+        string currentPassword,
+        CancellationToken cancellationToken = default)
+    {
+        CoordinatorDeviceLink? link;
+        try { link = await ReadLinkAsync(); }
+        catch (Exception exception) when (exception is InvalidDataException or IOException)
+        { return CoordinatorPasswordRecoveryResult.Rejected("La vinculación guardada no es válida. Vuelve a vincular este dispositivo."); }
+        if (link is null || !link.IsConfirmed) return CoordinatorPasswordRecoveryResult.NotLinked();
+
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return CoordinatorPasswordRecoveryResult.Unavailable("Inicia sesión con el coordinador y vuelve a intentarlo.");
+
+        using (client)
+        {
+            try
+            {
+                using var response = await client.PostAsJsonAsync(
+                    "api/auth/recovery/enroll", new { currentPassword }, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<RecoveryCodeResponse>(cancellationToken);
+                    return !string.IsNullOrWhiteSpace(result?.RecoveryCode)
+                        ? CoordinatorPasswordRecoveryResult.Completed(result.RecoveryCode)
+                        : CoordinatorPasswordRecoveryResult.OutcomeUnknown("El código pudo guardarse, pero no se recibió. Vuelve a generarlo para obtener uno nuevo.");
+                }
+
+                var error = await ReadApiMessageAsync(response, cancellationToken);
+                return response.StatusCode == HttpStatusCode.Unauthorized
+                    ? CoordinatorPasswordRecoveryResult.Rejected(error?.Message ?? "La contraseña actual no es correcta o la sesión venció.")
+                    : CoordinatorPasswordRecoveryResult.Unavailable(error?.Message ?? "El coordinador no pudo guardar el código.");
+            }
+            catch (HttpRequestException) { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("Se perdió la conexión y no se confirmó el resultado. El código pudo guardarse; vuelve a generarlo para obtener uno nuevo."); }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("El coordinador tardó demasiado. El código pudo guardarse; vuelve a generarlo para obtener uno nuevo."); }
+            catch (System.Text.Json.JsonException)
+            { return CoordinatorPasswordRecoveryResult.OutcomeUnknown("La respuesta no se pudo leer. El código pudo guardarse; vuelve a generarlo para obtener uno nuevo."); }
+        }
+    }
+
+    private static async Task<ApiMessageResponse?> ReadApiMessageAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        try { return await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken); }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     public async Task<CashierAccountListResult> GetCashiersAsync(CancellationToken cancellationToken = default)
@@ -562,6 +663,7 @@ public sealed class CoordinatorPairingClient(
     private sealed record PairResponse(bool Success, string Message);
     private sealed record HealthResponse(string Status);
     private sealed record SessionResponse(string SessionToken, Guid UserId, string UserName, string Role, DateTime ExpiresAtUtc);
+    private sealed record RecoveryCodeResponse(string? RecoveryCode);
     private sealed record ApiMessageResponse(string Message);
 }
 

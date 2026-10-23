@@ -110,6 +110,15 @@
 
                 <VerticalStackLayout Grid.Row="3" Spacing="8">
                     <Border Style="{StaticResource SidebarButtonStyle}">
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnAccountRecoveryClicked" /></Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
+                            <Label Text="♙" FontSize="20" TextColor="White" HorizontalTextAlignment="Center"
+                                   VerticalTextAlignment="Center" />
+                            <Label Grid.Column="1" Text="Seguridad de la cuenta" FontSize="13" TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource SidebarButtonStyle}">
                         <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSynchronizationClicked" /></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
                             <Image Source="nav_more_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />

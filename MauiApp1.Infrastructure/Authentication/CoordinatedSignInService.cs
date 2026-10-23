@@ -5,6 +5,7 @@ namespace MauiApp1.Infrastructure.Authentication;
 public sealed class CoordinatedSignInService(
     IAuthenticationService localAuthentication,
     ICoordinatorAuthenticationClient coordinatorClient,
+    ICoordinatorPasswordRecoveryClient coordinatorPasswordRecoveryClient,
     ICoordinatorUserSessionStorage sessionStorage) : ICoordinatedSignInService
 {
     public string? LastSignInStatus { get; private set; }
@@ -92,6 +93,67 @@ public sealed class CoordinatedSignInService(
 
         LastSignInStatus = "Acceso local. La sesión compartida no está activa.";
         return new(local);
+    }
+
+    public async Task<PasswordRecoveryResult> ResetPasswordAsync(
+        string userName,
+        string recoveryCode,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var central = await coordinatorPasswordRecoveryClient.ResetPasswordAsync(
+            userName, recoveryCode, newPassword, cancellationToken);
+        switch (central.Status)
+        {
+            case CoordinatorRecoveryStatus.Completed:
+                await ClearCoordinatorSessionAsync();
+                localAuthentication.SignOut();
+                return central.RecoveryCode is not null
+                    ? PasswordRecoveryResult.Success(central.RecoveryCode)
+                    : PasswordRecoveryResult.Failure("El coordinador no devolvió el nuevo código. Contacta al Administrador antes de volver a intentarlo.");
+            case CoordinatorRecoveryStatus.Unavailable:
+                return PasswordRecoveryResult.Failure(central.Message ??
+                    "El coordinador no está disponible. Conéctate a la red del negocio; no se cambió ninguna credencial.");
+            case CoordinatorRecoveryStatus.OutcomeUnknown:
+                return PasswordRecoveryResult.Failure(central.Message ??
+                    "No se recibió confirmación. El cambio pudo completarse; intenta iniciar sesión con la contraseña nueva. Si logras entrar, genera otro código desde Seguridad de la cuenta.");
+            case CoordinatorRecoveryStatus.Rejected:
+                return PasswordRecoveryResult.Failure(central.Message ??
+                    "El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada.");
+            default:
+                return await localAuthentication.ResetPasswordAsync(
+                    userName, recoveryCode, newPassword, cancellationToken);
+        }
+    }
+
+    public async Task<PasswordRecoveryResult> ConfigureRecoveryCodeAsync(
+        string currentPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var central = await coordinatorPasswordRecoveryClient.ConfigureRecoveryCodeAsync(
+            currentPassword, cancellationToken);
+        switch (central.Status)
+        {
+            case CoordinatorRecoveryStatus.Completed:
+                return central.RecoveryCode is not null
+                    ? PasswordRecoveryResult.Success(central.RecoveryCode)
+                    : PasswordRecoveryResult.Failure("El coordinador no devolvió el código de recuperación.");
+            case CoordinatorRecoveryStatus.Unavailable:
+                return PasswordRecoveryResult.Failure(central.Message ??
+                    "El coordinador no está disponible. Conéctate a la red del negocio; no se cambió ninguna credencial.");
+            case CoordinatorRecoveryStatus.OutcomeUnknown:
+                return PasswordRecoveryResult.Failure(central.Message ??
+                    "El código pudo guardarse, pero no se recibió. Vuelve a generarlo para obtener uno nuevo.");
+            case CoordinatorRecoveryStatus.Rejected:
+                return PasswordRecoveryResult.Failure(central.Message ?? "La contraseña actual no es correcta.");
+            default:
+                return await localAuthentication.ConfigureRecoveryCodeAsync(currentPassword, cancellationToken);
+        }
+    }
+
+    private async Task ClearCoordinatorSessionAsync()
+    {
+        try { await sessionStorage.RemoveAsync(); } catch { }
     }
 
     private async Task KeepOnlyMatchingSessionAsync(Guid localUserId, CancellationToken cancellationToken)

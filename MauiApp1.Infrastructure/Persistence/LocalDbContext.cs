@@ -98,6 +98,9 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.PasswordSalt).IsRequired();
             entity.Property(item => item.PasswordHash).IsRequired();
             entity.Property(item => item.PasswordIterations).IsRequired();
+            entity.Property(item => item.RecoveryCodeSalt);
+            entity.Property(item => item.RecoveryCodeHash);
+            entity.Property(item => item.RecoveryCodeIterations);
             entity.Property(item => item.Role).IsRequired();
             entity.Property(item => item.IsEnabled).IsRequired();
             entity.Property(item => item.CreatedAtUtc)

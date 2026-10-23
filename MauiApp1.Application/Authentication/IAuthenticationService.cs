@@ -10,14 +10,26 @@ public interface IAuthenticationService
 
     Task<bool> HasAdministratorAsync(CancellationToken cancellationToken = default);
 
-    Task<AuthenticationResult> CreateInitialAdministratorAsync(
+    Task<AccountProvisioningResult> CreateInitialAdministratorAsync(
         string userName,
         string password,
+        string recoveryCode,
         CancellationToken cancellationToken = default);
 
-    Task<AuthenticationResult> CreateCashierAccountAsync(
+    Task<AccountProvisioningResult> CreateCashierAccountAsync(
         string userName,
         string password,
+        string recoveryCode,
+        CancellationToken cancellationToken = default);
+
+    Task<PasswordRecoveryResult> ResetPasswordAsync(
+        string userName,
+        string recoveryCode,
+        string newPassword,
+        CancellationToken cancellationToken = default);
+
+    Task<PasswordRecoveryResult> ConfigureRecoveryCodeAsync(
+        string currentPassword,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(

@@ -11,6 +11,7 @@ namespace MauiApp1.Infrastructure.Authentication;
 internal sealed class LocalAuthenticationService(
     IDbContextFactory<LocalDbContext> contextFactory,
     Pbkdf2PasswordHasher passwordHasher,
+    RecoveryCodeGenerator recoveryCodeGenerator,
     ILogger<LocalAuthenticationService> logger) : IAuthenticationService
 {
     private const int MinimumPasswordLength = 5;
@@ -29,16 +30,19 @@ internal sealed class LocalAuthenticationService(
             account => account.Role == (int)UserRole.Administrator, cancellationToken);
     }
 
-    public async Task<AuthenticationResult> CreateInitialAdministratorAsync(
+    public async Task<AccountProvisioningResult> CreateInitialAdministratorAsync(
         string userName,
         string password,
+        string recoveryCode,
         CancellationToken cancellationToken = default)
     {
         var validationError = ValidateCredentials(userName, password);
         if (validationError is not null)
         {
-            return AuthenticationResult.Failure(validationError);
+            return AccountProvisioningResult.Failure(validationError);
         }
+        if (!RecoveryCodeGenerator.TryNormalize(recoveryCode, out var normalizedRecoveryCode))
+            return AccountProvisioningResult.Failure("No se pudo validar el código de recuperación. Genera uno nuevo e inténtalo de nuevo.");
 
         var normalizedUserName = NormalizeUserName(userName);
         logger.LogDebug("Acceso: consultando cuenta local (longitud del usuario: {UserNameLength}).", userName.Length);
@@ -46,28 +50,30 @@ internal sealed class LocalAuthenticationService(
         if (await context.UserAccounts.AnyAsync(
                 account => account.Role == (int)UserRole.Administrator, cancellationToken))
         {
-            return AuthenticationResult.Failure("La cuenta inicial ya fue configurada en este dispositivo.");
+            return AccountProvisioningResult.Failure("La cuenta inicial ya fue configurada en este dispositivo.");
         }
 
         if (await context.UserAccounts.AnyAsync(
                 account => account.NormalizedUserName == normalizedUserName, cancellationToken))
         {
-            return AuthenticationResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
+            return AccountProvisioningResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
         }
 
         var (salt, hash) = await Task.Run(() => passwordHasher.Hash(password), cancellationToken);
+        var (recoverySalt, recoveryHash) = await Task.Run(
+            () => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         if (await context.UserAccounts.AnyAsync(
                 account => account.Role == (int)UserRole.Administrator, cancellationToken))
         {
-            return AuthenticationResult.Failure("La cuenta inicial ya fue configurada en este dispositivo.");
+            return AccountProvisioningResult.Failure("La cuenta inicial ya fue configurada en este dispositivo.");
         }
 
         if (await context.UserAccounts.AnyAsync(
                 account => account.NormalizedUserName == normalizedUserName, cancellationToken))
         {
-            return AuthenticationResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
+            return AccountProvisioningResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
         }
 
         var account = new UserAccountEntity
@@ -78,6 +84,9 @@ internal sealed class LocalAuthenticationService(
             PasswordSalt = salt,
             PasswordHash = hash,
             PasswordIterations = Pbkdf2PasswordHasher.Iterations,
+            RecoveryCodeSalt = recoverySalt,
+            RecoveryCodeHash = recoveryHash,
+            RecoveryCodeIterations = Pbkdf2PasswordHasher.Iterations,
             Role = (int)UserRole.Administrator,
             IsEnabled = true,
             CreatedAtUtc = DateTime.UtcNow
@@ -88,39 +97,44 @@ internal sealed class LocalAuthenticationService(
         await transaction.CommitAsync(cancellationToken);
 
         SetCurrentUser(ToAuthenticatedUser(account));
-        return AuthenticationResult.Success(_currentUser!);
+        return AccountProvisioningResult.Success(recoveryCode);
     }
 
-    public async Task<AuthenticationResult> CreateCashierAccountAsync(
+    public async Task<AccountProvisioningResult> CreateCashierAccountAsync(
         string userName,
         string password,
+        string recoveryCode,
         CancellationToken cancellationToken = default)
     {
         if (_currentUser?.Role != UserRole.Administrator)
         {
-            return AuthenticationResult.Failure("Solo una sesión de Administrador puede crear cuentas.");
+            return AccountProvisioningResult.Failure("Solo una sesión de Administrador puede crear cuentas.");
         }
 
         var validationError = ValidateCredentials(userName, password);
         if (validationError is not null)
         {
-            return AuthenticationResult.Failure(validationError);
+            return AccountProvisioningResult.Failure(validationError);
         }
+        if (!RecoveryCodeGenerator.TryNormalize(recoveryCode, out var normalizedRecoveryCode))
+            return AccountProvisioningResult.Failure("No se pudo validar el código de recuperación. Genera uno nuevo e inténtalo de nuevo.");
 
         var normalizedUserName = NormalizeUserName(userName);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (await context.UserAccounts.AnyAsync(
                 account => account.NormalizedUserName == normalizedUserName, cancellationToken))
         {
-            return AuthenticationResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
+            return AccountProvisioningResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
         }
 
         var (salt, hash) = await Task.Run(() => passwordHasher.Hash(password), cancellationToken);
+        var (recoverySalt, recoveryHash) = await Task.Run(
+            () => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
 
         if (await context.UserAccounts.AnyAsync(
                 account => account.NormalizedUserName == normalizedUserName, cancellationToken))
         {
-            return AuthenticationResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
+            return AccountProvisioningResult.Failure("Ese nombre de usuario ya está registrado en este dispositivo.");
         }
 
         var account = new UserAccountEntity
@@ -131,6 +145,9 @@ internal sealed class LocalAuthenticationService(
             PasswordSalt = salt,
             PasswordHash = hash,
             PasswordIterations = Pbkdf2PasswordHasher.Iterations,
+            RecoveryCodeSalt = recoverySalt,
+            RecoveryCodeHash = recoveryHash,
+            RecoveryCodeIterations = Pbkdf2PasswordHasher.Iterations,
             Role = (int)UserRole.Cashier,
             IsEnabled = true,
             CreatedAtUtc = DateTime.UtcNow
@@ -138,7 +155,83 @@ internal sealed class LocalAuthenticationService(
 
         context.UserAccounts.Add(account);
         await context.SaveChangesAsync(cancellationToken);
-        return AuthenticationResult.Success(ToAuthenticatedUser(account));
+        return AccountProvisioningResult.Success(recoveryCode);
+    }
+
+    public async Task<PasswordRecoveryResult> ResetPasswordAsync(
+        string userName,
+        string recoveryCode,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(userName) || userName.Trim().Length > MaximumUserNameLength ||
+            string.IsNullOrEmpty(newPassword) || newPassword.Length is < MinimumPasswordLength or > MaximumPasswordLength ||
+            !RecoveryCodeGenerator.TryNormalize(recoveryCode, out var normalizedRecoveryCode))
+            return PasswordRecoveryResult.Failure("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada.");
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var account = await context.UserAccounts.SingleOrDefaultAsync(
+            item => item.NormalizedUserName == NormalizeUserName(userName) && item.IsEnabled,
+            cancellationToken);
+        if (account is null || account.CoordinatorUserId is not null ||
+            account.RecoveryCodeSalt is null || account.RecoveryCodeHash is null || account.RecoveryCodeIterations is null)
+            return PasswordRecoveryResult.Failure("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada.");
+
+        var codeIsValid = await Task.Run(
+            () => passwordHasher.Verify(normalizedRecoveryCode, account.RecoveryCodeSalt,
+                account.RecoveryCodeHash, account.RecoveryCodeIterations.Value), cancellationToken);
+        if (!codeIsValid)
+            return PasswordRecoveryResult.Failure("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada.");
+
+        var newRecoveryCode = recoveryCodeGenerator.Generate();
+        RecoveryCodeGenerator.TryNormalize(newRecoveryCode, out var normalizedNewRecoveryCode);
+        var (passwordSalt, passwordHash) = await Task.Run(
+            () => passwordHasher.Hash(newPassword), cancellationToken);
+        var (recoverySalt, recoveryHash) = await Task.Run(
+            () => passwordHasher.Hash(normalizedNewRecoveryCode), cancellationToken);
+
+        account.PasswordSalt = passwordSalt;
+        account.PasswordHash = passwordHash;
+        account.PasswordIterations = Pbkdf2PasswordHasher.Iterations;
+        account.RecoveryCodeSalt = recoverySalt;
+        account.RecoveryCodeHash = recoveryHash;
+        account.RecoveryCodeIterations = Pbkdf2PasswordHasher.Iterations;
+        await context.SaveChangesAsync(cancellationToken);
+
+        if (_currentUser?.Id.Value == account.UserId) SetCurrentUser(null);
+        logger.LogInformation("Se restablecieron las credenciales de una cuenta local habilitada.");
+        return PasswordRecoveryResult.Success(newRecoveryCode);
+    }
+
+    public async Task<PasswordRecoveryResult> ConfigureRecoveryCodeAsync(
+        string currentPassword,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser is null || string.IsNullOrEmpty(currentPassword) || currentPassword.Length > MaximumPasswordLength)
+            return PasswordRecoveryResult.Failure("Vuelve a iniciar sesión e inténtalo de nuevo.");
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var account = await context.UserAccounts.SingleOrDefaultAsync(
+            item => item.UserId == _currentUser.Id.Value && item.IsEnabled, cancellationToken);
+        if (account is null)
+            return PasswordRecoveryResult.Failure("No se pudo validar la cuenta actual.");
+        if (account.CoordinatorUserId is not null)
+            return PasswordRecoveryResult.Failure("Esta cuenta se administra en el coordinador. Conéctate a la red del negocio para configurar su recuperación.");
+
+        var passwordIsValid = await Task.Run(
+            () => passwordHasher.Verify(currentPassword, account.PasswordSalt, account.PasswordHash, account.PasswordIterations),
+            cancellationToken);
+        if (!passwordIsValid)
+            return PasswordRecoveryResult.Failure("La contraseña actual no es correcta.");
+
+        var recoveryCode = recoveryCodeGenerator.Generate();
+        RecoveryCodeGenerator.TryNormalize(recoveryCode, out var normalizedRecoveryCode);
+        var (salt, hash) = await Task.Run(() => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
+        account.RecoveryCodeSalt = salt;
+        account.RecoveryCodeHash = hash;
+        account.RecoveryCodeIterations = Pbkdf2PasswordHasher.Iterations;
+        await context.SaveChangesAsync(cancellationToken);
+        return PasswordRecoveryResult.Success(recoveryCode);
     }
 
     public async Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(
@@ -244,6 +337,9 @@ internal sealed class LocalAuthenticationService(
         account.PasswordSalt = salt;
         account.PasswordHash = hash;
         account.PasswordIterations = Pbkdf2PasswordHasher.Iterations;
+        account.RecoveryCodeSalt = null;
+        account.RecoveryCodeHash = null;
+        account.RecoveryCodeIterations = null;
         account.Role = (int)role;
         account.IsEnabled = true;
 

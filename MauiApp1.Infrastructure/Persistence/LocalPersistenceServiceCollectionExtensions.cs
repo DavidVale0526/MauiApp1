@@ -47,6 +47,8 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddScoped<IOperationOutbox, EfOperationOutbox>();
         services.AddScoped<ILocalUnitOfWork>(provider => provider.GetRequiredService<LocalDbContext>());
         services.AddSingleton<Pbkdf2PasswordHasher>();
+        services.AddSingleton<RecoveryCodeGenerator>();
+        services.AddSingleton<IRecoveryCodeGenerator>(provider => provider.GetRequiredService<RecoveryCodeGenerator>());
         services.AddSingleton<CoordinatorBusinessOperationApplier>();
         if (registerLocalSyncServices)
         {

@@ -15,6 +15,15 @@
                 </Grid>
 
                 <VerticalStackLayout Spacing="10">
+                    <Label Text="MI CUENTA" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="AccountOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
                     <Label Text="OPERACIONES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
                            CharacterSpacing="1" TextColor="#737B85" />
                     <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"

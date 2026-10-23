@@ -6,6 +6,7 @@ using System.Windows.Input;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
 
 namespace MauiApp1.Presentation.ViewModels;
 
@@ -15,11 +16,13 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
     private readonly ICoordinatorCashierAccountClient _coordinatorCashierClient;
     private readonly ICoordinatorUserSessionStorage _coordinatorSessionStorage;
     private readonly DesktopCoordinatorModeOptions _desktopMode;
+    private readonly IRecoveryCodeGenerator _recoveryCodeGenerator;
     private string _userName = string.Empty;
     private string _password = string.Empty;
     private string _passwordConfirmation = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
+    private string _recoveryCode = string.Empty;
     private string _listErrorMessage = string.Empty;
     private bool _isBusy;
 
@@ -27,20 +30,26 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         IAuthenticationService authenticationService,
         ICoordinatorCashierAccountClient coordinatorCashierClient,
         ICoordinatorUserSessionStorage coordinatorSessionStorage,
-        DesktopCoordinatorModeOptions desktopMode)
+        DesktopCoordinatorModeOptions desktopMode,
+        IRecoveryCodeGenerator recoveryCodeGenerator)
     {
         _authenticationService = authenticationService;
         _coordinatorCashierClient = coordinatorCashierClient;
         _coordinatorSessionStorage = coordinatorSessionStorage;
         _desktopMode = desktopMode;
+        _recoveryCodeGenerator = recoveryCodeGenerator;
         CreateAccountCommand = new Command(async () => await CreateAccountAsync(), () => !IsBusy);
         RefreshCashiersCommand = new Command(async () => await LoadCashiersAsync(), () => !IsBusy);
+        CopyRecoveryCodeCommand = new Command(async () => await Clipboard.Default.SetTextAsync(RecoveryCode));
+        DismissRecoveryCodeCommand = new Command(() => RecoveryCode = string.Empty);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ICommand CreateAccountCommand { get; }
     public ICommand RefreshCashiersCommand { get; }
+    public ICommand CopyRecoveryCodeCommand { get; }
+    public ICommand DismissRecoveryCodeCommand { get; }
     public ObservableCollection<CashierAccountRow> Cashiers { get; } = new();
 
     public string UserName
@@ -72,6 +81,17 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         get => _successMessage;
         private set => SetProperty(ref _successMessage, value);
     }
+
+    public string RecoveryCode
+    {
+        get => _recoveryCode;
+        private set
+        {
+            if (SetProperty(ref _recoveryCode, value)) OnPropertyChanged(nameof(HasRecoveryCode));
+        }
+    }
+
+    public bool HasRecoveryCode => !string.IsNullOrWhiteSpace(RecoveryCode);
 
     public string ListErrorMessage
     {
@@ -136,6 +156,7 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
 
         ErrorMessage = string.Empty;
         SuccessMessage = string.Empty;
+        RecoveryCode = string.Empty;
         if (!string.Equals(Password, PasswordConfirmation, StringComparison.Ordinal))
         {
             ErrorMessage = "Las contraseñas no coinciden.";
@@ -146,20 +167,30 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         try
         {
             var useCoordinator = await ShouldUseCoordinatorAccountStoreAsync();
+            var recoveryCode = _recoveryCodeGenerator.Generate();
             var result = useCoordinator
-                ? await _coordinatorCashierClient.CreateCashierAsync(UserName, Password)
-                : await _authenticationService.CreateCashierAccountAsync(UserName, Password);
+                ? await _coordinatorCashierClient.CreateCashierAsync(UserName, Password, recoveryCode)
+                : await _authenticationService.CreateCashierAccountAsync(UserName, Password, recoveryCode);
 
             if (!result.Succeeded)
             {
                 ErrorMessage = result.ErrorMessage ?? "No fue posible crear la cuenta.";
+                if (result.OutcomeUnknown && result.RecoveryCode is not null)
+                {
+                    RecoveryCode = result.RecoveryCode;
+                    SuccessMessage = "No se recibió confirmación. Conserva el código y verifica si la cuenta aparece en la lista.";
+                    Password = string.Empty;
+                    PasswordConfirmation = string.Empty;
+                    await RefreshCashiersCoreAsync();
+                }
                 return;
             }
 
             UserName = string.Empty;
             Password = string.Empty;
             PasswordConfirmation = string.Empty;
-            SuccessMessage = "Cuenta de cajero creada correctamente.";
+            RecoveryCode = result.RecoveryCode ?? recoveryCode;
+            SuccessMessage = "Cuenta creada. Entrega este código al cajero y guárdalo en un lugar seguro.";
             await RefreshCashiersCoreAsync();
         }
         catch

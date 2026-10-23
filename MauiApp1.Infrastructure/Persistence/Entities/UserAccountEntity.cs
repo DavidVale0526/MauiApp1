@@ -16,6 +16,12 @@ internal sealed class UserAccountEntity
 
     public int PasswordIterations { get; set; }
 
+    public byte[]? RecoveryCodeSalt { get; set; }
+
+    public byte[]? RecoveryCodeHash { get; set; }
+
+    public int? RecoveryCodeIterations { get; set; }
+
     public int Role { get; set; }
 
     public bool IsEnabled { get; set; }

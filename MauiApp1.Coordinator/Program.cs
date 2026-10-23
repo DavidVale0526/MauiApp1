@@ -12,11 +12,13 @@ using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Sync;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 internal static class Program
 {
     private static readonly SemaphoreSlim PairingCredentialLock = new(1, 1);
+    private static readonly SemaphoreSlim RecoveryCredentialLock = new(1, 1);
 
     public static async Task<int> Main(string[] args)
     {
@@ -133,6 +135,16 @@ internal static class Program
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+            options.AddPolicy("password-recovery", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                         AutoReplenishment = true
@@ -427,6 +439,127 @@ internal static class Program
             }
         }).RequireRateLimiting("device-pairing");
 
+        app.MapPost("/api/auth/recovery/reset", async (
+            PasswordRecoveryRequest request,
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher passwordHasher,
+            MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator recoveryCodeGenerator,
+            CoordinatorPairingStore pairingStore,
+            CoordinatorConnectionRegistry connectionRegistry,
+            Microsoft.AspNetCore.SignalR.IHubContext<CoordinatorChangesHub> changesHub,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null)
+                return Results.Json(new ApiMessageResponse("Este dispositivo no está autorizado para solicitar la recuperación."), statusCode: StatusCodes.Status401Unauthorized);
+
+            await RecoveryCredentialLock.WaitAsync(cancellationToken);
+            try
+            {
+                var userName = request.UserName?.Trim();
+                if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 ||
+                    string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length is < 5 or > 1024 ||
+                    !MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(
+                        request.RecoveryCode, out var normalizedRecoveryCode))
+                    return Results.Json(new ApiMessageResponse("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada."), statusCode: StatusCodes.Status401Unauthorized);
+
+                await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+                var normalizedUserName = userName.ToUpperInvariant();
+                var account = await context.UserAccounts.SingleOrDefaultAsync(
+                    item => item.NormalizedUserName == normalizedUserName && item.IsEnabled, cancellationToken);
+                if (account is null || account.RecoveryCodeSalt is null || account.RecoveryCodeHash is null ||
+                    account.RecoveryCodeIterations is null)
+                    return Results.Json(new ApiMessageResponse("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada."), statusCode: StatusCodes.Status401Unauthorized);
+
+                var codeIsValid = await Task.Run(
+                    () => passwordHasher.Verify(normalizedRecoveryCode, account.RecoveryCodeSalt,
+                        account.RecoveryCodeHash, account.RecoveryCodeIterations.Value), cancellationToken);
+                if (!codeIsValid)
+                    return Results.Json(new ApiMessageResponse("El usuario o el código no son correctos, o esta cuenta aún no tiene recuperación configurada."), statusCode: StatusCodes.Status401Unauthorized);
+
+                var newRecoveryCode = recoveryCodeGenerator.Generate();
+                MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(
+                    newRecoveryCode, out var normalizedNewRecoveryCode);
+                var (passwordSalt, passwordHash) = await Task.Run(
+                    () => passwordHasher.Hash(request.NewPassword), cancellationToken);
+                var (recoverySalt, recoveryHash) = await Task.Run(
+                    () => passwordHasher.Hash(normalizedNewRecoveryCode), cancellationToken);
+
+                // Revoke existing device sessions before changing credentials. A failed save may require
+                // users to sign in again, but it cannot leave their old central sessions active.
+                await pairingStore.RevokeUserSessionsAsync(account.UserId, cancellationToken);
+                foreach (var connection in connectionRegistry.Snapshot().Where(item => item.UserId == account.UserId))
+                {
+                    try
+                    {
+                        await changesHub.Clients.Client(connection.ConnectionId)
+                            .SendAsync("AuthorizationRevoked", cancellationToken: cancellationToken);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        app.Logger.LogDebug(exception, "No se pudo notificar la revocación al dispositivo {DeviceId}.", connection.DeviceId);
+                    }
+                    finally { connectionRegistry.Remove(connection.ConnectionId); }
+                }
+                account.PasswordSalt = passwordSalt;
+                account.PasswordHash = passwordHash;
+                account.PasswordIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations;
+                account.RecoveryCodeSalt = recoverySalt;
+                account.RecoveryCodeHash = recoveryHash;
+                account.RecoveryCodeIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations;
+                await context.SaveChangesAsync(cancellationToken);
+                app.Logger.LogInformation("Password recovery completed for a coordinator account.");
+                return Results.Ok(new RecoveryCodeResponse(newRecoveryCode));
+            }
+            finally { RecoveryCredentialLock.Release(); }
+        }).RequireRateLimiting("password-recovery");
+
+        app.MapPost("/api/auth/recovery/enroll", async (
+            ConfigureRecoveryCodeRequest request,
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher passwordHasher,
+            MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator recoveryCodeGenerator,
+            CoordinatorPairingStore pairingStore,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps) return Results.BadRequest();
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+            await RecoveryCredentialLock.WaitAsync(cancellationToken);
+            try
+            {
+                if (string.IsNullOrEmpty(request.CurrentPassword) || request.CurrentPassword.Length > 1024)
+                    return Results.Json(new ApiMessageResponse("La contraseña actual no es correcta o la sesión venció."), statusCode: StatusCodes.Status401Unauthorized);
+
+                await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+                var account = await context.UserAccounts.SingleOrDefaultAsync(
+                    item => item.UserId == userId.Value && item.IsEnabled, cancellationToken);
+                if (account is null) return Results.Unauthorized();
+                var passwordIsValid = await Task.Run(
+                    () => passwordHasher.Verify(request.CurrentPassword, account.PasswordSalt,
+                        account.PasswordHash, account.PasswordIterations), cancellationToken);
+                if (!passwordIsValid)
+                    return Results.Json(new ApiMessageResponse("La contraseña actual no es correcta."), statusCode: StatusCodes.Status401Unauthorized);
+
+                var recoveryCode = recoveryCodeGenerator.Generate();
+                MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(
+                    recoveryCode, out var normalizedRecoveryCode);
+                var (salt, hash) = await Task.Run(
+                    () => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
+                account.RecoveryCodeSalt = salt;
+                account.RecoveryCodeHash = hash;
+                account.RecoveryCodeIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations;
+                await context.SaveChangesAsync(cancellationToken);
+                return Results.Ok(new RecoveryCodeResponse(recoveryCode));
+            }
+            finally { RecoveryCredentialLock.Release(); }
+        }).RequireRateLimiting("password-recovery");
+
         app.MapPost("/api/devices/pairing-code", async (
             CreatePairingCodeRequest request,
             HttpContext httpContext,
@@ -599,16 +732,20 @@ internal static class Program
             var admin = await context.UserAccounts.SingleOrDefaultAsync(item => item.UserId == userId.Value && item.IsEnabled, cancellationToken);
             if (admin?.Role != (int)UserRole.Administrator) return Results.Json(new ApiMessageResponse("Solo el Administrador puede crear cuentas de Cajero."), statusCode: StatusCodes.Status403Forbidden);
             var userName = request.UserName?.Trim();
-            if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 || string.IsNullOrEmpty(request.Password) || request.Password.Length is < 5 or > 1024)
-                return Results.BadRequest(new ApiMessageResponse("El usuario debe tener entre 1 y 80 caracteres y la contraseña entre 5 y 1024."));
+            if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 || string.IsNullOrEmpty(request.Password) || request.Password.Length is < 5 or > 1024 ||
+                !MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(request.RecoveryCode, out var normalizedRecoveryCode))
+                return Results.BadRequest(new ApiMessageResponse("El usuario, contraseña o código de recuperación no son válidos."));
             var normalized = userName.ToUpperInvariant();
             if (await context.UserAccounts.AnyAsync(item => item.NormalizedUserName == normalized, cancellationToken))
                 return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado."));
             var (salt, hash) = await Task.Run(() => passwordHasher.Hash(request.Password), cancellationToken);
+            var (recoverySalt, recoveryHash) = await Task.Run(() => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
             context.UserAccounts.Add(new MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity
             {
                 UserId = Guid.NewGuid(), UserName = userName, NormalizedUserName = normalized, PasswordSalt = salt,
                 PasswordHash = hash, PasswordIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
+                RecoveryCodeSalt = recoverySalt, RecoveryCodeHash = recoveryHash,
+                RecoveryCodeIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
                 Role = (int)UserRole.Cashier, IsEnabled = true, CreatedAtUtc = DateTime.UtcNow
             });
             try { await context.SaveChangesAsync(cancellationToken); }
@@ -800,6 +937,9 @@ internal sealed record UnlinkDeviceRequest(Guid DeviceId);
 internal sealed record PairDeviceResponse(bool Success, string Message);
 internal sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);
 internal sealed record SyncChangesResponse(IReadOnlyList<ConfirmedOperation> Changes, long NextSequence);
-internal sealed record CreateCashierRequest(string? UserName, string? Password);
+internal sealed record CreateCashierRequest(string? UserName, string? Password, string? RecoveryCode);
+internal sealed record PasswordRecoveryRequest(string? UserName, string? RecoveryCode, string? NewPassword);
+internal sealed record ConfigureRecoveryCodeRequest(string? CurrentPassword);
+internal sealed record RecoveryCodeResponse(string RecoveryCode);
 internal sealed record ResolveCoordinatorConflictRequest(Guid OperationId, bool ApplyIncoming);
 internal sealed record ApiMessageResponse(string Message);

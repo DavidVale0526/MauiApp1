@@ -125,6 +125,20 @@ internal sealed class CoordinatorPairingStore(string databasePath)
         return null;
     }
 
+    public async Task RevokeUserSessionsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty) return;
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE CoordinatorUserSessions SET RevokedAtUtc = $now WHERE UserId = $userId AND RevokedAtUtc IS NULL;";
+        command.Parameters.AddWithValue("$now", DateTime.UtcNow.Ticks);
+        command.Parameters.AddWithValue("$userId", userId.ToString("D"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<NewDevicePairing> CreateCodeAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

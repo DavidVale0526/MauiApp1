@@ -49,6 +49,12 @@ public partial class MainPage : CoordinatorRefreshPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 
+    private async void OnAccountRecoveryClicked(object? sender, EventArgs args)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<AccountRecoveryPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
     private readonly MainPageViewModel _viewModel;
     private readonly ICoordinatorRealtimeClient _realtimeClient;
     private readonly IConnectivity _connectivity;

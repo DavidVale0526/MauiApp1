@@ -56,6 +56,8 @@ namespace MauiApp1
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorCashierAccountClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorPasswordRecoveryClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorChangeClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Sync.IInitialDataImportClient>(services =>
@@ -76,6 +78,7 @@ namespace MauiApp1
             builder.Services.AddTransient<MoreOptionsPage>();
             builder.Services.AddTransient<CashierSetupPage>();
             builder.Services.AddTransient<CashierSetupViewModel>();
+            builder.Services.AddTransient<AccountRecoveryPage>();
             builder.Services.AddTransient<CategoryManagementPage>();
             builder.Services.AddTransient<CategoryManagementViewModel>();
             builder.Services.AddTransient<ProductManagementPage>();

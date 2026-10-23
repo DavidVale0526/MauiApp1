@@ -547,6 +547,15 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<int>("PasswordIterations")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte[]>("RecoveryCodeHash")
+                        .HasColumnType("BLOB");
+
+                    b.Property<int?>("RecoveryCodeIterations")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("RecoveryCodeSalt")
+                        .HasColumnType("BLOB");
+
                     b.Property<byte[]>("PasswordSalt")
                         .IsRequired()
                         .HasColumnType("BLOB");
