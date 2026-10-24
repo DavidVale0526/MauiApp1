@@ -7,5 +7,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MauiApp1.Setup</RootNamespace>
     <AssemblyName>MiscelaneaAriSetup</AssemblyName>
+    <ApplicationIcon>Resources\MiscelaneaAri.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Haukcode.Mdns;
 using Microsoft.Extensions.Hosting;
@@ -47,9 +49,12 @@ internal sealed class CoordinatorMdnsAdvertiser(
             };
             var profile = new ServiceProfile(displayName, "_miscelanea-ari-v1._tcp",
                 checked((ushort)endpoint.Port), properties);
-            _advertiser = new MdnsAdvertiser(profile);
+            var localAddress = ResolveLocalIpv4Address();
+            _advertiser = new MdnsAdvertiser(profile, localAddress);
             _advertiser.Start();
-            logger.LogInformation("Se anunció el coordinador Miscelánea Ari mediante DNS-SD en el puerto {Port}.", endpoint.Port);
+            logger.LogInformation(
+                "Se anunció el coordinador Miscelánea Ari mediante DNS-SD en {Address}:{Port}.",
+                localAddress, endpoint.Port);
         }
         catch (Exception exception) when (exception is CryptographicException or IOException or
                                               UnauthorizedAccessException or ArgumentException or SocketException or InvalidOperationException)
@@ -58,6 +63,55 @@ internal sealed class CoordinatorMdnsAdvertiser(
             _advertiser = null;
             logger.LogWarning(exception, "No se pudo anunciar el coordinador por mDNS; la vinculación por QR y manual sigue disponible.");
         }
+    }
+
+    private static IPAddress ResolveLocalIpv4Address()
+    {
+        // Let Windows choose the interface used for link-local multicast. This also works
+        // when NetworkInterface enumeration returns adapters the mDNS library cannot rank.
+        using (var routeProbe = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+        {
+            try
+            {
+                routeProbe.Connect(new IPEndPoint(IPAddress.Parse("224.0.0.251"), 5353));
+                if (routeProbe.LocalEndPoint is IPEndPoint { Address: var address } && IsUsableIpv4(address))
+                    return address;
+            }
+            catch (SocketException)
+            {
+                // Fall back to an active physical adapter if there is no multicast route.
+            }
+        }
+
+        var candidates = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
+                              (adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or
+                                  NetworkInterfaceType.Wireless80211) &&
+                              adapter.SupportsMulticast)
+            .SelectMany(adapter =>
+            {
+                var hasIpv4Gateway = adapter.GetIPProperties().GatewayAddresses
+                    .Any(gateway => gateway.Address.AddressFamily == AddressFamily.InterNetwork &&
+                                    !gateway.Address.Equals(IPAddress.Any));
+                return adapter.GetIPProperties().UnicastAddresses
+                    .Select(unicast => new { unicast.Address, HasIpv4Gateway = hasIpv4Gateway });
+            })
+            .Where(candidate => IsUsableIpv4(candidate.Address))
+            .OrderByDescending(candidate => candidate.HasIpv4Gateway)
+            .Select(candidate => candidate.Address)
+            .FirstOrDefault();
+
+        return candidates ?? throw new InvalidOperationException(
+            "No se encontró una dirección IPv4 activa para anunciar el coordinador en la red local.");
+    }
+
+    private static bool IsUsableIpv4(IPAddress address)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+            return false;
+
+        var bytes = address.GetAddressBytes();
+        return bytes[0] != 0 && bytes[0] != 169;
     }
 
     private static X509Certificate2 LoadCertificate(string? thumbprint)

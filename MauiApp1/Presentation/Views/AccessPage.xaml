@@ -35,19 +35,15 @@
                                              Padding="24,26,24,22"
                                              Spacing="12"
                                              HorizontalOptions="Center">
-                            <Border WidthRequest="46"
-                                    HeightRequest="46"
-                                    BackgroundColor="#0D1B2A"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 12"
+                            <Border WidthRequest="58"
+                                    HeightRequest="58"
+                                    Padding="5"
+                                    BackgroundColor="#FFFFFF"
+                                    Stroke="#E3EAF2"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 14"
                                     HorizontalOptions="Center">
-                                <Border WidthRequest="16"
-                                        HeightRequest="16"
-                                        Stroke="#FFFFFF"
-                                        StrokeThickness="1.4"
-                                        StrokeShape="RoundRectangle 4"
-                                        HorizontalOptions="Center"
-                                        VerticalOptions="Center" />
+                                <Image Source="system_icon.png" Aspect="AspectFit" />
                             </Border>
                             <Label Text="Miscelánea Ari"
                                    FontSize="22"
