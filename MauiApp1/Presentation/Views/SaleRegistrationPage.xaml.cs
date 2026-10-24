@@ -6,10 +6,14 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class SaleRegistrationPage : CoordinatorRefreshPage
 {
+    private bool _useDesktopLayout;
+    private int _productLayoutSpan;
+
     private void OnSaleLayoutSizeChanged(object? sender, EventArgs args)
     {
         if (PageLayout.Width <= 0) return;
         var useDesktopLayout = PageLayout.Width >= 900;
+        _useDesktopLayout = useDesktopLayout;
         PageLayout.Padding = useDesktopLayout ? new Thickness(28, 24) : new Thickness(16, 16);
         SaleLayout.WidthRequest = Math.Min(1440, Math.Max(0, PageLayout.Width - PageLayout.Padding.HorizontalThickness));
         ContentPanels.ColumnDefinitions.Clear();
@@ -33,6 +37,34 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
         MobileSummary.IsVisible = !useDesktopLayout;
         CloseCartButton.IsVisible = !useDesktopLayout;
         CartSheetHost.HeightRequest = Math.Max(0, Math.Min(800, PageLayout.Height * 0.92));
+        Dispatcher.Dispatch(UpdateProductItemsLayout);
+    }
+
+    private void OnProductsCollectionSizeChanged(object? sender, EventArgs args) => Dispatcher.Dispatch(UpdateProductItemsLayout);
+
+    private void UpdateProductItemsLayout()
+    {
+        // Use the CollectionView's measured width. SaleLayout.Width can still
+        // reflect the window's outer width while its columns are being laid out.
+        var width = ProductsCollection.Width;
+        if (width <= 0) return;
+
+        const double minDesktopCardWidth = 230;
+        const double desktopSpacing = 12;
+        var span = _useDesktopLayout
+            ? Math.Clamp((int)Math.Floor((width + desktopSpacing) / (minDesktopCardWidth + desktopSpacing)), 1, 4)
+            : 1;
+
+        if (_productLayoutSpan == span) return;
+        _productLayoutSpan = span;
+
+        ProductsCollection.ItemsLayout = span == 1
+            ? new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 8 }
+            : new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
+            {
+                HorizontalItemSpacing = desktopSpacing,
+                VerticalItemSpacing = desktopSpacing
+            };
     }
 
     private void OnShowCartClicked(object? sender, EventArgs args) => CartSheetBackdrop.IsVisible = true;
@@ -54,6 +86,17 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
+#if WINDOWS
+        ProductsCollection.ItemsLayout = new GridItemsLayout(4, ItemsLayoutOrientation.Vertical)
+        {
+            HorizontalItemSpacing = 12,
+            VerticalItemSpacing = 12
+        };
+        _productLayoutSpan = 4;
+#else
+        ProductsCollection.ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 8 };
+        _productLayoutSpan = 1;
+#endif
         _viewModel = viewModel;
         _saleService = saleService;
         BindingContext = viewModel;
@@ -63,6 +106,7 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
     {
         base.OnAppearing();
         await _viewModel.LoadAsync();
+        Dispatcher.Dispatch(UpdateProductItemsLayout);
     }
 
     protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.RefreshAfterCoordinatorChangesAsync();

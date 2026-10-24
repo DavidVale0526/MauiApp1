@@ -61,7 +61,7 @@
                 </VerticalStackLayout>
               </Grid>
             </Border>
-            <CollectionView x:Name="ProductsCollection" Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct, Mode=TwoWay}" SelectionMode="Single" ItemSizingStrategy="MeasureAllItems" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalScrollBarVisibility="Never" IsEnabled="{Binding CanEditLines}">
+            <CollectionView x:Name="ProductsCollection" Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct, Mode=TwoWay}" SelectionMode="Single" ItemSizingStrategy="MeasureAllItems" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalScrollBarVisibility="Never" IsEnabled="{Binding CanEditLines}" SizeChanged="OnProductsCollectionSizeChanged">
               <CollectionView.EmptyView>
                 <Border Style="{StaticResource Surface}">
                   <Label Text="No hay productos activos para vender." Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
@@ -69,7 +69,7 @@
               </CollectionView.EmptyView>
               <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="viewModels:SaleProductOption">
-                  <Border Style="{StaticResource Surface}" Margin="0,0,0,10" HorizontalOptions="Fill" MinimumWidthRequest="280" WidthRequest="{Binding Source={x:Reference ProductsCollection}, Path=Width}">
+                  <Border Style="{StaticResource Surface}" Margin="0" Padding="10" MinimumHeightRequest="118" HorizontalOptions="Fill">
                     <VisualStateManager.VisualStateGroups>
                       <VisualStateGroup Name="CommonStates">
                         <VisualState Name="Normal" />
@@ -81,10 +81,12 @@
                         </VisualState>
                       </VisualStateGroup>
                     </VisualStateManager.VisualStateGroups>
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6" HorizontalOptions="Fill">
-                      <Label Text="{Binding DisplayName}" FontSize="17" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="TailTruncation" />
-                      <Label Grid.Column="1" Text="{Binding PriceText}" FontSize="17" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" HorizontalTextAlignment="End" />
-                      <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding StockText}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6" HorizontalOptions="Fill">
+                      <Label Text="{Binding DisplayName}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                      <Label Grid.Row="1" Text="{Binding PriceText}" FontSize="18" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
+                      <Border Grid.Row="2" BackgroundColor="#EAF7F1" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="7,4" HorizontalOptions="Start">
+                        <Label Text="{Binding StockText}" FontSize="11" TextColor="#08734F" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                      </Border>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -139,28 +141,30 @@
               </CollectionView.EmptyView>
               <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="viewModels:SaleCartLine">
-                  <Border BackgroundColor="#F5F7FA" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14" Margin="0,0,0,10">
-                    <VerticalStackLayout Spacing="8">
-                      <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" />
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                        <VerticalStackLayout Spacing="3">
-                          <Label Text="{Binding QuantityText}" Style="{StaticResource Muted}" />
-                          <Label Text="{Binding PriceText}" FontSize="12" TextColor="#647792" />
-                        </VerticalStackLayout>
-                        <Label Grid.Column="1" Text="{Binding TotalAmountText}" FontSize="16" FontAttributes="Bold" TextColor="#007F60" VerticalOptions="Center" />
+                  <Border BackgroundColor="#F7F9FC" Stroke="#E5EBF2" StrokeThickness="1" StrokeShape="RoundRectangle 11" Padding="12" Margin="0,0,0,8">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="10">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                        <Button Grid.Column="1" Text="Quitar" Clicked="OnRemoveLineClicked" IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}" Style="{StaticResource Secondary}" FontSize="11" Padding="9,6" MinimumHeightRequest="36" VerticalOptions="Center" />
                       </Grid>
-                      <Button Text="Quitar" Clicked="OnRemoveLineClicked" IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CanEditLines}" Style="{StaticResource Secondary}" FontSize="12" Padding="10,5" HorizontalOptions="End" />
-                    </VerticalStackLayout>
+                      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="3" VerticalOptions="Center">
+                          <Label Text="{Binding QuantityText}" FontSize="13" FontAttributes="Bold" TextColor="#45556B" />
+                          <Label Text="{Binding PriceText}" FontSize="11" TextColor="#647792" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1" Text="{Binding TotalAmountText}" FontSize="16" FontAttributes="Bold" TextColor="#007F60" VerticalOptions="Center" HorizontalTextAlignment="End" />
+                      </Grid>
+                    </Grid>
                   </Border>
                 </DataTemplate>
               </CollectionView.ItemTemplate>
             </CollectionView>
             <VerticalStackLayout Grid.Row="3" Spacing="12">
               <BoxView HeightRequest="1" Color="#E4EBF2" />
-              <Border BackgroundColor="#F4F6F9" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14">
+              <Border BackgroundColor="#ECFCF5" Stroke="#C8EFDF" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="14">
                 <VerticalStackLayout Spacing="6">
-                  <Label Text="TOTAL DE LA VENTA" FontSize="11" FontAttributes="Bold" TextColor="#647792" />
-                  <Label Text="{Binding TotalAmountText}" FontSize="27" FontAttributes="Bold" TextColor="#0D172B" />
+                  <Label Text="TOTAL DE LA VENTA" FontSize="11" FontAttributes="Bold" TextColor="#08734F" />
+                  <Label Text="{Binding TotalAmountText}" FontSize="27" FontAttributes="Bold" TextColor="#075B41" />
                 </VerticalStackLayout>
               </Border>
               <Button Text="{Binding ConfirmButtonText}" Clicked="OnReviewClicked" IsEnabled="{Binding CanConfirm}" Style="{StaticResource Primary}" />
