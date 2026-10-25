@@ -1,5 +1,5 @@
-using System.Globalization;
 using MauiApp1.Application.Products;
+using MauiApp1.Presentation.Formatting;
 
 namespace MauiApp1.Presentation.ViewModels;
 
@@ -15,7 +15,7 @@ public sealed record OperationalStockAlert(string Name, string AlertType, string
             .Select(product => new OperationalStockAlert(
                 product.Name,
                 product.Stock.MilliUnits <= 0 ? "CRÍTICO" : "BAJO",
-                $"Existencia: {product.Stock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {product.Unit} · Mínimo: {product.MinimumStock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture)} {product.Unit}",
+                $"Existencia: {QuantityText.Format(product.Stock.ToDecimal(), product.Unit)} · Mínimo: {QuantityText.Format(product.MinimumStock.ToDecimal(), product.Unit)}",
                 product.Stock.MilliUnits <= 0 ? "Sin existencias disponibles" : "Requiere reposición",
                 product.Stock.MilliUnits <= 0))
             .ToArray();

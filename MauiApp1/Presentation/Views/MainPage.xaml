@@ -14,7 +14,7 @@
             <Setter Property="Stroke" Value="#E3EAF2" />
             <Setter Property="StrokeThickness" Value="1" />
             <Setter Property="StrokeShape" Value="RoundRectangle 14" />
-            <Setter Property="Padding" Value="18" />
+            <Setter Property="Padding" Value="{OnPlatform Android=14, Default=18}" />
         </Style>
         <Style x:Key="DashboardButtonStyle" TargetType="Button">
             <Setter Property="BackgroundColor" Value="#0D1B2A" />
@@ -31,12 +31,33 @@
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="14,10" />
         </Style>
-        <Style x:Key="SidebarButtonStyle" TargetType="Border">
-            <Setter Property="BackgroundColor" Value="#1B3047" />
+        <Style x:Key="DashboardRefreshButtonStyle" TargetType="Button" BasedOn="{StaticResource DashboardSecondaryButtonStyle}">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="TextColor" Value="#61738A" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
+            <Setter Property="HorizontalOptions" Value="End" />
+        </Style>
+        <Style x:Key="SidebarNavigationButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="TextColor" Value="#E5EBF3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
             <Setter Property="HorizontalOptions" Value="Fill" />
-            <Setter Property="StrokeThickness" Value="0" />
-            <Setter Property="StrokeShape" Value="RoundRectangle 8" />
-            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="LineBreakMode" Value="WordWrap" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style x:Key="SidebarSuboptionButtonStyle" TargetType="Button" BasedOn="{StaticResource SidebarNavigationButtonStyle}">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="MinimumHeightRequest">
+                <Setter.Value>
+                    <OnPlatform x:TypeArguments="x:Double" Default="44">
+                        <On Platform="WinUI" Value="40" />
+                    </OnPlatform>
+                </Setter.Value>
+            </Setter>
         </Style>
     </ContentPage.Resources>
     <Grid x:Name="RootLayout"
@@ -48,147 +69,241 @@
                 IsVisible="False"
                 BackgroundColor="#0D1B2A"
                 StrokeThickness="0"
-                Padding="22,28">
-            <Grid RowDefinitions="Auto,Auto,*,Auto">
-                <VerticalStackLayout Spacing="4">
+                Padding="16,24">
+            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="20">
+                <VerticalStackLayout Spacing="12">
                     <Grid ColumnDefinitions="24,*" ColumnSpacing="10">
-                        <Image Source="nav_home_sidebar.png" WidthRequest="22" HeightRequest="22"
-                               VerticalOptions="Center" Aspect="AspectFit" />
-                        <Label Grid.Column="1" Text="Miscelánea Ari" FontSize="20" FontAttributes="Bold"
-                               TextColor="White" VerticalOptions="Center" />
+                        <Image Source="nav_home_sidebar.png" WidthRequest="22" HeightRequest="22" VerticalOptions="Center" Aspect="AspectFit" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Miscelánea Ari" FontSize="18" FontAttributes="Bold" TextColor="White" />
+                            <Label Text="PUNTO DE VENTA" FontSize="9" CharacterSpacing="1" TextColor="#A9B8C9" />
+                        </VerticalStackLayout>
                     </Grid>
-                    <Label Text="GESTIÓN DEL NEGOCIO" FontSize="10" CharacterSpacing="1" TextColor="#A9B8C9" />
+                    <BoxView HeightRequest="1" Color="#2A3B50" />
                 </VerticalStackLayout>
-
-                <Label Grid.Row="1" Text="MENÚ PRINCIPAL" Margin="0,34,0,12" FontSize="10"
-                       FontAttributes="Bold" CharacterSpacing="1" TextColor="#93A4B8" />
-
-                <VerticalStackLayout Grid.Row="2" Spacing="8">
-                    <Border BackgroundColor="#193459" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="14,10">
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Label Text="⌂" FontSize="20" TextColor="White" />
-                            <Label Grid.Column="1" Text="Inicio / Dashboard" FontSize="13" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnRegisterSaleClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_sales_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Punto de venta" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnManageProductsClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_inventory_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Productos y categorías" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnConsultStockClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_inventory_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Existencias" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnRegisterPurchaseClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_sales_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Compras" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnInventoryMovementHistoryClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_inventory_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Movimientos" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnReportsClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_reports_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Reportes" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                </VerticalStackLayout>
-
-                <VerticalStackLayout Grid.Row="3" Spacing="8">
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSynchronizationClicked" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_more_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Sincronización y conexión" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                    <Border Style="{StaticResource SidebarButtonStyle}">
-                        <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SignOutCommand}" /></Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
-                            <Image Source="nav_more_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
-                            <Label Grid.Column="1" Text="Cerrar sesión" FontSize="13" TextColor="White" VerticalOptions="Center" />
-                        </Grid>
-                    </Border>
-                </VerticalStackLayout>
+                <ScrollView x:Name="SidebarScroll" Grid.Row="1" VerticalScrollBarVisibility="Always"
+                            HandlerChanged="OnSidebarScrollHandlerChanged">
+                    <VerticalStackLayout Spacing="6">
+                        <Border BackgroundColor="#193459" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,10"
+                                SemanticProperties.Description="Inicio / Dashboard, pantalla actual">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="10">
+                                <Image Source="nav_home_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" />
+                                <Label Grid.Column="1" Text="INICIO / DASHBOARD" FontSize="12" FontAttributes="Bold"
+                                       TextColor="White" VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_sales_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="PUNTO DE VENTA  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Sales"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="SalesNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Registrar venta" Clicked="OnRegisterSaleClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Historial de ventas" Clicked="OnSaleHistoryClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_inventory_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="INVENTARIO  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Inventory"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="InventoryNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Existencias" Clicked="OnConsultStockClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Productos" Clicked="OnManageProductsClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Categorías" Clicked="OnManageCategoriesClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Movimientos de inventario" Clicked="OnInventoryMovementHistoryClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Registrar salida o merma" Clicked="OnRegisterOtherExitClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_purchases_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="COMPRAS  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Purchases"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="PurchasesNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_customers_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="CLIENTES Y CRÉDITO  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Customers"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="CustomersNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Clientes y crédito" Clicked="OnCustomersClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Crédito y pagos" Clicked="OnPaymentsClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_reports_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="REPORTES  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Reports"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="ReportsNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Ver reportes" Clicked="OnReportsClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="1">
+                            <Grid ColumnDefinitions="22,*" ColumnSpacing="4">
+                                <Image Source="nav_administration_sidebar.png" WidthRequest="20" HeightRequest="20" Aspect="AspectFit" InputTransparent="True" />
+                                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Column="1" Text="ADMINISTRACIÓN  ▸" FontAttributes="Bold"
+                                        Style="{StaticResource SidebarNavigationButtonStyle}"
+                                        CommandParameter="Administration"
+                                        SemanticProperties.Hint="Grupo contraído. Activar para expandir."
+                                        Clicked="OnToggleSidebarGroupClicked" />
+                            </Grid>
+                            <Grid x:Name="AdministrationNavigationOptions" IsVisible="False" ColumnDefinitions="1,*" ColumnSpacing="10" Margin="10,0,0,2">
+                                <BoxView Color="#344458" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0">
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Sincronización y conexión" Clicked="OnSynchronizationClicked" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                    <Button HandlerChanged="OnSidebarButtonHandlerChanged" Text="Cuentas de cajero" Clicked="OnCreateCashierAccountClicked" IsVisible="{Binding IsAdministrator}" Style="{StaticResource SidebarSuboptionButtonStyle}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+                <Button HandlerChanged="OnSidebarButtonHandlerChanged" Grid.Row="2" Text="↪  Cerrar sesión" Command="{Binding SignOutCommand}"
+                        Style="{StaticResource SidebarNavigationButtonStyle}" BackgroundColor="#13243A"
+                        FontAttributes="Bold" Padding="14,16" />
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" RowDefinitions="*,Auto">
-        <ScrollView Grid.Row="0" VerticalScrollBarVisibility="Never">
+        <Grid Grid.Column="1" RowDefinitions="Auto,*">
+        <ContentView x:Name="DesktopHeaderHost" IsVisible="False" />
+        <ScrollView Grid.Row="1" VerticalScrollBarVisibility="Never">
             <VerticalStackLayout x:Name="DashboardContent"
                                  Padding="18,24"
-                                 Spacing="22"
+                                 Spacing="{OnPlatform Android=16, Default=22}"
                                  HorizontalOptions="Center"
                                  MaximumWidthRequest="1440">
+                <ContentView x:Name="MobileHeaderHost">
+                    <Border x:Name="HeaderStatusBar" BackgroundColor="White" Stroke="#E3EAF2"
+                            StrokeThickness="1" Padding="16,12">
+                        <Grid x:Name="HeaderStatusLayout" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
+                              ColumnSpacing="16" RowSpacing="6">
+                            <Grid x:Name="HeaderIdentity" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"
+                                  VerticalOptions="Center">
+                                <Image x:Name="HeaderIdentityIcon" Source="nav_home_active.png" IsVisible="False"
+                                       WidthRequest="20" HeightRequest="20" Aspect="AspectFit" VerticalOptions="Center"
+                                       AutomationProperties.IsInAccessibleTree="False" />
+                                <Label x:Name="HeaderIdentityText" Grid.Column="1" Text="Miscelánea Ari"
+                                       FontSize="18" FontAttributes="Bold" TextColor="#111D31" LineBreakMode="WordWrap"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                            <Grid x:Name="HeaderConnectionInfo" Grid.Row="1" Grid.ColumnSpan="2"
+                                  ColumnDefinitions="3*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="12"
+                                  RowSpacing="4" VerticalOptions="Center">
+                                <Grid x:Name="HeaderStateAction" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <Button Text="{Binding CoordinatorStatusDisplay}" TextColor="{Binding CoordinatorStatusColor}"
+                                            BackgroundColor="#F1F5F9" FontSize="12" CornerRadius="10" Padding="10,6"
+                                            MinimumHeightRequest="44" LineBreakMode="WordWrap" HorizontalOptions="Start"
+                                            Clicked="OnSynchronizationClicked"
+                                            SemanticProperties.Hint="{Binding HeaderStatusDetail}" />
+                                    <ActivityIndicator Grid.Column="1" WidthRequest="18" HeightRequest="18"
+                                                       IsVisible="{Binding IsHeaderStatusLoading}" IsRunning="{Binding IsHeaderStatusLoading}"
+                                                       Color="#52657D" VerticalOptions="Center" />
+                                </Grid>
+                                <Label x:Name="HeaderSyncSummary" Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SyncStatusText}"
+                                       FontSize="11" TextColor="#52657D" LineBreakMode="WordWrap" VerticalOptions="Center" />
+                            </Grid>
+                            <VerticalStackLayout x:Name="HeaderUserInfo" Grid.Row="2" Grid.ColumnSpan="2"
+                                                 Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding CurrentUserName}" FontSize="13" FontAttributes="Bold"
+                                       TextColor="#111D31" LineBreakMode="WordWrap" />
+                                <Label Text="{Binding CurrentRole}" FontSize="11" TextColor="#52657D" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </ContentView>
                 <!-- Encabezado principal adaptado desde Figma -->
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <VerticalStackLayout Spacing="3">
-                        <Label Text="Inicio" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
-                        <Label Text="Resumen de operaciones del día y estado general de la tienda" FontSize="13" TextColor="#57616F" />
+                <Grid x:Name="DashboardHeading" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                      ColumnSpacing="10" RowSpacing="{OnPlatform Android=6, Default=8}" SizeChanged="OnDashboardHeadingSizeChanged">
+                    <VerticalStackLayout x:Name="DashboardHeadingText" Spacing="{OnPlatform Android=2, Default=3}">
+                        <Label x:Name="DashboardTitle" Text="Inicio" FontSize="{OnPlatform Android=28, Default=30}" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="{OnPlatform Android='Resumen de operaciones del día', Default='Resumen de operaciones del día y estado general de la tienda'}"
+                               FontSize="13" TextColor="#57616F" LineBreakMode="WordWrap" />
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="+ Nueva venta" Clicked="OnRegisterSaleClicked"
+                    <Button x:Name="NewSaleButton" Grid.Column="1" Text="+ Nueva venta" Clicked="OnRegisterSaleClicked"
                             Style="{StaticResource DashboardButtonStyle}" VerticalOptions="Center" />
                 </Grid>
 
-                <!-- Datos aún no conectados: no representar cifras de Figma como reales. -->
+                <!-- Ventas y stock reutilizan las consultas del gráfico y las alertas. -->
                 <Grid x:Name="KpiCardsGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
                     <Border x:Name="SalesKpiCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="9">
-                            <Label Text="VENTAS DE HOY" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
-                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                        <VerticalStackLayout Spacing="{OnPlatform Android=7, Default=9}">
+                            <Label Text="VENTAS DE HOY" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" LineBreakMode="WordWrap" />
+                            <Label Text="{Binding TodaySalesKpiValue}" FontSize="{OnPlatform Android=21, Default=23}" FontAttributes="Bold" TextColor="#111D31" LineBreakMode="WordWrap" />
+                            <Label Text="{Binding TodaySalesKpiStatus}" FontSize="11" TextColor="#61738A" LineBreakMode="WordWrap" />
                             <Label Text="Ver ventas →" TextColor="#007A56" FontSize="12">
                                 <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnSaleHistoryClicked" /></Label.GestureRecognizers>
                             </Label>
                         </VerticalStackLayout>
                     </Border>
                     <Border x:Name="LowStockKpiCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="9">
-                            <Label Text="STOCK BAJO" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
-                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                        <VerticalStackLayout Spacing="{OnPlatform Android=7, Default=9}">
+                            <Label Text="STOCK BAJO" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" LineBreakMode="WordWrap" />
+                            <Label Text="{Binding LowStockKpiValue}" FontSize="{OnPlatform Android=21, Default=23}" FontAttributes="Bold" TextColor="#111D31" LineBreakMode="WordWrap" />
+                            <Label Text="{Binding LowStockKpiStatus}" FontSize="11" TextColor="#61738A" LineBreakMode="WordWrap" />
                             <Label Text="Ver stock →" TextColor="#BA7200" FontSize="12">
                                 <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnConsultStockClicked" /></Label.GestureRecognizers>
                             </Label>
                         </VerticalStackLayout>
                     </Border>
                     <Border x:Name="ExpiryKpiCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="9">
-                            <Label Text="PRÓXIMOS VENCIMIENTOS" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
-                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Revisar →" TextColor="#BD2727" FontSize="12" />
+                        <VerticalStackLayout Spacing="{OnPlatform Android=7, Default=9}">
+                            <Label Text="PRÓXIMOS VENCIMIENTOS" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" LineBreakMode="WordWrap" />
+                            <Label Text="No disponible" FontSize="{OnPlatform Android=21, Default=23}" FontAttributes="Bold" TextColor="#111D31" LineBreakMode="WordWrap" />
+                            <Label Text="Sin fechas de vencimiento consultables" TextColor="#61738A" FontSize="11" LineBreakMode="WordWrap" />
                         </VerticalStackLayout>
                     </Border>
                     <Border x:Name="CashKpiCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="9">
-                            <Label Text="EFECTIVO EN CAJA" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" />
-                            <Label Text="Sin datos" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Pendiente de integración" FontSize="12" TextColor="#61738A" />
+                        <VerticalStackLayout Spacing="{OnPlatform Android=7, Default=9}">
+                            <Label Text="EFECTIVO EN CAJA" FontSize="11" FontAttributes="Bold" TextColor="#4C5360" LineBreakMode="WordWrap" />
+                            <Label Text="No disponible" FontSize="{OnPlatform Android=21, Default=23}" FontAttributes="Bold" TextColor="#111D31" LineBreakMode="WordWrap" />
+                            <Label Text="Sin caja o turno activo consultable" FontSize="11" TextColor="#61738A" LineBreakMode="WordWrap" />
                         </VerticalStackLayout>
                     </Border>
                 </Grid>
 
                 <Grid x:Name="SalesAndAlertsGrid" ColumnDefinitions="*,0" RowDefinitions="Auto,Auto" RowSpacing="22">
                 <Border Style="{StaticResource DashboardCardStyle}" VerticalOptions="Start">
-                    <VerticalStackLayout Spacing="16">
+                    <VerticalStackLayout Spacing="{OnPlatform Android=10, Default=16}">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="Ventas de los últimos 7 días" FontSize="18" FontAttributes="Bold"
@@ -207,26 +322,31 @@
                                FontSize="13" TextColor="#57616F" HorizontalTextAlignment="Center" />
                         <views:WeeklySalesChart Days="{Binding WeeklySalesDays}" />
                         <FlexLayout Wrap="Wrap" JustifyContent="Center" AlignItems="Center">
-                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                            <HorizontalStackLayout Spacing="6" Margin="{OnPlatform Android='6,2', Default='6,4'}">
                                 <BoxView Color="#007A56" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
                                 <Label Text="Hoy" FontSize="11" TextColor="#57616F" />
                             </HorizontalStackLayout>
-                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                            <HorizontalStackLayout Spacing="6" Margin="{OnPlatform Android='6,2', Default='6,4'}">
                                 <BoxView Color="#D6E2FF" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
                                 <Label Text="Días anteriores" FontSize="11" TextColor="#57616F" />
                             </HorizontalStackLayout>
-                            <HorizontalStackLayout Spacing="6" Margin="6,4">
+                            <HorizontalStackLayout Spacing="6" Margin="{OnPlatform Android='6,2', Default='6,4'}" IsVisible="{Binding HasPreviousSales}">
                                 <BoxView Color="#1D293D" WidthRequest="10" HeightRequest="10" VerticalOptions="Center" />
                                 <Label Text="Mayor venta anterior" FontSize="11" TextColor="#57616F" />
                             </HorizontalStackLayout>
                         </FlexLayout>
                         <Button Text="Actualizar ventas" Clicked="OnRefreshWeeklySalesClicked"
-                                Style="{StaticResource DashboardSecondaryButtonStyle}" HorizontalOptions="End" />
+                                Style="{StaticResource DashboardRefreshButtonStyle}" />
                     </VerticalStackLayout>
                 </Border>
 
                 <Border x:Name="OperationalAlertsCard" Grid.Row="1" Style="{StaticResource DashboardCardStyle}" VerticalOptions="Start">
-                    <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="{OnPlatform Android=10, Default=14}">
+                        <VerticalStackLayout.Triggers>
+                            <DataTrigger TargetType="VerticalStackLayout" Binding="{Binding OperationalAlerts.Count}" Value="0">
+                                <Setter Property="Spacing" Value="{OnPlatform Android=6, Default=14}" />
+                            </DataTrigger>
+                        </VerticalStackLayout.Triggers>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Label Text="Alertas operativas" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
                             <Border Grid.Column="1" BackgroundColor="#FFE0DE" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="8,4" VerticalOptions="Center">
@@ -238,6 +358,11 @@
                         <Label Text="{Binding OperationalAlertsMessage}" IsVisible="{Binding HasOperationalAlertsMessage}"
                                FontSize="13" TextColor="#57616F" />
                         <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding OperationalAlerts}">
+                            <VerticalStackLayout.Triggers>
+                                <DataTrigger TargetType="VerticalStackLayout" Binding="{Binding OperationalAlerts.Count}" Value="0">
+                                    <Setter Property="IsVisible" Value="{OnPlatform Android=False, Default=True}" />
+                                </DataTrigger>
+                            </VerticalStackLayout.Triggers>
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:OperationalStockAlert">
                                     <Border BackgroundColor="#F3F5F7" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
@@ -257,84 +382,81 @@
                         <Button Text="Ver todas las alertas →" Clicked="OnConsultStockClicked"
                                 Style="{StaticResource DashboardSecondaryButtonStyle}" LineBreakMode="WordWrap" />
                         <Button Text="Actualizar alertas" Clicked="OnRefreshOperationalAlertsClicked"
-                                Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                                Style="{StaticResource DashboardRefreshButtonStyle}" />
                     </VerticalStackLayout>
                 </Border>
                 </Grid>
 
-                <Label Text="Accesos a módulos existentes" FontSize="17" FontAttributes="Bold" TextColor="#111D31" />
-                <Border BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
-                        StrokeShape="RoundRectangle 14" Padding="18">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                        <Label Text="Sesión iniciada como" FontSize="13" TextColor="#61738A" />
-                        <Label Grid.Row="1" Text="{Binding CurrentUserName}" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
-                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding CurrentRole}" FontSize="14"
-                               TextColor="#52657D" VerticalOptions="Center" />
-                    </Grid>
+                <Border Style="{StaticResource DashboardCardStyle}">
+                    <VerticalStackLayout Spacing="{OnPlatform Android=10, Default=14}">
+                        <Label Text="Últimas operaciones" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="{Binding RecentOperationsSubtitle}" FontSize="12" TextColor="#57616F" />
+                        <ActivityIndicator IsVisible="{Binding IsRecentOperationsLoading}" IsRunning="{Binding IsRecentOperationsLoading}" Color="#007A56" />
+                        <Label Text="{Binding RecentOperationsMessage}" IsVisible="{Binding HasRecentOperationsMessage}" FontSize="13" TextColor="#57616F" />
+                        <ScrollView x:Name="RecentOperationsTable" Orientation="Horizontal" IsVisible="False">
+                            <VerticalStackLayout x:Name="RecentOperationsTableContent" MinimumWidthRequest="850" HorizontalOptions="Fill" Spacing="0">
+                                <Grid ColumnDefinitions="110,120,*,140,110" ColumnSpacing="12" Padding="12" BackgroundColor="#F0F3F6">
+                                    <Label Text="FECHA / HORA" FontSize="10" FontAttributes="Bold" TextColor="#57616F" />
+                                    <Label Grid.Column="1" Text="TIPO" FontSize="10" FontAttributes="Bold" TextColor="#57616F" />
+                                    <Label Grid.Column="2" Text="DESCRIPCIÓN" FontSize="10" FontAttributes="Bold" TextColor="#57616F" />
+                                    <Label Grid.Column="3" Text="IMPORTE / CANTIDAD" FontSize="10" FontAttributes="Bold" TextColor="#57616F" />
+                                    <Label Grid.Column="4" Text="HISTORIAL" FontSize="10" FontAttributes="Bold" TextColor="#57616F" />
+                                </Grid>
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding RecentOperations}" Spacing="0">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="viewModels:RecentOperationItem">
+                                            <VerticalStackLayout Spacing="0">
+                                                <Grid ColumnDefinitions="110,120,*,140,110" ColumnSpacing="12" Padding="12,16">
+                                                    <VerticalStackLayout Spacing="3">
+                                                        <Label Text="{Binding DateText}" FontSize="12" TextColor="#57616F" />
+                                                        <Label Text="{Binding TimeText}" FontSize="12" TextColor="#57616F" />
+                                                    </VerticalStackLayout>
+                                                    <Label Grid.Column="1" Text="{Binding Type}" FontSize="12" FontAttributes="Bold" TextColor="{Binding AccentColor}" />
+                                                    <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                                        <Label Text="{Binding Description}" FontSize="13" TextColor="#111D31" />
+                                                        <Label Text="{Binding Actor}" IsVisible="{Binding HasActor}" FontSize="11" TextColor="#61738A" />
+                                                    </VerticalStackLayout>
+                                                    <Label Grid.Column="3" Text="{Binding ValueText}" FontSize="13" FontAttributes="Bold" TextColor="{Binding AccentColor}" />
+                                                    <Button Grid.Column="4" Text="Ver historial" Clicked="OnRecentOperationHistoryClicked" FontSize="11" Padding="6,4" BackgroundColor="#F1F5F9" TextColor="#26384C" CornerRadius="8" VerticalOptions="Center" />
+                                                </Grid>
+                                                <BoxView HeightRequest="1" Color="#E3EAF2" />
+                                            </VerticalStackLayout>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </ScrollView>
+                        <VerticalStackLayout x:Name="RecentOperationsCards" BindableLayout.ItemsSource="{Binding RecentOperations}" Spacing="{OnPlatform Android=8, Default=12}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:RecentOperationItem">
+                                    <Border BackgroundColor="#F7F9FB" Stroke="#E3EAF2" StrokeShape="RoundRectangle 10" Padding="{OnPlatform Android=10, Default=12}">
+                                        <VerticalStackLayout Spacing="{OnPlatform Android=6, Default=8}">
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                <Label Text="{Binding Type}" FontSize="13" FontAttributes="Bold" TextColor="{Binding AccentColor}" />
+                                                <Label Grid.Column="1" Text="{Binding ValueText}" FontSize="16" FontAttributes="Bold" TextColor="{Binding AccentColor}" HorizontalTextAlignment="End" />
+                                            </Grid>
+                                            <Label Text="{Binding Description}" FontSize="13" TextColor="#111D31" />
+                                            <Label Text="{Binding Actor}" IsVisible="{Binding HasActor}" FontSize="11" TextColor="#61738A" />
+                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8"
+                                                  SizeChanged="OnRecentOperationFooterSizeChanged">
+                                                <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                                    <Label Text="{Binding DateText}" FontSize="11" TextColor="#57616F" LineBreakMode="WordWrap" />
+                                                    <Label Text="{Binding TimeText}" FontSize="11" TextColor="#57616F" LineBreakMode="WordWrap" />
+                                                </VerticalStackLayout>
+                                                <Button Grid.Column="1" Text="Ver historial" Clicked="OnRecentOperationHistoryClicked"
+                                                        FontSize="12" BackgroundColor="#E8EDF3" TextColor="#26384C" CornerRadius="8"
+                                                        Padding="8,4" MinimumHeightRequest="44" LineBreakMode="WordWrap"
+                                                        HorizontalOptions="End" VerticalOptions="Center" />
+                                            </Grid>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Button Text="Actualizar operaciones" Clicked="OnRefreshRecentOperationsClicked" Style="{StaticResource DashboardRefreshButtonStyle}" />
+                    </VerticalStackLayout>
                 </Border>
 
-                <Border BackgroundColor="#0D1B2A" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="18">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                        <Label Text="Acceso rápido" FontSize="17" FontAttributes="Bold" TextColor="White" />
-                        <Label Grid.Row="1" Text="Continúa con la operación del negocio" FontSize="12" TextColor="#C7D2DF" />
-                        <Button Grid.Column="1" Grid.RowSpan="2" Text="Registrar venta  →" Clicked="OnRegisterSaleClicked"
-                                BackgroundColor="#FFFFFF" TextColor="#0D1B2A" FontAttributes="Bold"
-                                CornerRadius="9" Padding="16,10" VerticalOptions="Center" />
-                    </Grid>
-                </Border>
-
-                <Label Text="Operaciones" FontSize="21" FontAttributes="Bold" TextColor="#111D31" />
-
-                <Grid x:Name="MenuCardsGrid" HorizontalOptions="Fill" ColumnDefinitions="*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="16">
-                    <Border x:Name="SalesCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="Ventas" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Registra ventas y consulta su historial." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
-                            <Button Text="Registrar venta" Clicked="OnRegisterSaleClicked" Style="{StaticResource DashboardButtonStyle}" />
-                            <Button Text="Historial de ventas" Clicked="OnSaleHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                        </VerticalStackLayout>
-                    </Border>
-
-                    <Border x:Name="InventoryCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="Catálogo e inventario" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Administra productos y revisa existencias." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
-                            <Button Text="Administrar productos" Clicked="OnManageProductsClicked" Style="{StaticResource DashboardButtonStyle}" />
-                            <Button Text="Administrar categorías" Clicked="OnManageCategoriesClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Consultar existencias" Clicked="OnConsultStockClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                        </VerticalStackLayout>
-                    </Border>
-
-                    <Border x:Name="PurchasesCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="Compras y movimientos" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Registra entradas y consulta el historial." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
-                            <Button Text="Registrar compra" Clicked="OnRegisterPurchaseClicked" Style="{StaticResource DashboardButtonStyle}" />
-                            <Button Text="Historial de compras" Clicked="OnPurchaseHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Historial de movimientos" Clicked="OnInventoryMovementHistoryClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Registrar salida de inventario" Clicked="OnRegisterOtherExitClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                        </VerticalStackLayout>
-                    </Border>
-
-                    <Border x:Name="OtherCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="Clientes y seguimiento" FontSize="18" FontAttributes="Bold" TextColor="#111D31" />
-                            <Label Text="Consulta clientes, pagos e información del negocio." FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
-                            <Button Text="Clientes y crédito" Clicked="OnCustomersClicked" Style="{StaticResource DashboardButtonStyle}" />
-                            <Button Text="Registrar pagos y consultar saldos" LineBreakMode="WordWrap" Clicked="OnPaymentsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Reportes" Clicked="OnReportsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                            <Button Text="Crear cuenta de Cajero" LineBreakMode="WordWrap" IsVisible="{Binding IsAdministrator}"
-                                    Clicked="OnCreateCashierAccountClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
-                        </VerticalStackLayout>
-                    </Border>
-                </Grid>
-
-                <Grid x:Name="BottomActionsGrid" ColumnDefinitions="*,*" ColumnSpacing="12">
-                    <Button Text="Sincronización y conexión" Clicked="OnSynchronizationClicked"
-                            BackgroundColor="#E8EDF3" TextColor="#26384C" CornerRadius="9" Padding="14,12" />
-                    <Button Grid.Column="1" Text="Cerrar sesión" Command="{Binding SignOutCommand}"
-                            BackgroundColor="#E8EDF3" TextColor="#26384C" CornerRadius="9" Padding="14,12" />
-                </Grid>
             </VerticalStackLayout>
         </ScrollView>
         </Grid>

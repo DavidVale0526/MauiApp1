@@ -1,16 +1,13 @@
 using System.ComponentModel;
 using System.Collections.ObjectModel;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
-using System.Runtime.Versioning;
 using System.Windows.Input;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Lan;
 using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
+using MauiApp1.Services;
 using Microsoft.Maui.Storage;
 
 namespace MauiApp1.Presentation.ViewModels;
@@ -23,6 +20,13 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     private readonly ICoordinatorDiscoveryApprovalClient _discoveryApproval;
     private readonly IAuthenticationService _authentication;
     private readonly DesktopCoordinatorModeOptions _desktopMode;
+    private readonly ICoordinatorHostEnvironment _hostEnvironment;
+    public bool IsWindowsHost => _hostEnvironment.IsWindows && _desktopMode.IsHost;
+    private bool _hostAddressValidated;
+    private string _validatedHostAddress = string.Empty, _validatedHostCandidates = string.Empty;
+    private string _hostAddressMessage = string.Empty;
+    public string HostAddressMessage { get => _hostAddressMessage; private set => Set(ref _hostAddressMessage, value); }
+    public bool ShowHostAddressConfirmation => IsWindowsHost && !_hostAddressValidated;
     private string _address = string.Empty, _fingerprint = string.Empty, _userName = string.Empty;
     private string _password = string.Empty, _code = string.Empty, _message = string.Empty, _generatedCode = string.Empty, _generatedQrPayload = string.Empty;
     private bool _busy, _ready, _confirmed, _hasSavedLink, _hasPendingLink;
@@ -41,7 +45,8 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         ICoordinatorDiscoveryPairingClient discoveryPairing,
         ICoordinatorDiscoveryApprovalClient discoveryApproval,
         IAuthenticationService authentication,
-        DesktopCoordinatorModeOptions desktopMode)
+        DesktopCoordinatorModeOptions desktopMode,
+        ICoordinatorHostEnvironment? hostEnvironment = null)
     {
         _client = client;
         _discovery = discovery;
@@ -49,8 +54,10 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         _discoveryApproval = discoveryApproval;
         _authentication = authentication;
         _desktopMode = desktopMode;
+        _hostEnvironment = hostEnvironment ?? new CoordinatorHostEnvironment();
         UserName = authentication.CurrentUser?.UserName ?? string.Empty;
-        GenerateCodeCommand = new Command(async () => await GenerateCodeAsync(), () => CanGenerateCode && !IsBusy && _ready);
+        GenerateCodeCommand = new Command(async () => await GenerateCodeAsync(), () => CanGenerateCode && !IsBusy && _ready && (!IsWindowsHost || _hostAddressValidated));
+        ConfirmHostAddressCommand = new Command(ConfirmHostAddress, () => IsWindowsHost && _ready && !IsBusy);
         LoadFingerprintCommand = new Command(async () => await LoadFingerprintAsync(), () => CanLoadFingerprintFromFile && CanEditConnection && !IsBusy);
         PairCommand = new Command(async () => await PairAsync(), () => ShowPairForm && !IsBusy && _ready);
         DiscoverCommand = new Command(async () => await DiscoverCoordinatorAsync(), () => CanDiscover);
@@ -58,7 +65,21 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         CancelDiscoveredPairingCommand = new Command(async () => await CancelDiscoveredPairingAsync(), () => CanCancelDiscoveredPairing && !IsBusy);
     }
 
-    public string Address { get => _address; set => Set(ref _address, value); }
+    public string Address
+    {
+        get => _address;
+        set
+        {
+            if (Set(ref _address, value) && IsWindowsHost && _hostAddressValidated &&
+                !string.Equals(value, _validatedHostAddress, StringComparison.Ordinal))
+                InvalidateHostAddress("Confirma la dirección LAN antes de generar un código.");
+        }
+    }
+    private string _newCoordinatorAddress = string.Empty, _addressUpdateMessage = string.Empty;
+    public string NewCoordinatorAddress { get => _newCoordinatorAddress; set => Set(ref _newCoordinatorAddress, value); }
+    public string AddressUpdateMessage { get => _addressUpdateMessage; private set => Set(ref _addressUpdateMessage, value); }
+    public bool ShowAddressUpdate => !IsWindowsHost && _ready && _confirmed;
+    public bool CanUpdateCoordinatorAddress => ShowAddressUpdate && !IsBusy;
     public string Fingerprint { get => _fingerprint; set => Set(ref _fingerprint, value); }
     public string UserName { get => _userName; set => Set(ref _userName, value); }
     public string Password { get => _password; set => Set(ref _password, value); }
@@ -91,10 +112,10 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanShowGeneratedQr)));
         }
     }
-    public bool CanGenerateCode => OperatingSystem.IsWindows() && _authentication.CurrentUser?.Role == UserRole.Administrator;
-    public bool CanLoadFingerprintFromFile => OperatingSystem.IsWindows();
+    public bool CanGenerateCode => _hostEnvironment.IsWindows && _authentication.CurrentUser?.Role == UserRole.Administrator;
+    public bool CanLoadFingerprintFromFile => _hostEnvironment.IsWindows && !IsWindowsHost;
     public bool CanShowGeneratedQr => CanGenerateCode && !string.IsNullOrWhiteSpace(GeneratedQrPayload);
-    public bool CanScanQr => OperatingSystem.IsAndroid() && !_confirmed;
+    public bool CanScanQr => _hostEnvironment.IsAndroid && !_confirmed;
     public bool CanDiscover => !_desktopMode.IsHost && !_confirmed && (!_hasSavedLink || _hasPendingLink) &&
         !_discoveryRequestId.HasValue && !IsBusy;
     public bool HasDiscoveredCoordinators => DiscoveredCoordinators.Count > 0;
@@ -103,17 +124,19 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         !_confirmed && (!_hasSavedLink || _hasPendingLink) && !IsBusy;
     public bool ShowDiscoveryRequest => _discoveryRequestId.HasValue;
     public bool CanCancelDiscoveredPairing => _discoveryRequestId.HasValue && !IsBusy;
-    public bool CanManageDiscoveredPairings => OperatingSystem.IsWindows() && _desktopMode.IsHost && CanGenerateCode;
-    public bool ShowPairForm => !_confirmed;
-    public bool CanUnlink => _confirmed && !IsBusy;
-    public bool CanEditConnection => _ready && !_hasSavedLink && !IsBusy;
-    public bool CanEditAddress => _ready && !_confirmed && !IsBusy;
+    public bool CanManageDiscoveredPairings => IsWindowsHost && CanGenerateCode;
+    public bool ShowPairForm => !IsWindowsHost && !_confirmed;
+    public bool CanUnlink => !IsWindowsHost && _confirmed && !IsBusy;
+    public bool CanEditConnection => !IsWindowsHost && _ready && !_hasSavedLink && !IsBusy;
+    public bool CanEditAddress => _ready && (IsWindowsHost || !_confirmed) && !IsBusy;
     public bool CanEditForm => _ready && !IsBusy;
-    public string LinkStatus => _confirmed ? "Este dispositivo está vinculado." : _hasSavedLink
+    public string LinkStatus => IsWindowsHost ? "Este Windows es el Coordinador local. Autoriza otros dispositivos; no necesita vincularse consigo mismo."
+        : _confirmed ? "Este dispositivo está vinculado." : _hasSavedLink
         ? "Vinculación pendiente. Puedes reintentar con el mismo código o ingresar uno nuevo si venció."
         : "Este dispositivo todavía no está vinculado.";
     public bool IsBusy { get => _busy; private set { if (Set(ref _busy, value)) RefreshState(); } }
     public ICommand GenerateCodeCommand { get; }
+    public ICommand ConfirmHostAddressCommand { get; }
     public ICommand LoadFingerprintCommand { get; }
     public ICommand PairCommand { get; }
     public ICommand DiscoverCommand { get; }
@@ -125,6 +148,23 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         IsBusy = true;
         try
         {
+            if (IsWindowsHost)
+            {
+                _ready = false;
+                _hasSavedLink = _confirmed = _hasPendingLink = _hostAddressValidated = false;
+                Message = Code = GeneratedCode = GeneratedQrPayload = string.Empty;
+                Address = Fingerprint = string.Empty;
+                Fingerprint = await ReadHostFingerprintAsync();
+                _ready = true;
+                var candidates = HostCandidates();
+                if (candidates.Count == 1)
+                {
+                    Address = candidates[0].Address;
+                    ValidateHostAddress(candidates);
+                }
+                else InvalidateHostAddress(DescribeCandidates(candidates));
+                return;
+            }
             var status = await _client.GetStatusAsync();
             _hasSavedLink = status is not null;
             _confirmed = status?.IsConfirmed == true;
@@ -135,42 +175,41 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                 Fingerprint = status.CertificateFingerprint;
                 Code = status.PendingCode ?? string.Empty;
             }
-            else if (_desktopMode.IsHost && OperatingSystem.IsWindows())
-            {
-                Address = GetDefaultCoordinatorAddress();
-                var fingerprintPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                    "Miscelanea Ari", "Coordinator", "coordinator-certificate-fingerprint.txt");
-                if (File.Exists(fingerprintPath))
-                {
-                    var fingerprint = await File.ReadAllTextAsync(fingerprintPath);
-                    Fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
-                }
-            }
             _ready = true;
         }
         catch
         {
             _ready = false;
-            Message = "No se pudo leer la autorización segura del dispositivo. No se reemplazará automáticamente.";
+            if (IsWindowsHost) InvalidateHostAddress("No se pudo comprobar la red LAN o el certificado instalado del servicio Coordinador. Revisa su configuración y vuelve a abrir esta pantalla.");
+            else Message = "No se pudo leer la autorización segura del dispositivo. No se reemplazará automáticamente.";
         }
         finally { IsBusy = false; RefreshState(); }
     }
 
     private async Task GenerateCodeAsync()
     {
-        if (IsBusy || !CanGenerateCode || !_ready) return;
+        if (IsBusy || !CanGenerateCode || !_ready || IsWindowsHost && !_hostAddressValidated) return;
         IsBusy = true;
         Message = GeneratedCode = GeneratedQrPayload = string.Empty;
         try
         {
-            var result = await _client.CreateCodeAsync(Address, Fingerprint, UserName, Password);
+            if (IsWindowsHost && !await CheckHostAddressAsync()) return;
+            var address = Address;
+            var fingerprint = Fingerprint;
+            var result = await _client.CreateCodeAsync(address, fingerprint, UserName, Password);
+            if (IsWindowsHost && !await CheckHostAddressAsync()) return;
+            if (IsWindowsHost && (Address != address || Fingerprint != fingerprint))
+            {
+                InvalidateHostAddress("Los datos del Coordinador cambiaron durante la solicitud. Confirma la dirección y genera otro código.");
+                Message = HostAddressMessage;
+                return;
+            }
             Message = result.Message;
             if (result.Succeeded && result.ExpiresAtUtc.HasValue)
             {
                 GeneratedCode = $"Código: {result.Code}\nVence a las {result.ExpiresAtUtc.Value.ToLocalTime():HH:mm:ss}.\nCrear otro código invalida el anterior.";
                 GeneratedQrPayload = JsonSerializer.Serialize(new PairingQrData(
-                    "miscelanea-ari-pairing", 1, Address.Trim(), Fingerprint.Trim(),
+                    "miscelanea-ari-pairing", 1, address.Trim(), fingerprint.Trim(),
                     result.Code!, result.ExpiresAtUtc.Value));
             }
         }
@@ -232,6 +271,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
 
     public bool ApplyScannedQr(string rawValue)
     {
+        if (IsWindowsHost) return false;
         try
         {
             var data = JsonSerializer.Deserialize<PairingQrData>(rawValue);
@@ -259,7 +299,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
 
     private async Task PairAsync()
     {
-        if (IsBusy || _confirmed || !_ready) return;
+        if (IsWindowsHost || IsBusy || _confirmed || !_ready) return;
         IsBusy = true;
         try { Message = (await _client.PairAsync(Address, Fingerprint, Code)).Message; }
         catch { Message = "No fue posible vincular el dispositivo. Inténtalo de nuevo."; }
@@ -540,49 +580,97 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         finally { IsBusy = false; RefreshState(); }
     }
 
-    [SupportedOSPlatform("windows")]
-    private static string GetDefaultCoordinatorAddress()
+    private IReadOnlyList<CoordinatorLanAddress> HostCandidates() =>
+        CoordinatorHostAddressPolicy.Candidates(_hostEnvironment.GetLanAddresses());
+
+    private static string CandidateSignature(IReadOnlyList<CoordinatorLanAddress> candidates) =>
+        string.Join("|", candidates.Select(item => item.Address));
+
+    private static string DescribeCandidates(IReadOnlyList<CoordinatorLanAddress> candidates) =>
+        candidates.Count == 0
+            ? "No se detectó una dirección LAN válida. Conecta Windows a la red del negocio y pulsa Confirmar dirección LAN."
+            : (candidates.Count == 1 ? "Escribe la dirección LAN actual y pulsa Confirmar dirección LAN:\n"
+                : "Se detectaron varias direcciones LAN. Escribe la que comparte red con Android y pulsa Confirmar dirección LAN:\n") +
+                string.Join("\n", candidates.Select(item => $"{item.InterfaceName}: {item.Address}"));
+
+    private void InvalidateHostAddress(string message)
+    {
+        _hostAddressValidated = false;
+        GeneratedCode = GeneratedQrPayload = string.Empty;
+        HostAddressMessage = message;
+        RefreshState();
+    }
+
+    private void ValidateHostAddress(IReadOnlyList<CoordinatorLanAddress> candidates)
+    {
+        Address = new Uri(Address).AbsoluteUri;
+        _validatedHostAddress = Address;
+        _validatedHostCandidates = CandidateSignature(candidates);
+        _hostAddressValidated = true;
+        HostAddressMessage = $"Dirección LAN comprobada: {Address}";
+        RefreshState();
+    }
+
+    private async Task<string> ReadHostFingerprintAsync()
+    {
+        var fingerprint = await _hostEnvironment.ReadInstalledFingerprintAsync();
+        if (fingerprint.Length != 64 || !fingerprint.All(Uri.IsHexDigit))
+            throw new InvalidDataException("La huella del servicio no es SHA-256.");
+        return fingerprint.ToUpperInvariant();
+    }
+
+    private void ConfirmHostAddress()
+    {
+        if (!IsWindowsHost || IsBusy || !_ready) return;
+        IsBusy = true;
+        try
+        {
+            var candidates = HostCandidates();
+            if (string.IsNullOrWhiteSpace(Address) && candidates.Count == 1)
+                Address = candidates[0].Address;
+            if (!CoordinatorHostAddressPolicy.IsCandidate(Address, candidates))
+            {
+                InvalidateHostAddress("La dirección debe ser HTTPS, puerto 5080 y pertenecer a una interfaz LAN actual. " +
+                    DescribeCandidates(candidates));
+                return;
+            }
+            ValidateHostAddress(candidates);
+        }
+        catch
+        {
+            InvalidateHostAddress("No se pudieron consultar las interfaces LAN. Revisa la conexión y vuelve a confirmar.");
+        }
+        finally { IsBusy = false; }
+    }
+
+    private async Task<bool> CheckHostAddressAsync()
     {
         try
         {
-            var address = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
-                    adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211)
-                .SelectMany(adapter =>
-                {
-                    var properties = adapter.GetIPProperties();
-                    var hasGateway = properties.GatewayAddresses.Any(gateway =>
-                        gateway.Address.AddressFamily == AddressFamily.InterNetwork &&
-                        !IPAddress.Any.Equals(gateway.Address));
-                    return properties.UnicastAddresses
-                        .Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork)
-                        .Select(item => (Address: item.Address, HasGateway: hasGateway));
-                })
-                .Where(item => !IPAddress.IsLoopback(item.Address) &&
-                    IsPrivateIpv4(item.Address))
-                .OrderByDescending(item => item.HasGateway)
-                .Select(item => item.Address)
-                .FirstOrDefault();
-
-            return address is null ? string.Empty : $"https://{address}:5080";
+            var candidates = HostCandidates();
+            var fingerprint = await ReadHostFingerprintAsync();
+            if (_hostAddressValidated && CoordinatorHostAddressPolicy.IsCandidate(Address, candidates) &&
+                (candidates.Count == 1 || _validatedHostCandidates == CandidateSignature(candidates)) &&
+                Fingerprint == fingerprint)
+                return true;
+            InvalidateHostAddress("Cambió la dirección LAN, sus interfaces o la huella del servicio. Revisa los datos y confirma la dirección antes de generar otro código. " +
+                (candidates.Count == 1 ? string.Empty : DescribeCandidates(candidates)));
+            Address = candidates.Count == 1 ? candidates[0].Address : string.Empty;
+            Fingerprint = fingerprint;
+            Message = HostAddressMessage;
         }
-        catch (Exception exception) when (exception is NetworkInformationException or InvalidOperationException)
+        catch
         {
-            return string.Empty;
+            _ready = false;
+            InvalidateHostAddress("No se pudo verificar la red LAN o el certificado instalado. No se mostrará ningún código o QR. Vuelve a abrir esta pantalla.");
+            Message = HostAddressMessage;
         }
-    }
-
-    private static bool IsPrivateIpv4(IPAddress address)
-    {
-        var bytes = address.GetAddressBytes();
-        return bytes[0] == 10 ||
-            bytes[0] == 192 && bytes[1] == 168 ||
-            bytes[0] == 172 && bytes[1] is >= 16 and <= 31;
+        return false;
     }
 
     public async Task<PairingActionResult> UnlinkAsync()
     {
-        if (IsBusy || !_confirmed || !_ready)
+        if (IsWindowsHost || IsBusy || !_confirmed || !_ready)
             return new(false, "No se pudo iniciar la desvinculación. Comprueba el estado del dispositivo y vuelve a intentar.");
         IsBusy = true;
         try
@@ -601,6 +689,37 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         finally { IsBusy = false; RefreshState(); }
     }
 
+    public async Task UpdateCoordinatorAddressAsync(Func<string, Task<bool>> confirm)
+    {
+        if (!CanUpdateCoordinatorAddress) return;
+        IsBusy = true;
+        try
+        {
+            AddressUpdateMessage = "Comprobando HTTPS con el certificado guardado…";
+            var verification = await _client.VerifyCoordinatorAddressAsync(NewCoordinatorAddress);
+            AddressUpdateMessage = verification.Message;
+            if (!verification.Succeeded || verification.VerificationId is not { } id || verification.Address is null) return;
+            if (!await confirm(verification.Address))
+            {
+                AddressUpdateMessage = "Actualización cancelada. La dirección anterior se conserva.";
+                return;
+            }
+            AddressUpdateMessage = "Verificando y guardando la dirección…";
+            var result = await _client.UpdateCoordinatorAddressAsync(id);
+            AddressUpdateMessage = result.Message;
+            if (result.Succeeded)
+            {
+                Address = verification.Address;
+                NewCoordinatorAddress = string.Empty;
+            }
+        }
+        catch
+        {
+            AddressUpdateMessage = "No se pudo completar la actualización. Revisa la dirección guardada antes de reintentar.";
+        }
+        finally { IsBusy = false; }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {
@@ -611,6 +730,10 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     }
     private void RefreshState()
     {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowHostAddressConfirmation)));
+        ((Command)ConfirmHostAddressCommand).ChangeCanExecute();
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowAddressUpdate)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanUpdateCoordinatorAddress)));
         foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus), nameof(CanDiscover), nameof(CanRequestDiscoveredPairing), nameof(ShowDiscoveryRequest), nameof(CanCancelDiscoveredPairing), nameof(CanManageDiscoveredPairings) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();

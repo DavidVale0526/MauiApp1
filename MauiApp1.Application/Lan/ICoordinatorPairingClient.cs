@@ -7,7 +7,12 @@ public interface ICoordinatorPairingClient
     Task<PairingCodeResult> CreateCodeAsync(string address, string fingerprint, string userName, string password);
     Task<PairingActionResult> PairAsync(string address, string fingerprint, string code);
     Task<PairingActionResult> UnlinkAsync();
+    Task<CoordinatorAddressVerification> VerifyCoordinatorAddressAsync(string address);
+    Task<PairingActionResult> UpdateCoordinatorAddressAsync(Guid verificationId);
 }
+
+public sealed record CoordinatorAddressVerification(bool Succeeded, string Message,
+    Guid? VerificationId = null, string? Address = null);
 
 public sealed record CoordinatorLinkStatus(string Address, string CertificateFingerprint, bool IsConfirmed, string? PendingCode);
 public sealed record CoordinatorAvailability(bool IsConfigured, bool IsAvailable, bool IsConfirmed);

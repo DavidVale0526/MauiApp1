@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MauiApp1.Infrastructure.Lan;
 
-public sealed class CoordinatorPairingClient(
+public sealed partial class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,

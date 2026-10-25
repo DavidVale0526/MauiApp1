@@ -20,6 +20,7 @@ New-Item -ItemType Directory -Path $appDirectory, $coordinatorDirectory, $script
 
 dotnet publish (Join-Path $repositoryRoot 'MauiApp1\MauiApp1.csproj') `
     --configuration Release --framework net10.0-windows10.0.19041.0 --runtime win-x64 `
+    -p:WindowsInstallerPublish=true `
     --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true `
     -p:NuGetAudit=false $restoreArguments --output $appDirectory -m:1
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo publicar la aplicación Windows.' }

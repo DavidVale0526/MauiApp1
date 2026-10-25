@@ -44,6 +44,19 @@
                         <Label Text="Al desvincular, se revoca el acceso al coordinador. Los datos locales se conservan." IsVisible="{Binding CanUnlink}" FontSize="13" TextColor="#61738A" />
                     </VerticalStackLayout>
                 </Border>
+                <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding ShowAddressUpdate}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Actualizar dirección del Coordinador" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="Si cambió la IP de Windows, comprueba su nueva dirección con el certificado ya guardado. No es una nueva vinculación." FontSize="13" TextColor="#61738A" />
+                        <Label Text="Nueva dirección HTTPS" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                        <Entry Text="{Binding NewCoordinatorAddress}" Placeholder="https://192.168.1.38:5080" Keyboard="Url"
+                               IsEnabled="{Binding CanUpdateCoordinatorAddress}" Style="{StaticResource Input}" />
+                        <Label Text="Los datos locales y la vinculación se conservan. Al guardar, la sincronización automática existente puede enviar los pendientes." FontSize="13" TextColor="#61738A" />
+                        <Button Text="Comprobar nueva dirección" Clicked="OnUpdateCoordinatorAddressClicked"
+                                IsEnabled="{Binding CanUpdateCoordinatorAddress}" Style="{StaticResource PrimaryButton}" />
+                        <Label Text="{Binding AddressUpdateMessage}" FontSize="14" TextColor="#111D31" />
+                    </VerticalStackLayout>
+                </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding CanDiscover}">
                     <VerticalStackLayout Spacing="12">
                         <VerticalStackLayout Spacing="3">
@@ -138,6 +151,9 @@
                                 IsVisible="{Binding CanLoadFingerprintFromFile}" IsEnabled="{Binding CanEditConnection}"
                                 Style="{StaticResource SecondaryButton}" />
                         <Label Text="La huella permite reconocer el equipo autorizado al conectarse." FontSize="13" TextColor="#61738A" />
+                        <Label Text="{Binding HostAddressMessage}" IsVisible="{Binding IsWindowsHost}" FontSize="13" TextColor="#52657D" />
+                        <Button Text="Confirmar dirección LAN" Command="{Binding ConfirmHostAddressCommand}"
+                                IsVisible="{Binding ShowHostAddressConfirmation}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding CanGenerateCode}">

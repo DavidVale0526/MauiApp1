@@ -81,6 +81,12 @@ public abstract class CoordinatorRefreshPage : ContentPage
         grid.Add(reports, 3);
         grid.Add(more, 4);
 
+        if (DeviceInfo.Platform == DevicePlatform.Android)
+        {
+            grid.Loaded += (_, _) => AdjustAndroidNavigationColumns(grid);
+            grid.SizeChanged += (_, _) => AdjustAndroidNavigationColumns(grid);
+        }
+
         return new Border
         {
             Content = grid,
@@ -88,8 +94,35 @@ public abstract class CoordinatorRefreshPage : ContentPage
             Stroke = Color.FromArgb("#E3EAF2"),
             StrokeThickness = 1,
             Padding = 0,
-            HeightRequest = 68
+            HeightRequest = DeviceInfo.Platform == DevicePlatform.Android ? -1 : 68,
+            MinimumHeightRequest = 68
         };
+    }
+
+    private static void AdjustAndroidNavigationColumns(Grid grid)
+    {
+        var availableWidth = grid.Width - grid.Padding.HorizontalThickness
+            - grid.ColumnSpacing * (grid.ColumnDefinitions.Count - 1);
+        if (availableWidth <= 0) return;
+
+        // Reserve each scaled label's natural width, then share the remaining space.
+        var widths = grid.Children.Cast<Grid>().Select(item =>
+        {
+            var label = item.Children.OfType<Label>().Single();
+            var size = ((Microsoft.Maui.IView)label).Measure(double.PositiveInfinity, double.PositiveInfinity);
+            return Math.Max(48, Math.Ceiling(size.Width) + item.Padding.HorizontalThickness + 4);
+        }).ToArray();
+        var remainingWidth = availableWidth - widths.Sum();
+        for (var i = 0; i < widths.Length; i++)
+        {
+            // At larger accessibility sizes, wrapping remains available and the bar grows.
+            var width = remainingWidth >= 0
+                ? new GridLength(widths[i] + remainingWidth / widths.Length)
+                : GridLength.Star;
+            var current = grid.ColumnDefinitions[i].Width;
+            if (current.GridUnitType != width.GridUnitType || Math.Abs(current.Value - width.Value) > 0.5)
+                grid.ColumnDefinitions[i].Width = width;
+        }
     }
 
     private static View CreateNavigationButton(string iconName, string title, bool isSelected, Func<Task> onClicked)
@@ -116,14 +149,15 @@ public abstract class CoordinatorRefreshPage : ContentPage
         {
             RowDefinitions =
             {
-                new RowDefinition(GridLength.Star),
+                new RowDefinition(DeviceInfo.Platform == DevicePlatform.Android ? GridLength.Auto : GridLength.Star),
                 new RowDefinition(GridLength.Auto)
             },
             RowSpacing = 2,
             Padding = new Thickness(2, 3),
             BackgroundColor = Colors.Transparent,
             HorizontalOptions = LayoutOptions.Fill,
-            VerticalOptions = LayoutOptions.Fill
+            VerticalOptions = DeviceInfo.Platform == DevicePlatform.Android ? LayoutOptions.Center : LayoutOptions.Fill,
+            MinimumHeightRequest = DeviceInfo.Platform == DevicePlatform.Android ? 48 : -1
         };
         item.Add(icon, 0);
         Grid.SetRow(label, 1);

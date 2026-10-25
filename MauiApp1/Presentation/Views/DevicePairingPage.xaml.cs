@@ -24,6 +24,14 @@ public partial class DevicePairingPage : ContentPage
     }
     private async void OnBackClicked(object? sender, EventArgs args) => await Navigation.PopModalAsync();
 
+    private async void OnUpdateCoordinatorAddressClicked(object? sender, EventArgs args)
+    {
+        await _viewModel.UpdateCoordinatorAddressAsync(address => DisplayAlertAsync(
+            "Actualizar dirección del Coordinador",
+            $"Se comprobó {address} con el certificado guardado. ¿Guardar esta dirección conservando la vinculación? Al recuperar conectividad puede comenzar la sincronización automática de los pendientes locales.",
+            "Guardar dirección", "Cancelar"));
+    }
+
     private async void OnRequestDiscoveredPairingClicked(object? sender, EventArgs args)
     {
         var coordinatorName = _viewModel.SelectedCoordinator?.DisplayName ?? "el coordinador seleccionado";

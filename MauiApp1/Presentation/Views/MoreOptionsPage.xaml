@@ -15,7 +15,7 @@
                 </Grid>
 
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="OPERACIONES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                    <Label Text="PUNTO DE VENTA" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
                            CharacterSpacing="1" TextColor="#737B85" />
                     <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
                             StrokeShape="RoundRectangle 16">
@@ -24,7 +24,7 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="INVENTARIO Y COMPRAS" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                    <Label Text="INVENTARIO" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
                            CharacterSpacing="1" TextColor="#737B85" />
                     <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
                             StrokeShape="RoundRectangle 16">
@@ -33,11 +33,29 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="CLIENTES Y REPORTES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                    <Label Text="COMPRAS" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="PurchaseOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="CLIENTES Y CRÉDITO" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
                            CharacterSpacing="1" TextColor="#737B85" />
                     <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
                             StrokeShape="RoundRectangle 16">
                         <VerticalStackLayout x:Name="CustomerOptions" Spacing="0" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="REPORTES" Margin="14,0,0,4" FontSize="13" FontAttributes="Bold"
+                           CharacterSpacing="1" TextColor="#737B85" />
+                    <Border Padding="0" BackgroundColor="White" Stroke="#E9EDF1" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 16">
+                        <VerticalStackLayout x:Name="ReportOptions" Spacing="0" />
                     </Border>
                 </VerticalStackLayout>
 

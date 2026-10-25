@@ -29,19 +29,27 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
 
         AddOptions(InventoryOptions,
         [
+            new("▣", "Existencias", "Consultar el inventario disponible", typeof(StockConsultationPage)),
             new("▦", "Productos", "Administrar el catálogo de productos", typeof(ProductManagementPage)),
             new("▤", "Categorías", "Administrar las categorías", typeof(CategoryManagementPage)),
-            new("▣", "Existencias", "Consultar el inventario disponible", typeof(StockConsultationPage)),
-            new("＋", "Registrar compra", "Agregar productos recibidos", typeof(PurchaseRegistrationPage)),
-            new("↻", "Historial de compras", "Consultar compras registradas", typeof(PurchaseHistoryPage)),
             new("⇅", "Movimientos de inventario", "Consultar entradas y salidas", typeof(InventoryMovementHistoryPage)),
             new("−", "Registrar salida o merma", "Registrar una salida de producto o merma mixta", typeof(OtherExitPage))
+        ]);
+
+        AddOptions(PurchaseOptions,
+        [
+            new("＋", "Registrar compra", "Agregar productos recibidos", typeof(PurchaseRegistrationPage)),
+            new("↻", "Historial de compras", "Consultar compras registradas", typeof(PurchaseHistoryPage))
         ]);
 
         AddOptions(CustomerOptions,
         [
             new("♙", "Clientes y crédito", "Consultar clientes y saldos", typeof(CustomerManagementPage)),
-            new("C$", "Crédito y pagos", "Registrar abonos y consultar pagos", typeof(PaymentManagementPage)),
+            new("C$", "Crédito y pagos", "Registrar abonos y consultar pagos", typeof(PaymentManagementPage))
+        ]);
+
+        AddOptions(ReportOptions,
+        [
             new("▥", "Reportes", "Consultar los reportes disponibles", typeof(ReportsPage))
         ]);
 
@@ -110,7 +118,16 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
             VerticalOptions = LayoutOptions.Center,
             Children =
             {
-                new Label { Text = option.Title, FontSize = 18, TextColor = titleColor, LineBreakMode = LineBreakMode.TailTruncation },
+                new Label
+                {
+                    Text = option.Title,
+                    FontSize = 18,
+                    TextColor = titleColor,
+                    // Let Android accessibility text grow the row instead of truncating the title.
+                    LineBreakMode = DeviceInfo.Platform == DevicePlatform.Android
+                        ? LineBreakMode.WordWrap
+                        : LineBreakMode.TailTruncation
+                },
                 new Label { Text = option.Subtitle, FontSize = 14, TextColor = Color.FromArgb("#50545A"), LineBreakMode = LineBreakMode.WordWrap }
             }
         };
