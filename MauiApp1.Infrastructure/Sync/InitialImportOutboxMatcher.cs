@@ -40,7 +40,8 @@ public static class InitialImportOutboxMatcher
                         snapshot.Products.Any(item => item.ProductId == payload.ProductId && item.Name == payload.Name.Trim() &&
                             item.SalePriceMinorUnits == payload.SalePriceMinorUnits && item.Unit == payload.Unit.Trim() &&
                             item.CategoryId == payload.CategoryId && item.MinimumStockMilliUnits == payload.MinimumStockMilliUnits &&
-                            item.IsActive == payload.IsActive);
+                            item.IsActive == payload.IsActive &&
+                            (!payload.ImageDataSpecified || ImagesEqual(item.ImageData, payload.ImageData)));
                 }
                 case "Customer.Created":
                 {
@@ -100,6 +101,9 @@ public static class InitialImportOutboxMatcher
             return false;
         }
     }
+
+    private static bool ImagesEqual(byte[]? left, byte[]? right) =>
+        left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
 
     private sealed record CustomerCreatedPayload(Guid CustomerId, string Name, string? Phone);
     private sealed record PaymentRecordedPayload(Guid PaymentId, Guid OperationId, Guid ActorUserId,

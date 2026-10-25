@@ -9,4 +9,6 @@ public sealed record ProductDraft(
     MoneyAmount SalePrice,
     string Unit,
     CategoryId CategoryId,
-    Quantity MinimumStock);
+    Quantity MinimumStock,
+    byte[]? ImageData = null,
+    bool ReplaceImage = false);

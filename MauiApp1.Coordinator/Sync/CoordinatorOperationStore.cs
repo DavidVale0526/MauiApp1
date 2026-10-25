@@ -205,12 +205,12 @@ internal sealed class CoordinatorOperationStore(string databasePath)
         {
             var proposed = JsonSerializer.Deserialize<ProductChangedPayload>(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNameCaseInsensitive = true });
             await using var query = connection.CreateCommand();
-            query.CommandText = "SELECT Name, SalePriceMinorUnits, Unit, StockMilliUnits, MinimumStockMilliUnits, IsActive FROM Products WHERE ProductId = $id;";
+            query.CommandText = "SELECT Name, SalePriceMinorUnits, Unit, StockMilliUnits, MinimumStockMilliUnits, IsActive, ImageData FROM Products WHERE ProductId = $id;";
             query.Parameters.AddWithValue("$id", id.ToString("D"));
             await using var reader = await query.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct)) return ("Producto no encontrado en el coordinador.", proposed?.Name ?? "Propuesta de producto", true);
-            var current = $"Nombre: {reader.GetString(0)}; precio: {reader.GetInt64(1) / 100m:0.00}; unidad: {reader.GetString(2)}; existencia: {reader.GetInt64(3) / 1000m:0.###}; mínimo: {reader.GetInt64(4) / 1000m:0.###}; activo: {(reader.GetBoolean(5) ? "sí" : "no")}.";
-            var incoming = proposed is null ? "Propuesta de producto" : $"Nombre: {proposed.Name}; precio: {proposed.SalePriceMinorUnits / 100m:0.00}; unidad: {proposed.Unit}; mínimo: {proposed.MinimumStockMilliUnits / 1000m:0.###}; activo: {(proposed.IsActive ? "sí" : "no")}.";
+            var current = $"Nombre: {reader.GetString(0)}; precio: {reader.GetInt64(1) / 100m:0.00}; unidad: {reader.GetString(2)}; existencia: {reader.GetInt64(3) / 1000m:0.###}; mínimo: {reader.GetInt64(4) / 1000m:0.###}; activo: {(reader.GetBoolean(5) ? "sí" : "no")}; imagen: {(reader.IsDBNull(6) ? "no" : "sí")}.";
+            var incoming = proposed is null ? "Propuesta de producto" : $"Nombre: {proposed.Name}; precio: {proposed.SalePriceMinorUnits / 100m:0.00}; unidad: {proposed.Unit}; mínimo: {proposed.MinimumStockMilliUnits / 1000m:0.###}; activo: {(proposed.IsActive ? "sí" : "no")}; imagen: {(!proposed.ImageDataSpecified ? "sin cambio" : proposed.ImageData is null ? "no" : "sí")}.";
             return (current, incoming, type is "Product.Updated" or "Product.Deactivated" or "Product.Reactivated");
         }
         if (type == "Category.Renamed")
@@ -286,11 +286,12 @@ internal sealed class CoordinatorOperationStore(string databasePath)
             read.Parameters.AddWithValue("$id", recordId.ToString("D"));
             if (type.StartsWith("Product.", StringComparison.Ordinal))
             {
-                read.CommandText = "SELECT Name, SalePriceMinorUnits, StockMilliUnits, Unit, CategoryId, MinimumStockMilliUnits, IsActive FROM Products WHERE ProductId=$id;";
+                read.CommandText = "SELECT Name, SalePriceMinorUnits, StockMilliUnits, Unit, CategoryId, MinimumStockMilliUnits, IsActive, ImageData FROM Products WHERE ProductId=$id;";
                 await using var reader = await read.ExecuteReaderAsync(ct);
                 if (!await reader.ReadAsync(ct)) return "El producto ya no existe en la base central.";
                 var snapshot = new ProductChangedPayload(recordId, reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3),
-                    Guid.Parse(reader.GetString(4)), reader.GetInt64(5), reader.GetBoolean(6), ResolutionOfOperationId: conflictedOperationId);
+                    Guid.Parse(reader.GetString(4)), reader.GetInt64(5), reader.GetBoolean(6), ResolutionOfOperationId: conflictedOperationId,
+                    ImageData: reader.IsDBNull(7) ? null : reader.GetFieldValue<byte[]>(7), ImageDataSpecified: true);
                 payload = JsonSerializer.Serialize(snapshot);
                 eventType = "Product.Resolved";
             }

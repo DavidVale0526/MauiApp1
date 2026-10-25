@@ -1,6 +1,6 @@
 # TASK — Mejora visual del punto de venta
 
-**Estado general:** En progreso — diseño implementado; columnas adaptadas al ancho medido; pendiente de revisión visual final  
+**Estado general:** En progreso — etapas 1–3 implementadas; etapa 4 con mejoras de foco y accesibilidad; pendiente revisión visual en ejecución
 **Creado:** 24 de octubre de 2026  
 **Referencia:** Imagen de punto de venta compartida por el usuario  
 **Vista principal:** `MauiApp1/Presentation/Views/SaleRegistrationPage.xaml`
@@ -75,16 +75,17 @@ Mejorar la presentación del punto de venta de Miscelánea Ari tomando como refe
 
 ## Etapa 4 — Revisar estados visuales y tamaños de ventana
 
-**Avance de revisión:** tras recompilar, se abrió la versión de desarrollo y apareció el formulario de inicio de sesión. El intento autorizado no abrió la sesión, así que la revisión visual posterior al ajuste queda pendiente. La revisión visual de Android también queda pendiente.
+**Avance de etapa:** se añadió un contorno visible al recibir foco los botones principales y secundarios, y descripciones accesibles para la lista de productos y el campo de cantidad. Se conservó el resaltado verde de producto seleccionado y el distintivo de existencias. Las compilaciones de ambos destinos pasan. La revisión de tamaños y estados en ejecución sigue pendiente: la sesión de desarrollo volvió al inicio de sesión y no se pudo abrir Ventas. Android tampoco se revisó visualmente en dispositivo.
 
 **Hallazgo y corrección:** en la primera ejecución de desarrollo, incluso maximizada, los productos seguían en una columna. Se ajustó la inicialización de `ItemsLayout` para empezar con cuadrícula en Windows y lista en Android, y se cambió el cálculo para basarse en el ancho medido del catálogo. La cuadrícula debe comprobarse en una sesión iniciada y en varios tamaños de ventana.
 
-- [ ] Revisar el estilo de producto seleccionado usando el color de acento actual.
-- [ ] Revisar cómo se lee la existencia disponible usando el texto que ya proporciona el sistema.
+- [x] Definir el estilo de producto seleccionado con el color de acento actual; falta validarlo visualmente en ejecución.
+- [x] Destacar la existencia con un distintivo verde usando el texto actual; falta validar legibilidad visual.
 - [ ] Comprobar tarjetas con nombre largo, unidad larga y valores de precio o cantidad fraccionaria.
 - [ ] Comprobar catálogo vacío, carrito vacío y carrito con varias líneas.
 - [ ] Redimensionar la ventana de Windows y revisar que el catálogo, carrito y botones se reacomoden sin cortes.
-- [ ] Revisar contraste, foco visible y etiquetas accesibles de los controles existentes.
+- [x] Añadir un estado de foco visible para los botones y descripciones accesibles para productos y cantidad.
+- [ ] Verificar en ejecución el contraste, el foco visible y las etiquetas accesibles de los controles existentes.
 
 **Criterio de aceptación:** los estados actuales son comprensibles en los tamaños previstos y ningún control queda oculto, cortado o fuera del área interactiva.
 
@@ -94,9 +95,11 @@ Mejorar la presentación del punto de venta de Miscelánea Ari tomando como refe
 - [ ] Confirmar manualmente que siguen funcionando las acciones enumeradas en las reglas de alcance.
 - [x] Compilar los destinos Windows y Android afectados por la presentación.
 - [ ] Revisar visualmente Windows maximizado, Windows en ventana y Android.
-- [ ] Registrar el resultado, incidencias restantes y evidencia de cada etapa antes de marcarla completa.
+- [x] Registrar el resultado, incidencias restantes y evidencia de cada etapa antes de marcarla completa.
 
-**Evidencia de compilación (24/10/2026):** Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron correctamente, ambos con 0 advertencias y 0 errores. La revisión visual posterior al último ajuste no pudo completarse porque el inicio de sesión de desarrollo no abrió la sesión. Android no se revisó en dispositivo.
+**Revisión final (24/10/2026):** el diff de esta etapa contiene cambios de presentación y accesibilidad en `SaleRegistrationPage.xaml` y esta actualización del task; no modifica ViewModel, servicios, persistencia, contratos ni reglas de venta. `git diff --check` terminó sin errores; Git solo avisó que normalizará LF a CRLF en Windows.
+
+**Evidencia de compilación:** después de las mejoras de foco y accesibilidad, Windows (`net10.0-windows10.0.19041.0`) y Android (`net10.0-android`) compilaron correctamente, ambos con 0 advertencias y 0 errores. La revisión visual y funcional posterior al ajuste no pudo completarse porque la versión de desarrollo volvió al inicio de sesión. Android no se revisó en dispositivo. La etapa 5 queda parcialmente pendiente hasta completar esas comprobaciones manuales.
 
 **Criterio de aceptación:** la vista mantiene las funciones y reglas existentes, la distribución se adapta correctamente a las tres condiciones de revisión y las compilaciones de los destinos afectados terminan correctamente.
 

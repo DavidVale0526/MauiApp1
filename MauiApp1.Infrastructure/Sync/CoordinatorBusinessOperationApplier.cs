@@ -165,6 +165,8 @@ public sealed class CoordinatorBusinessOperationApplier
     private static async Task ApplyProductAsync(LocalDbContext context, string operationType, string json, CancellationToken ct, bool force)
     {
         var payload = Read<ProductChangedPayload>(json);
+        if (!ProductImageRules.IsSupported(payload.ImageData))
+            throw new BusinessOperationConflictException("La imagen del producto no es JPG o PNG válida, o supera 512 KB.");
         var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == payload.ProductId, ct);
         if (product is null)
         {
@@ -178,6 +180,7 @@ public sealed class CoordinatorBusinessOperationApplier
             product.CategoryId = payload.CategoryId;
             product.MinimumStockMilliUnits = payload.MinimumStockMilliUnits;
             product.IsActive = payload.IsActive;
+            product.ImageData = payload.ImageData;
             return;
         }
         if (operationType == "Product.Created")
@@ -198,17 +201,24 @@ public sealed class CoordinatorBusinessOperationApplier
         product.CategoryId = payload.CategoryId;
         product.MinimumStockMilliUnits = payload.MinimumStockMilliUnits;
         product.IsActive = payload.IsActive;
+        if (payload.ImageDataSpecified)
+            product.ImageData = payload.ImageData;
     }
 
     private static bool CatalogMatches(ProductEntity product, ProductChangedPayload payload) =>
         product.Name == payload.Name && product.SalePriceMinorUnits == payload.SalePriceMinorUnits && product.Unit == payload.Unit &&
         product.CategoryId == payload.CategoryId && product.MinimumStockMilliUnits == payload.MinimumStockMilliUnits &&
-        product.IsActive == payload.IsActive;
+        product.IsActive == payload.IsActive &&
+        (!payload.ImageDataSpecified || ImagesEqual(product.ImageData, payload.ImageData));
 
     private static bool CatalogMatches(ProductEntity product, ProductCatalogSnapshot snapshot) =>
         product.Name == snapshot.Name && product.SalePriceMinorUnits == snapshot.SalePriceMinorUnits && product.Unit == snapshot.Unit &&
         product.CategoryId == snapshot.CategoryId && product.MinimumStockMilliUnits == snapshot.MinimumStockMilliUnits &&
-        product.IsActive == snapshot.IsActive;
+        product.IsActive == snapshot.IsActive &&
+        (!snapshot.ImageDataSpecified || ImagesEqual(product.ImageData, snapshot.ImageData));
+
+    private static bool ImagesEqual(byte[]? left, byte[]? right) =>
+        left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
 
     private static async Task ApplyCustomerAsync(LocalDbContext context, string json, DateTime createdAtUtc, CancellationToken ct)
     {
@@ -406,7 +416,7 @@ public sealed class CoordinatorBusinessOperationApplier
         var payload = Read<InitialImportProduct>(json);
         if (payload.ProductId == Guid.Empty || payload.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Name) ||
             string.IsNullOrWhiteSpace(payload.Unit) || payload.SalePriceMinorUnits < 0 || payload.StockMilliUnits < 0 ||
-            payload.MinimumStockMilliUnits < 0)
+            payload.MinimumStockMilliUnits < 0 || !ProductImageRules.IsSupported(payload.ImageData))
             throw new BusinessOperationConflictException("El producto importado contiene datos inválidos.");
         if (!await context.Categories.AnyAsync(item => item.CategoryId == payload.CategoryId, ct))
             throw new BusinessOperationConflictException("La categoría del producto importado no existe.");
@@ -416,17 +426,20 @@ public sealed class CoordinatorBusinessOperationApplier
             context.Products.Add(new ProductEntity { ProductId = payload.ProductId, Name = payload.Name.Trim(),
                 SalePriceMinorUnits = payload.SalePriceMinorUnits, StockMilliUnits = payload.StockMilliUnits,
                 Unit = payload.Unit.Trim(), CategoryId = payload.CategoryId,
-                MinimumStockMilliUnits = payload.MinimumStockMilliUnits, IsActive = payload.IsActive });
+                MinimumStockMilliUnits = payload.MinimumStockMilliUnits, IsActive = payload.IsActive,
+                ImageData = payload.ImageData });
             return;
         }
         if (product.Name != payload.Name.Trim() || product.SalePriceMinorUnits != payload.SalePriceMinorUnits ||
             product.Unit != payload.Unit.Trim() || product.CategoryId != payload.CategoryId ||
-            product.MinimumStockMilliUnits != payload.MinimumStockMilliUnits || product.IsActive != payload.IsActive)
+            product.MinimumStockMilliUnits != payload.MinimumStockMilliUnits || product.IsActive != payload.IsActive ||
+            !ImagesEqual(product.ImageData, payload.ImageData))
             throw new BusinessOperationConflictException("El producto importado ya existe con el mismo identificador y otros datos de catálogo.");
 
         // This event carries the administrator-approved stock snapshot, so clients converge
         // on the same balance while imported movement rows below remain historical only.
         product.StockMilliUnits = payload.StockMilliUnits;
+        product.ImageData = payload.ImageData;
     }
 
     private static async Task ApplyImportedCustomerAsync(LocalDbContext context, string json, CancellationToken ct)

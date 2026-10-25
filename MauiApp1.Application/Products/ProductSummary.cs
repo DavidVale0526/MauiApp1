@@ -13,7 +13,8 @@ public sealed record ProductSummary(
     CategoryId CategoryId,
     string CategoryName,
     Quantity MinimumStock,
-    bool IsActive)
+    bool IsActive,
+    byte[]? ImageData = null)
 {
     public string StatusText => IsActive ? "Activo" : "Inactivo";
 

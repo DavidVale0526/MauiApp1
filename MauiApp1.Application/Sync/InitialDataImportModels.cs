@@ -23,7 +23,8 @@ public sealed record InitialDataImportSnapshot(
 public sealed record InitialImportActor(Guid LocalUserId, string UserName, int Role);
 public sealed record InitialImportCategory(Guid CategoryId, string Name);
 public sealed record InitialImportProduct(Guid ProductId, string Name, long SalePriceMinorUnits,
-    long StockMilliUnits, string Unit, Guid CategoryId, long MinimumStockMilliUnits, bool IsActive);
+    long StockMilliUnits, string Unit, Guid CategoryId, long MinimumStockMilliUnits, bool IsActive,
+    byte[]? ImageData = null);
 public sealed record InitialImportCustomer(Guid CustomerId, string Name, string? Phone, DateTime CreatedAtUtc);
 public sealed record InitialImportPurchase(Guid OperationId, DateTime OccurredAtUtc, Guid ActorLocalUserId,
     IReadOnlyList<InitialImportPurchaseLine> Lines);

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using MauiApp1.Application.Authentication;
+using MauiApp1.Application.Products;
 using MauiApp1.Application.Sync;
 using MauiApp1.Application.Storage;
 using MauiApp1.Infrastructure.Persistence;
@@ -40,7 +41,8 @@ public sealed class LocalInitialDataImportService(
                 .Select(item => new InitialImportCategory(item.CategoryId, item.Name)).ToListAsync(cancellationToken);
             var products = await context.Products.AsNoTracking()
                 .Select(item => new InitialImportProduct(item.ProductId, item.Name, item.SalePriceMinorUnits,
-                    item.StockMilliUnits, item.Unit, item.CategoryId, item.MinimumStockMilliUnits, item.IsActive))
+                    item.StockMilliUnits, item.Unit, item.CategoryId, item.MinimumStockMilliUnits, item.IsActive,
+                    item.ImageData))
                 .ToListAsync(cancellationToken);
             var customers = await context.Customers.AsNoTracking()
                 .Select(item => new InitialImportCustomer(item.CustomerId, item.Name, item.Phone, item.CreatedAtUtc))
@@ -82,6 +84,9 @@ public sealed class LocalInitialDataImportService(
             var snapshot = new InitialDataImportSnapshot(Guid.NewGuid(), 1,
                 await deviceIdentity.GetDeviceIdAsync(cancellationToken), DateTime.UtcNow,
                 actors, categories, products, customers, purchases, sales, receivables, movements, payments, discrepancies);
+            if (snapshot.Products.Sum(item => (long)(item.ImageData?.Length ?? 0)) > ProductImageRules.MaximumInitialImportBytes)
+                return new(false, null,
+                    "Las imágenes de este equipo superan el máximo combinado de 24 MB para la importación inicial. Reduce el tamaño de algunas imágenes y vuelve a analizar.");
             var pendingOperations = await context.OutboxMessages.AsNoTracking()
                 .Where(item => (int)item.Status == 0 || (int)item.Status == 2)
                 .ToListAsync(cancellationToken);

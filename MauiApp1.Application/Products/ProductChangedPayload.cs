@@ -11,7 +11,9 @@ public sealed record ProductChangedPayload(
     long MinimumStockMilliUnits,
     bool IsActive,
     ProductCatalogSnapshot? Expected = null,
-    Guid? ResolutionOfOperationId = null);
+    Guid? ResolutionOfOperationId = null,
+    byte[]? ImageData = null,
+    bool ImageDataSpecified = false);
 
 public sealed record ProductCatalogSnapshot(
     string Name,
@@ -19,4 +21,6 @@ public sealed record ProductCatalogSnapshot(
     string Unit,
     Guid CategoryId,
     long MinimumStockMilliUnits,
-    bool IsActive);
+    bool IsActive,
+    byte[]? ImageData = null,
+    bool ImageDataSpecified = false);

@@ -17,4 +17,6 @@ internal sealed class ProductEntity
     public long MinimumStockMilliUnits { get; set; }
 
     public bool IsActive { get; set; }
+
+    public byte[]? ImageData { get; set; }
 }

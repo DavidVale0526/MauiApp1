@@ -62,7 +62,7 @@
                         <Label Text="La existencia inicial es cero; se actualiza mediante entradas de inventario." FontSize="12" TextColor="#718198" />
                     </VerticalStackLayout>
 
-                    <Grid x:Name="ProductFormGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                    <Grid x:Name="ProductFormGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
                         <VerticalStackLayout x:Name="NameField" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Spacing="5">
                             <Label Text="NOMBRE DEL PRODUCTO" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
                             <Border Style="{StaticResource ProductFieldBorderStyle}" HeightRequest="48">
@@ -102,6 +102,25 @@
                                 <Entry Placeholder="Ej.: 0 o 0.5" Text="{Binding MinimumStock}" Keyboard="Numeric" ReturnType="Done"
                                        TextColor="#172438" PlaceholderColor="#9AA9BA" HorizontalTextAlignment="Start" />
                             </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout x:Name="ProductImageField" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="7">
+                            <Label Text="IMAGEN DEL PRODUCTO" FontSize="10" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
+                            <Grid ColumnDefinitions="76,*,Auto,Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                <Border Grid.Column="0" WidthRequest="76" HeightRequest="76" Padding="2"
+                                        BackgroundColor="#F1F5F9" Stroke="#DCE5EF" StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 10">
+                                    <Image Source="{Binding ProductImagePreview}" Aspect="AspectFill"
+                                           IsVisible="{Binding HasProductImage}" />
+                                </Border>
+                                <Label Grid.Column="1" Text="{Binding ProductImageStatus}" FontSize="12"
+                                       TextColor="#61738A" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                                <Button Grid.Column="2" Text="Elegir imagen" Clicked="OnChooseProductImageClicked"
+                                        Style="{StaticResource ProductSecondaryButtonStyle}" FontSize="12" Padding="12,8" />
+                                <Button Grid.Column="3" Text="Quitar" Clicked="OnRemoveProductImageClicked"
+                                        IsVisible="{Binding HasProductImage}" Style="{StaticResource ProductSecondaryButtonStyle}"
+                                        FontSize="12" Padding="12,8" />
+                            </Grid>
                         </VerticalStackLayout>
                     </Grid>
 

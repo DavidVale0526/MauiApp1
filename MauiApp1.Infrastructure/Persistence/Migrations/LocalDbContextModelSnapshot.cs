@@ -333,6 +333,9 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                      b.Property<byte[]>("ImageData")
+                          .HasColumnType("BLOB");
+
                     b.Property<long>("MinimumStockMilliUnits")
                         .HasColumnType("INTEGER");
 

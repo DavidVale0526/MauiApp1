@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using MauiApp1.Application.Sync;
+using MauiApp1.Application.Products;
 using MauiApp1.Coordinator.Persistence;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
@@ -293,11 +294,14 @@ internal sealed class CoordinatorInitialDataImportService(
         foreach (var product in snapshot.Products)
         {
             if (product.ProductId == Guid.Empty || string.IsNullOrWhiteSpace(product.Name) || string.IsNullOrWhiteSpace(product.Unit) ||
-                product.SalePriceMinorUnits < 0 || product.StockMilliUnits < 0 || product.MinimumStockMilliUnits < 0)
+                product.SalePriceMinorUnits < 0 || product.StockMilliUnits < 0 || product.MinimumStockMilliUnits < 0 ||
+                !ProductImageRules.IsSupported(product.ImageData))
                 blockers.Add($"El producto «{product.Name}» contiene datos inválidos.");
             if (!categoryIds.Contains(product.CategoryId))
                 blockers.Add($"El producto «{product.Name}» hace referencia a una categoría que no se importó ni existe en el coordinador.");
         }
+        if (snapshot.Products.Sum(item => (long)(item.ImageData?.Length ?? 0)) > ProductImageRules.MaximumInitialImportBytes)
+            blockers.Add("Las imágenes de este equipo superan el máximo combinado de 24 MB para la importación inicial. Reduce el tamaño de algunas imágenes y vuelve a analizar.");
         foreach (var product in snapshot.Products)
             if (centralProducts.Any(item => item.ProductId != product.ProductId && item.CategoryId == product.CategoryId && SameName(item.Name, product.Name)))
                 warnings.Add($"El producto «{product.Name}» coincide por nombre y categoría con un producto central distinto. Se conservarán ambos identificadores.");
@@ -326,7 +330,8 @@ internal sealed class CoordinatorInitialDataImportService(
             var sameId = centralProducts.FirstOrDefault(item => item.ProductId == product.ProductId);
             if (sameId is not null && (sameId.Name != product.Name.Trim() || sameId.SalePriceMinorUnits != product.SalePriceMinorUnits ||
                 sameId.Unit != product.Unit.Trim() || sameId.CategoryId != product.CategoryId ||
-                sameId.MinimumStockMilliUnits != product.MinimumStockMilliUnits || sameId.IsActive != product.IsActive))
+                sameId.MinimumStockMilliUnits != product.MinimumStockMilliUnits || sameId.IsActive != product.IsActive ||
+                !ImagesEqual(sameId.ImageData, product.ImageData)))
                 blockers.Add($"El producto «{product.Name}» ya existe con el mismo identificador y otro catálogo.");
             else if (sameId is not null)
                 exactMatchCount++;
@@ -600,6 +605,9 @@ internal sealed class CoordinatorInitialDataImportService(
                 actorMap[item.ActorLocalUserId], item.CreatedAtUtc);
         return operations;
     }
+
+    private static bool ImagesEqual(byte[]? left, byte[]? right) =>
+        left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
 
     private static IReadOnlyList<InitialImportStockValue> GetProcessedProductStocks(
         IReadOnlyList<ImportJournalOperation> operations, int processedCount) => operations.Take(processedCount)

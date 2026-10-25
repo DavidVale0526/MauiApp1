@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Microsoft.Maui.Controls;
 using MauiApp1.Application.Categories;
 using MauiApp1.Application.Products;
 using MauiApp1.Domain.Values;
@@ -17,6 +18,8 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
     private string _salePrice = string.Empty;
     private string _unit = string.Empty;
     private string _minimumStock = "0";
+    private byte[]? _imageData;
+    private bool _replaceImage;
     private string _errorMessage = string.Empty;
     private CategorySummary? _selectedCategory;
     private Guid? _editingProductId;
@@ -62,6 +65,38 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
     {
         get => _minimumStock;
         set => SetProperty(ref _minimumStock, value);
+    }
+
+    public bool HasProductImage => _imageData is { Length: > 0 };
+
+    public ImageSource? ProductImagePreview => _imageData is { Length: > 0 } image
+        ? ImageSource.FromStream(() => new MemoryStream(image))
+        : null;
+
+    public string ProductImageStatus => HasProductImage
+        ? "Imagen seleccionada. Se mostrará en el catálogo de ventas."
+        : "Sin imagen. Puedes agregar una imagen JPG o PNG de hasta 512 KB.";
+
+    public void SetErrorMessage(string message) => ErrorMessage = message;
+
+    public void SetProductImage(byte[] imageData)
+    {
+        _imageData = imageData;
+        _replaceImage = true;
+        OnPropertyChanged(nameof(HasProductImage));
+        OnPropertyChanged(nameof(ProductImagePreview));
+        OnPropertyChanged(nameof(ProductImageStatus));
+        ErrorMessage = string.Empty;
+    }
+
+    public void RemoveProductImage()
+    {
+        _imageData = null;
+        _replaceImage = true;
+        OnPropertyChanged(nameof(HasProductImage));
+        OnPropertyChanged(nameof(ProductImagePreview));
+        OnPropertyChanged(nameof(ProductImageStatus));
+        ErrorMessage = string.Empty;
     }
 
     public string ErrorMessage
@@ -134,6 +169,11 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         SalePrice = product.SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture);
         Unit = product.Unit;
         MinimumStock = product.MinimumStock.ToDecimal().ToString("0.###", CultureInfo.CurrentCulture);
+        _imageData = product.ImageData;
+        _replaceImage = false;
+        OnPropertyChanged(nameof(HasProductImage));
+        OnPropertyChanged(nameof(ProductImagePreview));
+        OnPropertyChanged(nameof(ProductImageStatus));
         SelectedCategory = Categories.FirstOrDefault(category => category.Id.Value == product.CategoryId.Value);
         ErrorMessage = string.Empty;
         OnPropertyChanged(nameof(IsEditing));
@@ -209,7 +249,9 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
                 MoneyAmount.FromDecimal(salePrice),
                 Unit,
                 SelectedCategory.Id,
-                Quantity.FromDecimal(minimumStock));
+                Quantity.FromDecimal(minimumStock),
+                _imageData,
+                _replaceImage);
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -257,8 +299,13 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         SalePrice = string.Empty;
         Unit = string.Empty;
         MinimumStock = "0";
+        _imageData = null;
+        _replaceImage = false;
         SelectedCategory = Categories.FirstOrDefault();
         ErrorMessage = string.Empty;
+        OnPropertyChanged(nameof(HasProductImage));
+        OnPropertyChanged(nameof(ProductImagePreview));
+        OnPropertyChanged(nameof(ProductImageStatus));
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(SaveButtonText));
     }

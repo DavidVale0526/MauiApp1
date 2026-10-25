@@ -32,7 +32,8 @@ internal sealed class EfProductService(
                     new CategoryId(product.CategoryId),
                     category.Name,
                     new Quantity(product.MinimumStockMilliUnits),
-                    product.IsActive);
+                    product.IsActive,
+                    product.ImageData);
         return await query.ToListAsync(cancellationToken);
     }
 
@@ -50,6 +51,10 @@ internal sealed class EfProductService(
         {
             return ProductOperationResult.Failure(validationError);
         }
+        if (!ProductImageRules.IsSupported(draft.ImageData))
+        {
+            return ProductOperationResult.Failure("La imagen debe ser JPG o PNG y no superar 512 KB.");
+        }
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (!await context.Categories.AnyAsync(category => category.CategoryId == draft.CategoryId.Value, cancellationToken))
@@ -66,7 +71,8 @@ internal sealed class EfProductService(
             Unit = unit,
             CategoryId = draft.CategoryId.Value,
             MinimumStockMilliUnits = draft.MinimumStock.MilliUnits,
-            IsActive = true
+            IsActive = true,
+            ImageData = draft.ReplaceImage ? draft.ImageData : null
         };
         context.Products.Add(product);
         await EnqueueAsync(context, actor.Id.Value, "Product.Created", product, cancellationToken);
@@ -102,6 +108,10 @@ internal sealed class EfProductService(
         {
             return ProductOperationResult.Failure(validationError);
         }
+        if (!ProductImageRules.IsSupported(draft.ImageData))
+        {
+            return ProductOperationResult.Failure("La imagen debe ser JPG o PNG y no superar 512 KB.");
+        }
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == productId, cancellationToken);
@@ -115,20 +125,23 @@ internal sealed class EfProductService(
             return ProductOperationResult.Failure("Selecciona una categoría que siga disponible.");
         }
 
+        var imageData = draft.ReplaceImage ? draft.ImageData : product.ImageData;
         if (product.Name == name && product.SalePriceMinorUnits == draft.SalePrice.MinorUnits &&
             product.Unit == unit && product.CategoryId == draft.CategoryId.Value &&
-            product.MinimumStockMilliUnits == draft.MinimumStock.MilliUnits)
+            product.MinimumStockMilliUnits == draft.MinimumStock.MilliUnits &&
+            ImagesEqual(product.ImageData, imageData))
         {
             return ProductOperationResult.Success();
         }
 
         var expected = new ProductCatalogSnapshot(product.Name, product.SalePriceMinorUnits, product.Unit,
-            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive);
+            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive, product.ImageData, ImageDataSpecified: true);
         product.Name = name;
         product.SalePriceMinorUnits = draft.SalePrice.MinorUnits;
         product.Unit = unit;
         product.CategoryId = draft.CategoryId.Value;
         product.MinimumStockMilliUnits = draft.MinimumStock.MilliUnits;
+        product.ImageData = imageData;
         await EnqueueAsync(context, actor.Id.Value, "Product.Updated", product, cancellationToken, expected);
 
         try
@@ -171,7 +184,7 @@ internal sealed class EfProductService(
         }
 
         var expected = new ProductCatalogSnapshot(product.Name, product.SalePriceMinorUnits, product.Unit,
-            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive);
+            product.CategoryId, product.MinimumStockMilliUnits, product.IsActive, product.ImageData, ImageDataSpecified: true);
         product.IsActive = isActive;
         await EnqueueAsync(
             context,
@@ -210,7 +223,9 @@ internal sealed class EfProductService(
             product.CategoryId,
             product.MinimumStockMilliUnits,
             product.IsActive,
-            expected);
+            expected,
+            ImageData: product.ImageData,
+            ImageDataSpecified: true);
         await outbox.EnqueueAsync(
             new NewOutboxOperation(
                 Guid.NewGuid(),
@@ -227,6 +242,9 @@ internal sealed class EfProductService(
             throw new UnauthorizedAccessException("Inicia sesión para consultar productos.");
         }
     }
+
+    private static bool ImagesEqual(byte[]? left, byte[]? right) =>
+        left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
 
     private static bool TryNormalizeDraft(
         ProductDraft draft,

@@ -131,6 +131,7 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
             entity.Property(item => item.CategoryId).IsRequired();
             entity.Property(item => item.MinimumStockMilliUnits).IsRequired();
             entity.Property(item => item.IsActive).IsRequired();
+            entity.Property(item => item.ImageData).HasColumnType("BLOB");
             entity.HasOne<CategoryEntity>()
                 .WithMany()
                 .HasForeignKey(item => item.CategoryId)

@@ -16,6 +16,24 @@
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Padding" Value="16,12" />
       <Setter Property="MinimumHeightRequest" Value="48" />
+      <Setter Property="BorderColor" Value="Transparent" />
+      <Setter Property="BorderWidth" Value="0" />
+      <Setter Property="VisualStateManager.VisualStateGroups">
+        <VisualStateGroupList>
+          <VisualStateGroup Name="CommonStates">
+            <VisualState Name="Normal" />
+            <VisualState Name="PointerOver" />
+            <VisualState Name="Pressed" />
+            <VisualState Name="Disabled" />
+            <VisualState Name="Focused">
+              <VisualState.Setters>
+                <Setter Property="BorderColor" Value="#B7F7D5" />
+                <Setter Property="BorderWidth" Value="2" />
+              </VisualState.Setters>
+            </VisualState>
+          </VisualStateGroup>
+        </VisualStateGroupList>
+      </Setter>
     </Style>
     <Style x:Key="Secondary" TargetType="Button">
       <Setter Property="BackgroundColor" Value="#F0F3F7" />
@@ -23,6 +41,24 @@
       <Setter Property="FontSize" Value="13" />
       <Setter Property="CornerRadius" Value="9" />
       <Setter Property="Padding" Value="12,10" />
+      <Setter Property="BorderColor" Value="Transparent" />
+      <Setter Property="BorderWidth" Value="0" />
+      <Setter Property="VisualStateManager.VisualStateGroups">
+        <VisualStateGroupList>
+          <VisualStateGroup Name="CommonStates">
+            <VisualState Name="Normal" />
+            <VisualState Name="PointerOver" />
+            <VisualState Name="Pressed" />
+            <VisualState Name="Disabled" />
+            <VisualState Name="Focused">
+              <VisualState.Setters>
+                <Setter Property="BorderColor" Value="#007F60" />
+                <Setter Property="BorderWidth" Value="2" />
+              </VisualState.Setters>
+            </VisualState>
+          </VisualStateGroup>
+        </VisualStateGroupList>
+      </Setter>
     </Style>
     <Style x:Key="Muted" TargetType="Label">
       <Setter Property="FontSize" Value="13" />
@@ -61,7 +97,7 @@
                 </VerticalStackLayout>
               </Grid>
             </Border>
-            <CollectionView x:Name="ProductsCollection" Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct, Mode=TwoWay}" SelectionMode="Single" ItemSizingStrategy="MeasureAllItems" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalScrollBarVisibility="Never" IsEnabled="{Binding CanEditLines}" SizeChanged="OnProductsCollectionSizeChanged">
+            <CollectionView x:Name="ProductsCollection" Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct, Mode=TwoWay}" SelectionMode="Single" ItemSizingStrategy="MeasureAllItems" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalScrollBarVisibility="Never" IsEnabled="{Binding CanEditLines}" SizeChanged="OnProductsCollectionSizeChanged" SemanticProperties.Description="Productos disponibles" SemanticProperties.Hint="Selecciona un producto para revisar su precio y existencia.">
               <CollectionView.EmptyView>
                 <Border Style="{StaticResource Surface}">
                   <Label Text="No hay productos activos para vender." Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
@@ -69,7 +105,7 @@
               </CollectionView.EmptyView>
               <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="viewModels:SaleProductOption">
-                  <Border Style="{StaticResource Surface}" Margin="0" Padding="10" MinimumHeightRequest="118" HorizontalOptions="Fill">
+                  <Border Style="{StaticResource Surface}" Margin="0" Padding="10" MinimumHeightRequest="118" HorizontalOptions="Fill" SemanticProperties.Description="{Binding DisplayName}" SemanticProperties.Hint="Selecciona para consultar el precio y la existencia disponibles.">
                     <VisualStateManager.VisualStateGroups>
                       <VisualStateGroup Name="CommonStates">
                         <VisualState Name="Normal" />
@@ -81,12 +117,23 @@
                         </VisualState>
                       </VisualStateGroup>
                     </VisualStateManager.VisualStateGroups>
-                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6" HorizontalOptions="Fill">
-                      <Label Text="{Binding DisplayName}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="WordWrap" />
-                      <Label Grid.Row="1" Text="{Binding PriceText}" FontSize="18" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
-                      <Border Grid.Row="2" BackgroundColor="#EAF7F1" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="7,4" HorizontalOptions="Start">
-                        <Label Text="{Binding StockText}" FontSize="11" TextColor="#08734F" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                    <Grid ColumnDefinitions="68,*" ColumnSpacing="10" HorizontalOptions="Fill">
+                      <Border Grid.Column="0" WidthRequest="68" HeightRequest="76" Padding="2" BackgroundColor="#F1F5F9"
+                              Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 9"
+                              VerticalOptions="Center">
+                        <Grid>
+                          <Label Text="Sin imagen" FontSize="9" TextColor="#94A3B8" HorizontalTextAlignment="Center"
+                                 VerticalTextAlignment="Center" />
+                          <Image Source="{Binding ProductImageSource}" IsVisible="{Binding HasImage}" Aspect="AspectFill" />
+                        </Grid>
                       </Border>
+                      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" VerticalOptions="Center">
+                        <Label Text="{Binding DisplayName}" FontSize="15" FontAttributes="Bold" TextColor="#19253B" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                        <Label Grid.Row="1" Text="{Binding PriceText}" FontSize="18" FontAttributes="Bold" TextColor="#0D172B" VerticalOptions="Center" />
+                        <Border Grid.Row="2" BackgroundColor="#EAF7F1" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="7,4" HorizontalOptions="Start">
+                        <Label Text="{Binding StockText}" FontSize="11" TextColor="#08734F" VerticalOptions="Center" LineBreakMode="WordWrap" />
+                        </Border>
+                      </Grid>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -99,7 +146,7 @@
                     <VerticalStackLayout Spacing="5">
                       <Label Text="CANTIDAD" FontSize="11" FontAttributes="Bold" TextColor="#52657D" />
                     <Border Style="{StaticResource Field}">
-                      <Entry Placeholder="Ej.: 1 o 0.5" Keyboard="Text" Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#94A3B8" HorizontalTextAlignment="Start" FontSize="16" />
+                      <Entry Placeholder="Ej.: 1 o 0.5" Keyboard="Text" Text="{Binding QuantityInput}" IsEnabled="{Binding CanEditLines}" TextColor="#172438" PlaceholderColor="#94A3B8" HorizontalTextAlignment="Start" FontSize="16" SemanticProperties.Description="Cantidad que se venderá" />
                     </Border>
                     <Label Text="Puedes usar punto o coma decimal. Ej.: 0.75" FontSize="11" TextColor="#647792" />
                   </VerticalStackLayout>

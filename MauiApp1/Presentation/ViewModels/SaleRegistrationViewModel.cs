@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Microsoft.Maui.Controls;
 using MauiApp1.Application.Products;
 using MauiApp1.Application.Customers;
 using MauiApp1.Application.Sales;
@@ -190,7 +191,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             foreach (var product in products.Where(item => item.IsActive))
             {
                 Products.Add(new SaleProductOption(
-                    product.Id, product.Name, product.Unit, product.SalePrice, product.Stock));
+                    product.Id, product.Name, product.Unit, product.SalePrice, product.Stock, product.ImageData));
             }
 
             SelectedProduct = Products.FirstOrDefault(product => product.Id == selectedProductId) ?? Products.FirstOrDefault();
@@ -449,9 +450,16 @@ public sealed record CreditCustomerOption(Guid Id, string Name)
     public string DisplayName => Name;
 }
 
-public sealed record SaleProductOption(ProductId Id, string Name, string Unit, MoneyAmount SalePrice, Quantity Stock)
+public sealed record SaleProductOption(ProductId Id, string Name, string Unit, MoneyAmount SalePrice, Quantity Stock,
+    byte[]? ImageData = null)
 {
     public string DisplayName => $"{Name} ({Unit})";
+
+    public bool HasImage => ImageData is { Length: > 0 };
+
+    public ImageSource? ProductImageSource => HasImage
+        ? ImageSource.FromStream(() => new MemoryStream(ImageData!))
+        : null;
 
     public string PriceText => $"C$ {SalePrice.ToDecimal().ToString("0.00", CultureInfo.CurrentCulture)}";
 
