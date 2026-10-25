@@ -16,8 +16,10 @@ using MauiApp1.Infrastructure.Customers;
 using MauiApp1.Application.Credit;
 using MauiApp1.Infrastructure.Credit;
 using MauiApp1.Application.Reports;
+using MauiApp1.Application.Dashboard;
 using MauiApp1.Application.Sync;
 using MauiApp1.Infrastructure.Reports;
+using MauiApp1.Infrastructure.Dashboard;
 using MauiApp1.Infrastructure.Sync;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +68,7 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddTransient<ICustomerService, EfCustomerService>();
         services.AddTransient<IPaymentService, EfPaymentService>();
         services.AddTransient<IReportService, EfReportService>();
+        services.AddTransient<IDashboardService, EfDashboardService>();
         return services;
     }
 }

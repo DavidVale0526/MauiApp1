@@ -16,6 +16,15 @@
             <Setter Property="StrokeShape" Value="RoundRectangle 14" />
             <Setter Property="Padding" Value="18" />
         </Style>
+        <Style x:Key="DashboardSectionTitleStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="TextColor" Value="#111D31" />
+        </Style>
+        <Style x:Key="DashboardMutedTextStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextColor" Value="#718198" />
+        </Style>
         <Style x:Key="DashboardButtonStyle" TargetType="Button">
             <Setter Property="BackgroundColor" Value="#0D1B2A" />
             <Setter Property="TextColor" Value="White" />
@@ -141,12 +150,16 @@
         <ScrollView Grid.Column="1" VerticalScrollBarVisibility="Never">
             <VerticalStackLayout x:Name="DashboardContent"
                                  Padding="18,24"
-                                 Spacing="22"
+                                 Spacing="20"
                                  HorizontalOptions="Center"
                                  MaximumWidthRequest="1440">
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16">
                     <Label Text="Panel principal" FontSize="30" FontAttributes="Bold" TextColor="#111D31" />
                     <Label Grid.Row="1" Text="Resumen y accesos de Miscelánea Ari" FontSize="14" TextColor="#61738A" />
+                    <Border Grid.Column="1" Grid.RowSpan="2" BackgroundColor="#EAF1F8" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 18" Padding="12,7" VerticalOptions="Center">
+                        <Label Text="Resumen del negocio" FontSize="11" FontAttributes="Bold" TextColor="#52657D" />
+                    </Border>
                 </Grid>
 
                 <Border BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1"
@@ -165,6 +178,128 @@
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Atención: existencias bajas" FontSize="16" FontAttributes="Bold" TextColor="#A3440B" />
                         <Label Text="{Binding LowStockAlertMessage}" FontSize="13" TextColor="#873B13" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="{Binding DataNotice}" FontSize="11" TextColor="#61738A" />
+
+                <Border IsVisible="{Binding HasDashboardError}" BackgroundColor="#FFF8F3" Stroke="#F0A35E"
+                        StrokeThickness="1" StrokeShape="RoundRectangle 12" Padding="14">
+                    <Label Text="{Binding DashboardErrorMessage}" FontSize="13" TextColor="#873B13" />
+                </Border>
+
+                <Grid x:Name="KpiGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="12"
+                      IsVisible="{Binding HasDashboardData}">
+                    <Border x:Name="SalesTodayKpi" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}" Padding="16">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                            <Label Text="VENTAS DE HOY" FontSize="11" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
+                            <Label Grid.Row="1" Text="{Binding SalesTodayText}" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Grid.Row="2" Text="{Binding SalesTodayCountText}" FontSize="11" TextColor="#718198" />
+                            <Border Grid.Column="1" Grid.RowSpan="3" WidthRequest="38" HeightRequest="38" Padding="6"
+                                    BackgroundColor="#E1F5EC" StrokeThickness="0" StrokeShape="RoundRectangle 12" VerticalOptions="Start">
+                                <Label Text="C$" FontSize="13" FontAttributes="Bold" TextColor="#008060" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border x:Name="LowStockKpi" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}" Padding="16">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                            <Label Text="EXISTENCIAS BAJAS" FontSize="11" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
+                            <Label Grid.Row="1" Text="{Binding LowStockCountText}" FontSize="27" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Grid.Row="2" Text="productos con alerta" FontSize="11" TextColor="#718198" />
+                            <Border Grid.Column="1" Grid.RowSpan="3" WidthRequest="38" HeightRequest="38" Padding="6"
+                                    BackgroundColor="#FFF0DD" StrokeThickness="0" StrokeShape="RoundRectangle 12" VerticalOptions="Start">
+                                <Label Text="!" FontSize="20" FontAttributes="Bold" TextColor="#B56516" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border x:Name="TodayCountKpi" Grid.Row="0" Grid.Column="2" Style="{StaticResource DashboardCardStyle}" Padding="16">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                            <Label Text="OPERACIONES DE HOY" FontSize="11" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
+                            <Label Grid.Row="1" Text="{Binding SalesTodayCountValueText}" FontSize="27" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Grid.Row="2" Text="ventas registradas" FontSize="11" TextColor="#718198" />
+                            <Border Grid.Column="1" Grid.RowSpan="3" WidthRequest="38" HeightRequest="38" Padding="6"
+                                    BackgroundColor="#E7EDF9" StrokeThickness="0" StrokeShape="RoundRectangle 12" VerticalOptions="Start">
+                                <Label Text="#" FontSize="18" FontAttributes="Bold" TextColor="#47638F" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border x:Name="SalesMonthKpi" Grid.Row="0" Grid.Column="3" Style="{StaticResource DashboardCardStyle}" Padding="16">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                            <Label Text="VENTAS DEL MES" FontSize="11" FontAttributes="Bold" CharacterSpacing="0.5" TextColor="#61738A" />
+                            <Label Grid.Row="1" Text="{Binding SalesMonthText}" FontSize="23" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Grid.Row="2" Text="mes actual" FontSize="11" TextColor="#718198" />
+                            <Border Grid.Column="1" Grid.RowSpan="3" WidthRequest="38" HeightRequest="38" Padding="6"
+                                    BackgroundColor="#E7EDF9" StrokeThickness="0" StrokeShape="RoundRectangle 12" VerticalOptions="Start">
+                                <Label Text="↗" FontSize="18" FontAttributes="Bold" TextColor="#47638F" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Label Text="Los importes son ventas registradas; no representan cobros recibidos ni ganancias."
+                       FontSize="11" TextColor="#718198" IsVisible="{Binding HasDashboardData}" />
+
+                <Grid x:Name="InsightsGrid" ColumnDefinitions="*,*" RowDefinitions="Auto" ColumnSpacing="16" RowSpacing="16"
+                      IsVisible="{Binding HasDashboardData}">
+                    <Border x:Name="WeeklySalesCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Ventas de los últimos 7 días" Style="{StaticResource DashboardSectionTitleStyle}" FontSize="18" />
+                            <Label Text="Importe diario de ventas registradas" Style="{StaticResource DashboardMutedTextStyle}" />
+                            <GraphicsView x:Name="WeeklySalesChart" HeightRequest="230" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="TopProductsCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource DashboardCardStyle}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Productos más vendidos" Style="{StaticResource DashboardSectionTitleStyle}" FontSize="18" />
+                            <Label Text="Cantidad vendida durante el mes actual" Style="{StaticResource DashboardMutedTextStyle}" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding TopProducts}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="viewModels:DashboardTopProductCard">
+                                        <Grid ColumnDefinitions="30,*,Auto" Padding="4,12" ColumnSpacing="8">
+                                            <Label Text="{Binding Position}" FontSize="13" FontAttributes="Bold" TextColor="#008060" VerticalOptions="Center" />
+                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="13" FontAttributes="Bold"
+                                                   TextColor="#111D31" LineBreakMode="TailTruncation" VerticalOptions="Center" />
+                                            <Label Grid.Column="2" Text="{Binding QuantityText}" FontSize="12" FontAttributes="Bold" TextColor="#26384C" VerticalOptions="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                            <Label Text="Aún no hay ventas de productos este mes." FontSize="12" TextColor="#718198"
+                                   IsVisible="{Binding HasNoTopProducts}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="RecentSalesCard" IsVisible="{Binding HasDashboardData}" Style="{StaticResource DashboardCardStyle}">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <Label Text="Últimas ventas" Style="{StaticResource DashboardSectionTitleStyle}" FontSize="18" />
+                            <Label Grid.Row="1" Text="Operaciones registradas recientemente en este dispositivo" Style="{StaticResource DashboardMutedTextStyle}" />
+                            <Label Grid.Column="1" Text="5 recientes" FontSize="11" TextColor="#61738A" VerticalOptions="Center" />
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding RecentSales}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:DashboardRecentSaleCard">
+                                    <Border BackgroundColor="#F7F9FB" Stroke="#E8EDF3" StrokeThickness="1"
+                                            StrokeShape="RoundRectangle 10" Padding="12">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Label Text="{Binding DateText}" FontSize="12" FontAttributes="Bold" TextColor="#111D31" />
+                                                <Label Text="{Binding CustomerText}" FontSize="11" TextColor="#52657D" />
+                                                <Label Text="{Binding ActorText}" FontSize="10" TextColor="#718198" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="3" HorizontalOptions="End" VerticalOptions="Center">
+                                                <Label Text="{Binding TotalText}" FontSize="14" FontAttributes="Bold" TextColor="#008060" HorizontalTextAlignment="End" />
+                                                <Label Text="{Binding TypeText}" FontSize="11" TextColor="#52657D" HorizontalTextAlignment="End" />
+                                                <Label Text="{Binding ItemsText}" FontSize="10" TextColor="#718198" HorizontalTextAlignment="End" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Aún no hay ventas registradas." FontSize="12" TextColor="#718198"
+                               IsVisible="{Binding HasNoRecentSales}" />
                     </VerticalStackLayout>
                 </Border>
 

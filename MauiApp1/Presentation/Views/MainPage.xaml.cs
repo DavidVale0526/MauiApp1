@@ -1,4 +1,5 @@
 using MauiApp1.Presentation.ViewModels;
+using MauiApp1.Application.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Networking;
 using MauiApp1.Application.Sync;
@@ -7,6 +8,8 @@ namespace MauiApp1.Presentation.Views;
 
 public partial class MainPage : CoordinatorRefreshPage
 {
+    private readonly DashboardSalesChartDrawable _salesChartDrawable = new();
+
     private void OnRootLayoutSizeChanged(object? sender, EventArgs args)
     {
         var windowWidth = RootLayout.Width;
@@ -27,6 +30,8 @@ public partial class MainPage : CoordinatorRefreshPage
             : new Thickness(16, 24);
 
         var cardContentWidth = dashboardWidth - DashboardContent.Padding.Left - DashboardContent.Padding.Right;
+        UpdateKpiLayout(cardContentWidth);
+        UpdateInsightsLayout(cardContentWidth);
         var useTwoColumnCards = cardContentWidth >= 820;
         MenuCardsGrid.ColumnDefinitions.Clear();
         MenuCardsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
@@ -41,6 +46,44 @@ public partial class MainPage : CoordinatorRefreshPage
             Grid.SetColumn(cards[index], useTwoColumnCards ? index % 2 : 0);
             Grid.SetRow(cards[index], useTwoColumnCards ? index / 2 : index);
         }
+    }
+
+    private void UpdateKpiLayout(double contentWidth)
+    {
+        var columns = contentWidth >= 1120 ? 4 : contentWidth >= 650 ? 2 : 1;
+        KpiGrid.ColumnDefinitions.Clear();
+        KpiGrid.RowDefinitions.Clear();
+        for (var column = 0; column < columns; column++)
+            KpiGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+
+        var cards = new Border[] { SalesTodayKpi, LowStockKpi, TodayCountKpi, SalesMonthKpi };
+        var rows = (int)Math.Ceiling(cards.Length / (double)columns);
+        for (var row = 0; row < rows; row++)
+            KpiGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        for (var index = 0; index < cards.Length; index++)
+        {
+            Grid.SetColumn(cards[index], index % columns);
+            Grid.SetRow(cards[index], index / columns);
+        }
+    }
+
+    private void UpdateInsightsLayout(double contentWidth)
+    {
+        var twoColumns = contentWidth >= 1050;
+        InsightsGrid.ColumnDefinitions.Clear();
+        InsightsGrid.RowDefinitions.Clear();
+        InsightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        if (twoColumns)
+            InsightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+        InsightsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        if (!twoColumns)
+            InsightsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        Grid.SetColumn(WeeklySalesCard, 0);
+        Grid.SetRow(WeeklySalesCard, 0);
+        Grid.SetColumn(TopProductsCard, twoColumns ? 1 : 0);
+        Grid.SetRow(TopProductsCard, twoColumns ? 0 : 1);
     }
 
     private async void OnSynchronizationClicked(object? sender, EventArgs args)
@@ -69,6 +112,8 @@ public partial class MainPage : CoordinatorRefreshPage
         _realtimeClient = realtimeClient;
         _connectivity = connectivity;
         _operationSyncService = operationSyncService;
+        WeeklySalesChart.Drawable = _salesChartDrawable;
+        _viewModel.PropertyChanged += OnDashboardViewModelPropertyChanged;
         BindingContext = viewModel;
     }
 
@@ -76,7 +121,8 @@ public partial class MainPage : CoordinatorRefreshPage
     {
         base.OnAppearing();
         _connectivity.ConnectivityChanged += OnConnectivityChanged;
-        await _viewModel.LoadLowStockAlertsAsync();
+        await _viewModel.LoadDashboardAsync();
+        UpdateSalesChart();
         await TrySynchronizeInBackgroundAsync();
         await _realtimeClient.StartAsync();
     }
@@ -87,7 +133,23 @@ public partial class MainPage : CoordinatorRefreshPage
         base.OnDisappearing();
     }
 
-    protected override Task RefreshAfterCoordinatorChangesAsync() => _viewModel.LoadLowStockAlertsAsync();
+    protected override async Task RefreshAfterCoordinatorChangesAsync()
+    {
+        await _viewModel.LoadDashboardAsync();
+        UpdateSalesChart();
+    }
+
+    private void OnDashboardViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MainPageViewModel.SalesLastSevenDays))
+            UpdateSalesChart();
+    }
+
+    private void UpdateSalesChart()
+    {
+        _salesChartDrawable.Points = _viewModel.SalesLastSevenDays;
+        MainThread.BeginInvokeOnMainThread(() => WeeklySalesChart.Invalidate());
+    }
 
     private async void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs args) =>
         await TrySynchronizeInBackgroundAsync();
