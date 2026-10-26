@@ -1,5 +1,6 @@
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Sync;
+using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
 
 namespace MauiApp1.Presentation.Views;
@@ -9,17 +10,20 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
     private readonly IServiceProvider _services;
     private readonly IAuthenticationService _authenticationService;
     private readonly ICoordinatedSignInService _signInService;
+    private readonly DesktopCoordinatorModeOptions _desktopMode;
 
     public MoreOptionsPage(
         IServiceProvider services,
         IAuthenticationService authenticationService,
         ICoordinatedSignInService signInService,
+        DesktopCoordinatorModeOptions desktopMode,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
         InitializeComponent();
         _services = services;
         _authenticationService = authenticationService;
         _signInService = signInService;
+        _desktopMode = desktopMode;
 
         AddOptions(AccountOptions,
         [
@@ -55,7 +59,13 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
             new("⇄", "Sincronización y conexión", "Conexión con el coordinador", typeof(SyncManagementPage))
         };
         if (_authenticationService.CurrentUser?.Role == UserRole.Administrator)
+        {
             administration.Add(new("♙", "Cuentas de cajero", "Administrar cuentas de cajero", typeof(CashierSetupPage)));
+#if WINDOWS
+            if (_desktopMode.IsHost)
+                administration.Add(new("▤", "Respaldos", "Guardar y consultar copias en una memoria USB", typeof(BackupManagementPage)));
+#endif
+        }
         administration.Add(new("⇥", "Cerrar sesión", "Salir de la sesión actual", IsSignOut: true));
         AddOptions(AdministrationOptions, administration);
     }

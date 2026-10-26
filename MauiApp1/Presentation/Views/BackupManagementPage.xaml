@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:backups="clr-namespace:MauiApp1.Application.Backups;assembly=MauiApp1.Application"
+             x:Class="MauiApp1.Presentation.Views.BackupManagementPage"
+             Title="Respaldos"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F7F9FB">
+    <ContentPage.Resources>
+        <Style x:Key="BackupCardStyle" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="Stroke" Value="#E3EAF2" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 16" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+        <Style x:Key="BackupPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#07805F" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="18,12" />
+        </Style>
+        <Style x:Key="BackupSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#EEF2F7" />
+            <Setter Property="TextColor" Value="#26384C" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="16,10" />
+        </Style>
+    </ContentPage.Resources>
+
+    <ScrollView VerticalScrollBarVisibility="Never">
+        <VerticalStackLayout Padding="20,22" Spacing="18" HorizontalOptions="Center" MaximumWidthRequest="1100">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <Button Text="← Volver" Clicked="OnBackClicked" VerticalOptions="Center"
+                        Style="{StaticResource BackupSecondaryButtonStyle}" />
+                <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                    <Label Text="Respaldo de base de datos" FontSize="29" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Guarda una copia de la base central en una memoria USB. No requiere Internet."
+                           FontSize="14" TextColor="#61738A" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <Border Style="{StaticResource BackupCardStyle}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+                    <Border WidthRequest="66" HeightRequest="66" BackgroundColor="#E8F6EF" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 33" VerticalOptions="Center">
+                        <Label Text="▤" FontSize="34" TextColor="#07805F" HorizontalTextAlignment="Center"
+                               VerticalTextAlignment="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                        <Label Text="Último respaldo correcto" FontSize="13" TextColor="#61738A" />
+                        <Label x:Name="LastBackupDateLabel" Text="Aún no hay respaldos" FontSize="21"
+                               FontAttributes="Bold" TextColor="#07805F" />
+                        <Label x:Name="LastBackupSizeLabel" Text="Conecta una USB para guardar la base central."
+                               FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2" Spacing="3" VerticalOptions="Center" HorizontalOptions="End">
+                        <Label Text="ESTADO" FontSize="10" FontAttributes="Bold" TextColor="#61738A" HorizontalTextAlignment="End" />
+                        <Label x:Name="LastBackupStatusLabel" Text="Sin respaldo" FontSize="17" FontAttributes="Bold"
+                               TextColor="#61738A" HorizontalTextAlignment="End" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource BackupCardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <Label Text="Programación automática" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                        <Label Text="El coordinador realizará la copia aunque cierres esta aplicación."
+                               FontSize="13" TextColor="#61738A" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="Frecuencia" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                            <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 9" Padding="8,0">
+                                <Picker x:Name="ScheduleFrequencyPicker" Title="Frecuencia"
+                                        SelectedIndexChanged="OnScheduleFrequencyChanged" TextColor="#172438" />
+                            </Border>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                            <Label Text="Hora local de Windows" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                            <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 9" Padding="8,0">
+                                <TimePicker x:Name="ScheduleTimePicker" Format="HH:mm" TextColor="#172438" />
+                            </Border>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="2" Spacing="5" VerticalOptions="Center">
+                            <Label Text="Activado" FontSize="12" FontAttributes="Bold" TextColor="#61738A"
+                                   HorizontalTextAlignment="Center" />
+                            <Switch x:Name="ScheduleEnabledSwitch" OnColor="#07805F" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout x:Name="WeeklyDayField" Grid.Row="1" Grid.Column="0" Spacing="5" IsVisible="False">
+                            <Label Text="Día de la semana" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                            <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 9" Padding="8,0">
+                                <Picker x:Name="ScheduleWeeklyDayPicker" Title="Día" ItemDisplayBinding="{Binding DisplayName}"
+                                        TextColor="#172438" />
+                            </Border>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout x:Name="MonthlyDayField" Grid.Row="1" Grid.Column="1" Spacing="5" IsVisible="False">
+                            <Label Text="Día del mes (1–28)" FontSize="12" FontAttributes="Bold" TextColor="#61738A" />
+                            <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 9" Padding="8,0">
+                                <Picker x:Name="ScheduleMonthlyDayPicker" Title="Día del mes" TextColor="#172438" />
+                            </Border>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Label x:Name="ScheduleTargetLabel" FontSize="12" TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Label x:Name="NextScheduledRunLabel" FontSize="12" FontAttributes="Bold" TextColor="#37694F" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Label x:Name="ScheduleStatusLabel" FontSize="12" TextColor="#61738A"
+                               VerticalOptions="Center" LineBreakMode="WordWrap" />
+                        <Button x:Name="SaveScheduleButton" Grid.Column="1" Text="Guardar programación"
+                                Clicked="OnSaveScheduleClicked" Style="{StaticResource BackupSecondaryButtonStyle}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource BackupCardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Crear respaldo" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Selecciona una memoria extraíble conectada a esta PC."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="Actualizar unidades" Clicked="OnRefreshClicked"
+                                Style="{StaticResource BackupSecondaryButtonStyle}" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" VerticalOptions="Center">
+                        <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                                StrokeShape="RoundRectangle 10" Padding="12,2">
+                            <Picker x:Name="UsbPicker" Title="Selecciona una memoria USB"
+                                    ItemDisplayBinding="{Binding DisplayName}"
+                                    SelectedIndexChanged="OnUsbSelectionChanged"
+                                    TextColor="#172438" />
+                        </Border>
+                        <Button x:Name="CreateBackupButton" Grid.Column="1" Text="Crear respaldo"
+                                Clicked="OnCreateBackupClicked" IsEnabled="False"
+                                Style="{StaticResource BackupPrimaryButtonStyle}" />
+                    </Grid>
+
+                    <Label x:Name="DestinationDetailLabel" Text="La copia se guardará en la carpeta Miscelánea Ari/Respaldos de la USB seleccionada."
+                           FontSize="12" TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Label x:Name="OperationStatusLabel" IsVisible="False" FontSize="13" TextColor="#07805F"
+                           LineBreakMode="WordWrap" />
+                    <ActivityIndicator x:Name="BackupActivityIndicator" IsVisible="False" IsRunning="False"
+                                       Color="#07805F" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource BackupCardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Historial de respaldos" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                            <Label Text="Las copias se muestran desde la memoria USB seleccionada."
+                                   FontSize="13" TextColor="#61738A" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="Abrir carpeta" Clicked="OnOpenFolderClicked"
+                                Style="{StaticResource BackupSecondaryButtonStyle}" IsEnabled="False" x:Name="OpenFolderButton" />
+                    </Grid>
+
+                    <CollectionView x:Name="BackupHistoryView" ItemsSource="{Binding BackupHistory}"
+                                    SelectionMode="Single" SelectionChanged="OnBackupSelectionChanged"
+                                    ItemsLayout="VerticalList">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout Padding="10,24" Spacing="4">
+                                <Label x:Name="HistoryEmptyTitleLabel" Text="Selecciona una USB para consultar el historial."
+                                       FontSize="14" TextColor="#61738A" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="backups:BackupHistoryEntry">
+                                <Border Margin="0,0,0,8" Padding="12" BackgroundColor="#F7F9FB"
+                                        Stroke="#E5EBF1" StrokeThickness="1" StrokeShape="RoundRectangle 10">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                                        <Label Text="{Binding FileName}" FontSize="13" FontAttributes="Bold"
+                                               TextColor="#172438" LineBreakMode="TailTruncation" />
+                                        <Label Grid.Column="1" Text="{Binding Status}" FontSize="12" FontAttributes="Bold"
+                                               TextColor="#07805F" HorizontalTextAlignment="End">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding Status}" Value="Revisar">
+                                                    <Setter Property="TextColor" Value="#B54708" />
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Label" Binding="{Binding Status}" Value="Incompleto">
+                                                    <Setter Property="TextColor" Value="#B42318" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label Grid.Row="1" Text="{Binding CreatedAtUtc, StringFormat='{0:dd/MM/yyyy HH:mm} UTC'}"
+                                               FontSize="12" TextColor="#61738A" />
+                                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding SizeBytes, StringFormat='{0:N0} bytes'}"
+                                               FontSize="12" TextColor="#61738A" HorizontalTextAlignment="End" />
+                                        <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Detail}" FontSize="11"
+                                               TextColor="#61738A" LineBreakMode="WordWrap" />
+                                        <Label Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding VersionDescription}"
+                                               FontSize="11" TextColor="#61738A" LineBreakMode="TailTruncation" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <Label x:Name="SelectedBackupLabel" Text="Selecciona una copia válida para comprobarla antes de restaurar."
+                           FontSize="12" TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Button x:Name="ValidateBackupButton" Text="Validar copia seleccionada"
+                            Clicked="OnValidateBackupClicked" IsEnabled="False"
+                            Style="{StaticResource BackupSecondaryButtonStyle}" />
+                    <Label x:Name="BackupValidationLabel" IsVisible="False" FontSize="13"
+                           TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Border BackgroundColor="#FFF8F3" Stroke="#F0D3B8" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 10" Padding="12">
+                        <Label Text="Al restaurar, se reemplazarán los datos centrales actuales por los de la fecha de esa copia. Las operaciones que aún no se hayan sincronizado desde otros dispositivos podrían perderse."
+                               FontSize="12" TextColor="#873B13" LineBreakMode="WordWrap" />
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border BackgroundColor="#EEF8F1" Stroke="#D5EADD" StrokeThickness="1"
+                    StrokeShape="RoundRectangle 12" Padding="14">
+                <Label Text="El respaldo contiene la base central. Mantén la memoria USB en un lugar seguro y expúlsala desde Windows al terminar."
+                       FontSize="12" TextColor="#37694F" LineBreakMode="WordWrap" />
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

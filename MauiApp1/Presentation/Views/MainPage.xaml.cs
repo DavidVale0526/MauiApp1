@@ -3,6 +3,7 @@ using MauiApp1.Application.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Networking;
 using MauiApp1.Application.Sync;
+using MauiApp1.Configuration;
 
 namespace MauiApp1.Presentation.Views;
 
@@ -92,6 +93,14 @@ public partial class MainPage : CoordinatorRefreshPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 
+    private async void OnBackupManagementClicked(object? sender, EventArgs args)
+    {
+        if (!OperatingSystem.IsWindows() || !_desktopMode.IsHost || !_viewModel.IsAdministrator ||
+            Handler?.MauiContext?.Services.GetRequiredService<BackupManagementPage>() is not { } page)
+            return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
     private async void OnAccountRecoveryClicked(object? sender, EventArgs args)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<AccountRecoveryPage>() is not { } page) return;
@@ -102,19 +111,24 @@ public partial class MainPage : CoordinatorRefreshPage
     private readonly ICoordinatorRealtimeClient _realtimeClient;
     private readonly IConnectivity _connectivity;
     private readonly ILocalOperationSyncService _operationSyncService;
+    private readonly DesktopCoordinatorModeOptions _desktopMode;
 
     public MainPage(MainPageViewModel viewModel, ICoordinatorRealtimeClient realtimeClient,
         IConnectivity connectivity, ILocalOperationSyncService operationSyncService,
-        ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
+        ILocalDataChangeNotifier changeNotifier, DesktopCoordinatorModeOptions desktopMode) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _realtimeClient = realtimeClient;
         _connectivity = connectivity;
         _operationSyncService = operationSyncService;
+        _desktopMode = desktopMode;
         WeeklySalesChart.Drawable = _salesChartDrawable;
         _viewModel.PropertyChanged += OnDashboardViewModelPropertyChanged;
         BindingContext = viewModel;
+        var showBackupAccess = OperatingSystem.IsWindows() && desktopMode.IsHost && viewModel.IsAdministrator;
+        BackupSidebarButton.IsVisible = showBackupAccess;
+        BackupDashboardButton.IsVisible = showBackupAccess;
     }
 
     protected override async void OnAppearing()

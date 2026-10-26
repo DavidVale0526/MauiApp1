@@ -117,6 +117,14 @@
                             <Label Grid.Column="1" Text="Reportes" FontSize="13" TextColor="White" VerticalOptions="Center" />
                         </Grid>
                     </Border>
+                    <Border x:Name="BackupSidebarButton" Style="{StaticResource SidebarButtonStyle}" IsVisible="False">
+                        <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnBackupManagementClicked" /></Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="22,*" ColumnSpacing="12">
+                            <Label Text="▤" FontSize="20" TextColor="White" HorizontalTextAlignment="Center"
+                                   VerticalTextAlignment="Center" />
+                            <Label Grid.Column="1" Text="Respaldos" FontSize="13" TextColor="White" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Row="3" Spacing="8">
@@ -355,6 +363,8 @@
                             <Button Text="Reportes" Clicked="OnReportsClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                             <Button Text="Crear cuenta de Cajero" LineBreakMode="WordWrap" IsVisible="{Binding IsAdministrator}"
                                     Clicked="OnCreateCashierAccountClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
+                            <Button x:Name="BackupDashboardButton" Text="Respaldos de la base central" IsVisible="False"
+                                    Clicked="OnBackupManagementClicked" Style="{StaticResource DashboardSecondaryButtonStyle}" />
                         </VerticalStackLayout>
                     </Border>
                 </Grid>

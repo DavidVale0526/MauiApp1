@@ -31,6 +31,16 @@ namespace MauiApp1
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton(desktopMode);
+#if WINDOWS
+            builder.Services.AddTransient<BackupManagementPage>();
+            if (desktopMode.IsHost && !string.IsNullOrWhiteSpace(desktopMode.CentralDataDirectory))
+                builder.Services.AddSingleton<MauiApp1.Application.Backups.ICoordinatorBackupScheduleStore>(
+                    _ => new MauiApp1.Infrastructure.Backups.JsonCoordinatorBackupScheduleStore(desktopMode.CentralDataDirectory));
+            builder.Services.AddSingleton<MauiApp1.Application.Backups.IBackupDestinationProvider,
+                MauiApp1.Infrastructure.Windows.WindowsBackupDestinationProvider>();
+            builder.Services.AddSingleton<MauiApp1.Application.Backups.ICentralDatabaseBackupService,
+                MauiApp1.Infrastructure.Backups.SqliteCentralDatabaseBackupService>();
+#endif
             builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
             builder.Services.AddSingleton<MauiApp1.Application.Sync.ICoordinatorRealtimeClient, MauiApp1.Infrastructure.Lan.CoordinatorRealtimeClient>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Sync.LocalOperationSyncWorker>();

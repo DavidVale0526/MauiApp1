@@ -2,15 +2,19 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography;
 using System.Threading.RateLimiting;
+using MauiApp1.Application.Backups;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Sync;
 using MauiApp1.Coordinator.Persistence;
 using MauiApp1.Coordinator.Pairing;
 using MauiApp1.Coordinator.Sync;
+using MauiApp1.Coordinator.Backups;
 using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Sync;
+using MauiApp1.Infrastructure.Backups;
+using MauiApp1.Infrastructure.Windows;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -185,6 +189,20 @@ internal static class Program
             serviceProvider.GetRequiredService<ILogger<CoordinatorChangeBroadcaster>>()));
         builder.Services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<CoordinatorChangeBroadcaster>());
+
+        if (OperatingSystem.IsWindows())
+        {
+            builder.Services.AddSingleton<ICoordinatorBackupScheduleStore>(
+                _ => new JsonCoordinatorBackupScheduleStore(dataDirectory));
+            builder.Services.AddSingleton<IBackupDestinationProvider, WindowsBackupDestinationProvider>();
+            builder.Services.AddSingleton<ICentralDatabaseBackupService, SqliteCentralDatabaseBackupService>();
+            builder.Services.AddHostedService(serviceProvider => new CoordinatorBackupScheduler(
+                centralDatabasePath,
+                serviceProvider.GetRequiredService<ICoordinatorBackupScheduleStore>(),
+                serviceProvider.GetRequiredService<IBackupDestinationProvider>(),
+                serviceProvider.GetRequiredService<ICentralDatabaseBackupService>(),
+                serviceProvider.GetRequiredService<ILogger<CoordinatorBackupScheduler>>()));
+        }
 
         var app = builder.Build();
 
