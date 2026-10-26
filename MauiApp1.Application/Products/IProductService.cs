@@ -4,6 +4,12 @@ public interface IProductService
 {
     Task<IReadOnlyList<ProductSummary>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    Task<ProductCatalogPage> GetPageAsync(
+        string? searchTerm,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task<ProductOperationResult> CreateAsync(ProductDraft draft, CancellationToken cancellationToken = default);
 
     Task<ProductOperationResult> UpdateAsync(

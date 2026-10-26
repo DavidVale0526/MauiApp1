@@ -142,10 +142,22 @@
                 </VerticalStackLayout>
             </Grid>
 
+            <Grid x:Name="ProductSearchGrid" ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto" ColumnSpacing="8" RowSpacing="8">
+                <Border x:Name="ProductSearchField" Grid.Column="0" Style="{StaticResource ProductFieldBorderStyle}" HeightRequest="48">
+                    <Entry Text="{Binding SearchText}" Placeholder="Buscar producto, categoría o unidad"
+                           ReturnType="Search" Completed="OnSearchCompleted" ClearButtonVisibility="WhileEditing"
+                           TextColor="#172438" PlaceholderColor="#9AA9BA" />
+                </Border>
+                <Button x:Name="ProductSearchButton" Grid.Column="1" Text="Buscar" Command="{Binding SearchCommand}"
+                        Style="{StaticResource ProductPrimaryButtonStyle}" />
+                <Button x:Name="ProductClearSearchButton" Grid.Column="2" Text="Limpiar" Command="{Binding ClearSearchCommand}"
+                        Style="{StaticResource ProductSecondaryButtonStyle}" />
+            </Grid>
+
             <CollectionView x:Name="ProductsCollection" ItemsSource="{Binding Products}" SelectionMode="None" HeightRequest="560">
                 <CollectionView.EmptyView>
                     <Border BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 12" Padding="20">
-                        <Label Text="Todavía no hay productos registrados." TextColor="#61738A"
+                        <Label Text="{Binding EmptyProductsMessage}" TextColor="#61738A"
                                HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
                     </Border>
                 </CollectionView.EmptyView>
@@ -184,6 +196,16 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+
+            <VerticalStackLayout Spacing="8">
+                <Label Text="{Binding PageStatusText}" FontSize="12" TextColor="#61738A" HorizontalTextAlignment="Center" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Text="← Anterior" Command="{Binding PreviousPageCommand}"
+                            Style="{StaticResource ProductSecondaryButtonStyle}" />
+                    <Button Grid.Column="1" Text="Siguiente →" Command="{Binding NextPageCommand}"
+                            Style="{StaticResource ProductSecondaryButtonStyle}" />
+                </Grid>
+            </VerticalStackLayout>
         </VerticalStackLayout>
     </ScrollView>
 </views:CoordinatorRefreshPage>

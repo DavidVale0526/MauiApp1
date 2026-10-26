@@ -37,6 +37,55 @@ internal sealed class EfProductService(
         return await query.ToListAsync(cancellationToken);
     }
 
+    public async Task<ProductCatalogPage> GetPageAsync(
+        string? searchTerm,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureSignedIn();
+        if (pageNumber < 1) throw new ArgumentOutOfRangeException(nameof(pageNumber));
+        if (pageSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = from product in context.Products.AsNoTracking()
+                    join category in context.Categories.AsNoTracking()
+                        on product.CategoryId equals category.CategoryId
+                    select new { Product = product, Category = category };
+
+        var normalizedSearch = searchTerm?.Trim();
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            var pattern = $"%{normalizedSearch}%";
+            query = query.Where(item =>
+                EF.Functions.Like(item.Product.Name, pattern) ||
+                EF.Functions.Like(item.Product.Unit, pattern) ||
+                EF.Functions.Like(item.Category.Name, pattern));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var products = await query
+            .OrderByDescending(item => item.Product.IsActive)
+            .ThenBy(item => item.Product.Name)
+            .ThenBy(item => item.Product.ProductId)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(item => new ProductSummary(
+                new ProductId(item.Product.ProductId),
+                item.Product.Name,
+                new MoneyAmount(item.Product.SalePriceMinorUnits),
+                new Quantity(item.Product.StockMilliUnits),
+                item.Product.Unit,
+                new CategoryId(item.Product.CategoryId),
+                item.Category.Name,
+                new Quantity(item.Product.MinimumStockMilliUnits),
+                item.Product.IsActive,
+                item.Product.ImageData))
+            .ToListAsync(cancellationToken);
+
+        return new ProductCatalogPage(products, totalCount);
+    }
+
     public async Task<ProductOperationResult> CreateAsync(
         ProductDraft draft,
         CancellationToken cancellationToken = default)

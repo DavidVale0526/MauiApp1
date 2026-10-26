@@ -37,6 +37,37 @@ public partial class ProductManagementPage : CoordinatorRefreshPage
         Grid.SetColumn(ProductImageField, 0);
         Grid.SetColumnSpan(ProductImageField, useDesktopLayout ? 2 : 1);
 
+        ProductSearchGrid.ColumnDefinitions.Clear();
+        ProductSearchGrid.RowDefinitions.Clear();
+        if (useDesktopLayout)
+        {
+            ProductSearchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            ProductSearchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ProductSearchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ProductSearchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(ProductSearchField, 0);
+            Grid.SetColumn(ProductSearchField, 0);
+            Grid.SetColumnSpan(ProductSearchField, 1);
+            Grid.SetRow(ProductSearchButton, 0);
+            Grid.SetColumn(ProductSearchButton, 1);
+            Grid.SetRow(ProductClearSearchButton, 0);
+            Grid.SetColumn(ProductClearSearchButton, 2);
+        }
+        else
+        {
+            ProductSearchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            ProductSearchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            ProductSearchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            ProductSearchGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(ProductSearchField, 0);
+            Grid.SetColumn(ProductSearchField, 0);
+            Grid.SetColumnSpan(ProductSearchField, 2);
+            Grid.SetRow(ProductSearchButton, 1);
+            Grid.SetColumn(ProductSearchButton, 0);
+            Grid.SetRow(ProductClearSearchButton, 1);
+            Grid.SetColumn(ProductClearSearchButton, 1);
+        }
+
         PageContent.Padding = useDesktopLayout
             ? new Thickness(32, 28)
             : new Thickness(16, 20);
@@ -62,6 +93,12 @@ public partial class ProductManagementPage : CoordinatorRefreshPage
         _viewModel.IsEditing ? Task.CompletedTask : _viewModel.LoadAsync();
 
     private async void OnBackClicked(object? sender, EventArgs eventArgs) => await Navigation.PopModalAsync();
+
+    private void OnSearchCompleted(object? sender, EventArgs eventArgs)
+    {
+        if (_viewModel.SearchCommand.CanExecute(null))
+            _viewModel.SearchCommand.Execute(null);
+    }
 
     private async void OnChooseProductImageClicked(object? sender, EventArgs eventArgs)
     {

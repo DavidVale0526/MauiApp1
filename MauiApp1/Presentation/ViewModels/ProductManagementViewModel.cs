@@ -21,9 +21,14 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
     private byte[]? _imageData;
     private bool _replaceImage;
     private string _errorMessage = string.Empty;
+    private string _searchText = string.Empty;
     private CategorySummary? _selectedCategory;
     private Guid? _editingProductId;
     private bool _isBusy;
+    private int _currentPage = 1;
+    private int _totalProducts;
+    private int _loadVersion;
+    private const int PageSize = 20;
 
     public ProductManagementViewModel(IProductService productService, ICategoryService categoryService)
     {
@@ -31,6 +36,10 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         _categoryService = categoryService;
         SaveCommand = new Command(async () => await SaveAsync(), () => !IsBusy);
         CancelEditCommand = new Command(CancelEdit, () => !IsBusy);
+        SearchCommand = new Command(async () => await SearchAsync(), () => !IsBusy);
+        ClearSearchCommand = new Command(async () => await ClearSearchAsync(), () => !IsBusy);
+        PreviousPageCommand = new Command(async () => await ChangePageAsync(-1), () => CanGoPrevious && !IsBusy);
+        NextPageCommand = new Command(async () => await ChangePageAsync(1), () => CanGoNext && !IsBusy);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -42,6 +51,45 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
     public ICommand SaveCommand { get; }
 
     public ICommand CancelEditCommand { get; }
+
+    public ICommand SearchCommand { get; }
+
+    public ICommand ClearSearchCommand { get; }
+
+    public ICommand PreviousPageCommand { get; }
+
+    public ICommand NextPageCommand { get; }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+                OnPropertyChanged(nameof(EmptyProductsMessage));
+        }
+    }
+
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(_totalProducts / (double)PageSize));
+
+    public bool CanGoPrevious => _currentPage > 1;
+
+    public bool CanGoNext => _currentPage < TotalPages;
+
+    public string PageStatusText
+    {
+        get
+        {
+            if (_totalProducts == 0) return "0 productos";
+            var first = ((_currentPage - 1) * PageSize) + 1;
+            var last = Math.Min(_currentPage * PageSize, _totalProducts);
+            return $"Mostrando {first:N0}–{last:N0} de {_totalProducts:N0} productos · Página {_currentPage} de {TotalPages}";
+        }
+    }
+
+    public string EmptyProductsMessage => string.IsNullOrWhiteSpace(SearchText)
+        ? "Todavía no hay productos registrados."
+        : "No se encontraron productos con esa búsqueda.";
 
     public string Name
     {
@@ -124,6 +172,9 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
             {
                 ((Command)SaveCommand).ChangeCanExecute();
                 ((Command)CancelEditCommand).ChangeCanExecute();
+                ((Command)SearchCommand).ChangeCanExecute();
+                ((Command)ClearSearchCommand).ChangeCanExecute();
+                RefreshPaginationCommands();
             }
         }
     }
@@ -133,18 +184,11 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         try
         {
             var categories = await _categoryService.GetAllAsync();
-            var products = await _productService.GetAllAsync();
 
             Categories.Clear();
             foreach (var category in categories)
             {
                 Categories.Add(category);
-            }
-
-            Products.Clear();
-            foreach (var product in products)
-            {
-                Products.Add(product);
             }
 
             if (_editingProductId is null && SelectedCategory is null)
@@ -155,6 +199,7 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
             ErrorMessage = categories.Count == 0
                 ? "Primero crea una categoría para poder registrar productos."
                 : string.Empty;
+            await LoadProductsPageAsync();
         }
         catch
         {
@@ -203,7 +248,7 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
                 CancelEdit();
             }
 
-            await LoadAsync();
+            await LoadProductsPageAsync();
         }
         catch
         {
@@ -269,6 +314,7 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         IsBusy = true;
         try
         {
+            var wasEditing = IsEditing;
             var result = _editingProductId is Guid productId
                 ? await _productService.UpdateAsync(productId, draft)
                 : await _productService.CreateAsync(draft);
@@ -280,7 +326,12 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
             }
 
             CancelEdit();
-            await LoadAsync();
+            if (!wasEditing)
+            {
+                SearchText = string.Empty;
+                SetCurrentPage(1);
+            }
+            await LoadProductsPageAsync();
         }
         catch
         {
@@ -308,6 +359,83 @@ public sealed class ProductManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ProductImageStatus));
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(SaveButtonText));
+    }
+
+    private async Task SearchAsync()
+    {
+        if (IsBusy) return;
+        SetCurrentPage(1);
+        await LoadProductsPageAsync();
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        if (IsBusy) return;
+        SearchText = string.Empty;
+        SetCurrentPage(1);
+        await LoadProductsPageAsync();
+    }
+
+    private async Task ChangePageAsync(int offset)
+    {
+        if (IsBusy) return;
+        var targetPage = _currentPage + offset;
+        if (targetPage < 1 || targetPage > TotalPages) return;
+        SetCurrentPage(targetPage);
+        await LoadProductsPageAsync();
+    }
+
+    private async Task LoadProductsPageAsync()
+    {
+        var version = Interlocked.Increment(ref _loadVersion);
+        try
+        {
+            var page = await _productService.GetPageAsync(SearchText, _currentPage, PageSize);
+            if (version != _loadVersion) return;
+
+            var lastPage = Math.Max(1, (int)Math.Ceiling(page.TotalCount / (double)PageSize));
+            if (_currentPage > lastPage)
+            {
+                SetCurrentPage(lastPage);
+                await LoadProductsPageAsync();
+                return;
+            }
+
+            _totalProducts = page.TotalCount;
+            Products.Clear();
+            foreach (var product in page.Products)
+            {
+                Products.Add(product);
+            }
+
+            OnPropertyChanged(nameof(TotalPages));
+            OnPropertyChanged(nameof(PageStatusText));
+            OnPropertyChanged(nameof(CanGoPrevious));
+            OnPropertyChanged(nameof(CanGoNext));
+            OnPropertyChanged(nameof(EmptyProductsMessage));
+            RefreshPaginationCommands();
+        }
+        catch
+        {
+            if (version == _loadVersion)
+                ErrorMessage = "No se pudieron cargar los productos. Inténtalo de nuevo.";
+        }
+    }
+
+    private void SetCurrentPage(int page)
+    {
+        if (_currentPage == page) return;
+        _currentPage = page;
+        OnPropertyChanged(nameof(PageStatusText));
+        OnPropertyChanged(nameof(CanGoPrevious));
+        OnPropertyChanged(nameof(CanGoNext));
+        RefreshPaginationCommands();
+    }
+
+    private void RefreshPaginationCommands()
+    {
+        ((Command)PreviousPageCommand).ChangeCanExecute();
+        ((Command)NextPageCommand).ChangeCanExecute();
     }
 
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
