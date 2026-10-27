@@ -64,6 +64,27 @@
             </Border>
 
             <Border Style="{StaticResource BackupCardStyle}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Protección de las copias" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label x:Name="EncryptionStatusLabel" Text="Comprobando estado del cifrado…" FontSize="13" TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 9" Padding="10,0">
+                        <Entry x:Name="RecoveryPhraseEntry" Placeholder="Frase de recuperación (mínimo 12 caracteres)"
+                               IsPassword="True" MaxLength="256" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
+                               TextColor="#172438" PlaceholderColor="#8493A5" BackgroundColor="Transparent" />
+                    </Border>
+                    <Border BackgroundColor="#F7F9FB" Stroke="#DCE5EF" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 9" Padding="10,0">
+                        <Entry x:Name="RecoveryPhraseConfirmationEntry" Placeholder="Confirma la frase de recuperación"
+                               IsPassword="True" MaxLength="256" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
+                               TextColor="#172438" PlaceholderColor="#8493A5" BackgroundColor="Transparent" />
+                    </Border>
+                    <Button x:Name="ConfigureEncryptionButton" Text="Activar cifrado de respaldos" Clicked="OnConfigureEncryptionClicked" Style="{StaticResource BackupPrimaryButtonStyle}" />
+                    <Label Text="La frase no se guarda en la aplicación ni en la USB. Guárdala fuera de esta PC y de la memoria USB: sin ella no podrás recuperar las copias en otro equipo." FontSize="12" TextColor="#873B13" LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource BackupCardStyle}">
                 <VerticalStackLayout Spacing="12">
                     <VerticalStackLayout Spacing="3">
                         <Label Text="Programación automática" FontSize="20" FontAttributes="Bold" TextColor="#111D31" />
@@ -191,6 +212,9 @@
                                                 <DataTrigger TargetType="Label" Binding="{Binding Status}" Value="Incompleto">
                                                     <Setter Property="TextColor" Value="#B42318" />
                                                 </DataTrigger>
+                                                <DataTrigger TargetType="Label" Binding="{Binding Status}" Value="Creado sin cifrar">
+                                                    <Setter Property="TextColor" Value="#B54708" />
+                                                </DataTrigger>
                                             </Label.Triggers>
                                         </Label>
                                         <Label Grid.Row="1" Text="{Binding CreatedAtUtc, StringFormat='{0:dd/MM/yyyy HH:mm} UTC'}"
@@ -213,6 +237,9 @@
                             Style="{StaticResource BackupSecondaryButtonStyle}" />
                     <Label x:Name="BackupValidationLabel" IsVisible="False" FontSize="13"
                            TextColor="#61738A" LineBreakMode="WordWrap" />
+                    <Button x:Name="RestoreBackupButton" Text="Restaurar copia seleccionada"
+                            Clicked="OnRestoreBackupClicked" IsEnabled="False"
+                            Style="{StaticResource BackupPrimaryButtonStyle}" />
                     <Border BackgroundColor="#FFF8F3" Stroke="#F0D3B8" StrokeThickness="1"
                             StrokeShape="RoundRectangle 10" Padding="12">
                         <Label Text="Al restaurar, se reemplazarán los datos centrales actuales por los de la fecha de esa copia. Las operaciones que aún no se hayan sincronizado desde otros dispositivos podrían perderse."

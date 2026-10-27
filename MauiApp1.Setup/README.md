@@ -13,3 +13,7 @@ Ejecuta `build-windows-installer.ps1` en el entorno de desarrollo con el SDK de 
 ## Inicio del negocio
 
 En una instalación nueva, la base central se prepara antes de abrir la app. La primera vez que se abre la aplicación en la PC coordinadora, se puede crear allí la cuenta Administrador. Para trasladar datos existentes, el instalador permite elegir la base y el coordinador la copia usando SQLite Backup API sin modificar el origen.
+
+## Respaldos
+
+La PC coordinadora permite guardar copias cifradas en una memoria USB desde **Más → Respaldos**. La guía para configurar la frase de recuperación, programar copias y restaurarlas está en [GUIA_RESPALDOS.md](../MauiApp1/Deployment/GUIA_RESPALDOS.md). El instalador incluye el asistente de restauración junto a la aplicación Windows.

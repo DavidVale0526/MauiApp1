@@ -10,11 +10,28 @@ namespace MauiApp1.Infrastructure.Backups;
 /// <summary>Creates a consistent, verified SQLite snapshot on a mounted removable volume.</summary>
 public sealed class SqliteCentralDatabaseBackupService(
     IBackupDestinationProvider destinationProvider,
+    ICentralBackupEncryptionKeyStore encryptionKeyStore,
     ILogger<SqliteCentralDatabaseBackupService> logger) : ICentralDatabaseBackupService
 {
     private const long MinimumFreeSpaceReserve = 16 * 1024 * 1024;
     private const int BackupFormatVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    public Task<bool> IsEncryptionConfiguredAsync(CancellationToken cancellationToken = default) =>
+        encryptionKeyStore.IsConfiguredAsync(cancellationToken);
+
+    public Task ConfigureEncryptionAsync(string recoveryPassphrase, CancellationToken cancellationToken = default) =>
+        encryptionKeyStore.ConfigureAsync(recoveryPassphrase, cancellationToken);
+
+    public async Task UnlockEncryptionFromBackupAsync(BackupDestination destination, string backupFileName,
+        string recoveryPassphrase, CancellationToken cancellationToken = default)
+    {
+        var manifest = await ReadManifestAsync(destination, backupFileName, cancellationToken).ConfigureAwait(false);
+        if (manifest.EncryptionEnvelope is null)
+            throw new InvalidDataException("Esta copia no está cifrada y no tiene una frase de recuperación.");
+        await encryptionKeyStore.UnlockFromBackupAsync(manifest.EncryptionEnvelope, recoveryPassphrase, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     public async Task<IReadOnlyList<BackupHistoryEntry>> GetHistoryAsync(
         BackupDestination destination,
@@ -29,7 +46,7 @@ public sealed class SqliteCentralDatabaseBackupService(
             return Array.Empty<BackupHistoryEntry>();
 
         var entries = new List<BackupHistoryEntry>();
-        foreach (var databasePath in Directory.EnumerateFiles(directory, "MiscelaneaAri-*.db", SearchOption.TopDirectoryOnly))
+        foreach (var databasePath in EnumerateBackupFiles(directory))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var file = new FileInfo(databasePath);
@@ -57,11 +74,13 @@ public sealed class SqliteCentralDatabaseBackupService(
                     continue;
                 }
 
+                var encrypted = manifest.EncryptionEnvelope is not null && file.Name.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase);
                 entries.Add(new BackupHistoryEntry(manifest.BackupId, file.Name, manifest.CreatedAtUtc,
-                    file.Length, "Creado y verificado", manifest.SchemaVersion,
+                    file.Length, encrypted ? "Creado y cifrado" : "Creado sin cifrar", manifest.SchemaVersion,
                     manifest.ApplicationVersion, manifest.RetentionGroup == BackupRetentionGroup.Manual
-                        ? "La integridad se comprobó al crear este respaldo."
-                        : $"Respaldo automático ({GetRetentionGroupName(manifest.RetentionGroup)}); la integridad se comprobó al crearlo."));
+                        ? encrypted ? "Copia cifrada y autenticada al crearla." : "Copia antigua sin cifrar; integridad comprobada al crearla."
+                        : $"Respaldo automático ({GetRetentionGroupName(manifest.RetentionGroup)}); " +
+                          (encrypted ? "cifrado y autenticado al crearlo." : "copia antigua sin cifrar.")));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
                                                 JsonException or System.Security.SecurityException)
@@ -109,14 +128,22 @@ public sealed class SqliteCentralDatabaseBackupService(
         var backupId = Guid.NewGuid();
         var createdAtUtc = DateTimeOffset.UtcNow;
         var createdAtLocal = createdAtUtc.ToLocalTime();
+        if (!await encryptionKeyStore.IsConfiguredAsync(cancellationToken).ConfigureAwait(false))
+            throw new InvalidOperationException("Configura primero el cifrado y guarda la frase de recuperación. No se creará una copia nueva sin cifrar.");
+
         var fileStem = $"MiscelaneaAri-{createdAtUtc:yyyyMMdd-HHmmss}-{backupId:N}";
-        var finalPath = Path.Combine(backupDirectory, fileStem + ".db");
+        var finalPath = Path.Combine(backupDirectory, fileStem + ".db.enc");
         var temporaryPath = finalPath + ".partial";
         var metadataPath = finalPath + ".json";
         var temporaryMetadataPath = metadataPath + ".partial";
         var lockPath = Path.Combine(backupDirectory, ".backup-operation.lock");
+        var stagingDirectory = Path.Combine(Path.GetDirectoryName(sourcePath)!, "BackupStaging");
+        Directory.CreateDirectory(stagingDirectory);
+        var snapshotPath = Path.Combine(stagingDirectory, $"{backupId:N}.db");
 
         await using var operationLock = AcquireOperationLock(lockPath);
+        var keyMaterial = await encryptionKeyStore.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("No se pudo abrir la clave local de respaldos. Recupera la clave desde una copia cifrada válida.");
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -126,8 +153,11 @@ public sealed class SqliteCentralDatabaseBackupService(
             if (latestDestination.AvailableBytes < GetRequiredFreeSpace(sourceInfo.EstimatedBytes))
                 throw new IOException("La memoria USB no tiene espacio suficiente para crear el respaldo.");
 
-            await CreateSnapshotAsync(sourcePath, temporaryPath, cancellationToken).ConfigureAwait(false);
-            var validatedSchemaVersion = await ValidateSnapshotAsync(temporaryPath, cancellationToken)
+            await CreateSnapshotAsync(sourcePath, snapshotPath, cancellationToken).ConfigureAwait(false);
+            var validatedSchemaVersion = await ValidateSnapshotAsync(snapshotPath, cancellationToken)
+                .ConfigureAwait(false);
+            var plaintextSize = new FileInfo(snapshotPath).Length;
+            await AuthenticatedBackupFileCryptography.EncryptAsync(snapshotPath, temporaryPath, keyMaterial.DataKey, cancellationToken)
                 .ConfigureAwait(false);
             var fileInfo = new FileInfo(temporaryPath);
             var hash = await ComputeSha256Async(temporaryPath, cancellationToken).ConfigureAwait(false);
@@ -140,7 +170,13 @@ public sealed class SqliteCentralDatabaseBackupService(
                 createdAtLocal, fileInfo.Length, hash, validatedSchemaVersion, applicationVersion);
             var manifest = new BackupManifest(BackupFormatVersion, result.BackupId, result.CreatedAtUtc,
                 result.CreatedAtLocal, Path.GetFileName(result.DatabasePath), result.SizeBytes,
-                result.Sha256, result.SchemaVersion, result.ApplicationVersion, retentionGroup);
+                result.Sha256, result.SchemaVersion, result.ApplicationVersion, retentionGroup,
+                keyMaterial.RecoveryEnvelope, plaintextSize, null);
+            var macPayload = CreateManifestMacPayload(manifest);
+            manifest = manifest with
+            {
+                MetadataMacBase64 = BackupEncryptionCryptography.ComputeManifestMac(keyMaterial.DataKey, macPayload)
+            };
 
             await File.WriteAllTextAsync(temporaryMetadataPath,
                 JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken).ConfigureAwait(false);
@@ -172,6 +208,11 @@ public sealed class SqliteCentralDatabaseBackupService(
             logger.LogWarning(exception, "Central database backup failed for removable volume {VolumeId}.", destination.VolumeId);
             throw;
         }
+        finally
+        {
+            TryDelete(snapshotPath);
+            CryptographicOperations.ZeroMemory(keyMaterial.DataKey);
+        }
     }
 
     public async Task ApplyRetentionAsync(
@@ -194,42 +235,54 @@ public sealed class SqliteCentralDatabaseBackupService(
 
         await using var operationLock = AcquireOperationLock(Path.Combine(directory, ".backup-operation.lock"));
         var matching = new List<(string DatabasePath, DateTimeOffset CreatedAtUtc)>();
-        foreach (var databasePath in Directory.EnumerateFiles(directory, "MiscelaneaAri-*.db", SearchOption.TopDirectoryOnly))
+        var retentionKey = await encryptionKeyStore.ReadAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var metadataPath = databasePath + ".json";
-            if (!File.Exists(metadataPath)) continue;
-            try
+            foreach (var databasePath in EnumerateBackupFiles(directory))
             {
-                await using var stream = new FileStream(metadataPath, FileMode.Open, FileAccess.Read,
-                    FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
-                var manifest = await JsonSerializer.DeserializeAsync<BackupManifest>(stream, JsonOptions, cancellationToken)
-                    .ConfigureAwait(false);
-                var info = new FileInfo(databasePath);
-                if (manifest is null || manifest.RetentionGroup != retentionGroup ||
-                    manifest.FormatVersion != BackupFormatVersion ||
-                    !string.Equals(manifest.DatabaseFileName, info.Name, StringComparison.OrdinalIgnoreCase) ||
-                    manifest.SizeBytes != info.Length || !IsSha256(manifest.Sha256)) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var metadataPath = databasePath + ".json";
+                if (!File.Exists(metadataPath)) continue;
+                try
+                {
+                    await using var stream = new FileStream(metadataPath, FileMode.Open, FileAccess.Read,
+                        FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    var manifest = await JsonSerializer.DeserializeAsync<BackupManifest>(stream, JsonOptions, cancellationToken)
+                        .ConfigureAwait(false);
+                    var info = new FileInfo(databasePath);
+                    if (manifest is null || manifest.RetentionGroup != retentionGroup ||
+                        manifest.FormatVersion != BackupFormatVersion ||
+                        !string.Equals(manifest.DatabaseFileName, info.Name, StringComparison.OrdinalIgnoreCase) ||
+                        manifest.SizeBytes != info.Length || !IsSha256(manifest.Sha256)) continue;
 
-                var actualHash = await ComputeSha256Async(databasePath, cancellationToken).ConfigureAwait(false);
-                if (string.Equals(actualHash, manifest.Sha256, StringComparison.OrdinalIgnoreCase))
-                    matching.Add((databasePath, manifest.CreatedAtUtc));
+                    var actualHash = await ComputeSha256Async(databasePath, cancellationToken).ConfigureAwait(false);
+                    var encrypted = databasePath.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase);
+                    var authenticated = !encrypted || (retentionKey is not null && manifest.EncryptionEnvelope is not null &&
+                        BackupEncryptionCryptography.VerifyManifestMac(retentionKey.DataKey,
+                            CreateManifestMacPayload(manifest), manifest.MetadataMacBase64));
+                    if (authenticated && string.Equals(actualHash, manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+                        matching.Add((databasePath, manifest.CreatedAtUtc));
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or
+                                                    System.Security.SecurityException)
+                {
+                    logger.LogWarning(exception, "Skipping an unreadable backup during retention on volume {VolumeId}.", destination.VolumeId);
+                }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or
-                                                System.Security.SecurityException)
+
+            foreach (var oldBackup in matching.OrderByDescending(item => item.CreatedAtUtc).Skip(maximumBackups))
             {
-                logger.LogWarning(exception, "Skipping an unreadable backup during retention on volume {VolumeId}.", destination.VolumeId);
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = await RequireMountedVolumeAsync(destination.VolumeId, cancellationToken).ConfigureAwait(false);
+                if (!string.Equals(NormalizeRoot(current.MountPath), root, StringComparison.OrdinalIgnoreCase))
+                    throw new IOException("La memoria USB cambió de punto de montaje durante la retención; no se borraron más copias.");
+                File.Delete(oldBackup.DatabasePath);
+                File.Delete(oldBackup.DatabasePath + ".json");
             }
         }
-
-        foreach (var oldBackup in matching.OrderByDescending(item => item.CreatedAtUtc).Skip(maximumBackups))
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var current = await RequireMountedVolumeAsync(destination.VolumeId, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(NormalizeRoot(current.MountPath), root, StringComparison.OrdinalIgnoreCase))
-                throw new IOException("La memoria USB cambió de punto de montaje durante la retención; no se borraron más copias.");
-            File.Delete(oldBackup.DatabasePath);
-            File.Delete(oldBackup.DatabasePath + ".json");
+            if (retentionKey is not null) CryptographicOperations.ZeroMemory(retentionKey.DataKey);
         }
     }
 
@@ -244,7 +297,8 @@ public sealed class SqliteCentralDatabaseBackupService(
         if (string.IsNullOrWhiteSpace(backupFileName) ||
             !string.Equals(Path.GetFileName(backupFileName), backupFileName, StringComparison.Ordinal) ||
             !backupFileName.StartsWith("MiscelaneaAri-", StringComparison.OrdinalIgnoreCase) ||
-            !backupFileName.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+            !(backupFileName.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
+              backupFileName.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Selecciona un archivo de respaldo de Miscelánea Ari válido.", nameof(backupFileName));
 
         var mounted = await RequireMountedVolumeAsync(destination.VolumeId, cancellationToken).ConfigureAwait(false);
@@ -256,13 +310,7 @@ public sealed class SqliteCentralDatabaseBackupService(
         if (!File.Exists(databasePath) || !File.Exists(databasePath + ".json"))
             throw new FileNotFoundException("El archivo o su ficha de respaldo ya no están en la memoria USB.", databasePath);
 
-        BackupManifest? manifest;
-        await using (var stream = new FileStream(databasePath + ".json", FileMode.Open, FileAccess.Read,
-                         FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
-        {
-            manifest = await JsonSerializer.DeserializeAsync<BackupManifest>(stream, JsonOptions, cancellationToken)
-                .ConfigureAwait(false);
-        }
+        BackupManifest? manifest = await ReadManifestFromPathAsync(databasePath, cancellationToken).ConfigureAwait(false);
 
         var databaseFile = new FileInfo(databasePath);
         if (manifest is null || manifest.FormatVersion != BackupFormatVersion ||
@@ -278,10 +326,49 @@ public sealed class SqliteCentralDatabaseBackupService(
                 databaseFile.Length, manifest.SchemaVersion, null,
                 "La suma de verificación no coincide. El archivo pudo dañarse o modificarse.");
 
+        var encrypted = databasePath.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase);
+        var plaintextPath = databasePath;
+        byte[]? dataKey = null;
+        if (encrypted)
+        {
+            if (manifest.EncryptionEnvelope is null)
+                return new BackupValidationResult(false, false, backupFileName, manifest.CreatedAtUtc,
+                    databaseFile.Length, manifest.SchemaVersion, null, "La ficha no contiene una clave de recuperación válida.");
+            var keyMaterial = await encryptionKeyStore.ReadAsync(cancellationToken).ConfigureAwait(false);
+            if (keyMaterial is null)
+                return new BackupValidationResult(false, false, backupFileName, manifest.CreatedAtUtc,
+                    databaseFile.Length, manifest.SchemaVersion, null, "Escribe la frase de recuperación de esta copia para habilitar la validación.");
+            dataKey = keyMaterial.DataKey;
+            if (!BackupEncryptionCryptography.VerifyManifestMac(dataKey, CreateManifestMacPayload(manifest), manifest.MetadataMacBase64))
+            {
+                CryptographicOperations.ZeroMemory(dataKey);
+                return new BackupValidationResult(false, false, backupFileName, manifest.CreatedAtUtc,
+                    databaseFile.Length, manifest.SchemaVersion, null, "La ficha autenticada fue modificada o está dañada.");
+            }
+            plaintextPath = Path.Combine(Path.GetDirectoryName(currentCentralDatabasePath)!, "BackupStaging",
+                $"validate-{Guid.NewGuid():N}.db");
+            Directory.CreateDirectory(Path.GetDirectoryName(plaintextPath)!);
+            try
+            {
+                await AuthenticatedBackupFileCryptography.DecryptAsync(databasePath, plaintextPath, dataKey, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is CryptographicException or InvalidDataException or IOException)
+            {
+                CryptographicOperations.ZeroMemory(dataKey);
+                TryDelete(plaintextPath);
+                logger.LogWarning(exception, "Backup {BackupFileName} failed authentication.", backupFileName);
+                return new BackupValidationResult(false, false, backupFileName, manifest.CreatedAtUtc,
+                    databaseFile.Length, manifest.SchemaVersion, null, "No se pudo autenticar o descifrar esta copia.");
+            }
+        }
+
         string backupSchemaVersion;
+        Guid backupCoordinatorId;
         try
         {
-            backupSchemaVersion = await ValidateSnapshotAsync(databasePath, cancellationToken).ConfigureAwait(false);
+            backupSchemaVersion = await ValidateSnapshotAsync(plaintextPath, cancellationToken).ConfigureAwait(false);
+            backupCoordinatorId = await ReadCoordinatorIdAsync(plaintextPath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is SqliteException or InvalidDataException or IOException)
         {
@@ -290,19 +377,46 @@ public sealed class SqliteCentralDatabaseBackupService(
                 databaseFile.Length, manifest.SchemaVersion, null,
                 "La copia no superó la comprobación de integridad o le faltan tablas necesarias.");
         }
+        finally
+        {
+            if (dataKey is not null) CryptographicOperations.ZeroMemory(dataKey);
+            if (encrypted) TryDelete(plaintextPath);
+        }
 
         var currentSchemaVersion = await ReadLatestMigrationIdAsync(currentCentralDatabasePath, cancellationToken)
             .ConfigureAwait(false);
+        var currentCoordinatorId = await ReadCoordinatorIdAsync(currentCentralDatabasePath, cancellationToken)
+            .ConfigureAwait(false);
         var schemaMatchesManifest = string.Equals(backupSchemaVersion, manifest.SchemaVersion, StringComparison.Ordinal);
-        var schemaCompatible = schemaMatchesManifest &&
+        var sameCoordinator = currentCoordinatorId == backupCoordinatorId;
+        var schemaCompatible = sameCoordinator && schemaMatchesManifest &&
                                string.Equals(backupSchemaVersion, currentSchemaVersion, StringComparison.Ordinal);
-        var message = !schemaMatchesManifest
+        var message = !sameCoordinator
+            ? "La copia pertenece a otro coordinador. No se debe restaurar en este negocio."
+            : !schemaMatchesManifest
             ? "La versión de esquema de la ficha no coincide con la base validada. No se debe restaurar esta copia."
             : schemaCompatible
                 ? "Copia íntegra y compatible con el esquema actual. La validación no modificó la base."
                 : "La copia está íntegra, pero su esquema no coincide con el actual. No se habilita la restauración automática.";
         return new BackupValidationResult(true, schemaCompatible, backupFileName, manifest.CreatedAtUtc,
             databaseFile.Length, backupSchemaVersion, currentSchemaVersion, message);
+    }
+
+    private static async Task<Guid> ReadCoordinatorIdAsync(string databasePath, CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.GetFullPath(databasePath),
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false
+        }.ToString());
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT DeviceId FROM DeviceIdentity WHERE SingletonKey = 1 LIMIT 1;";
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is string text && Guid.TryParse(text, out var id) && id != Guid.Empty
+            ? id
+            : throw new InvalidDataException("La base no contiene una identidad válida del coordinador.");
     }
 
     private async Task<BackupDestination> RequireMountedVolumeAsync(
@@ -498,6 +612,31 @@ public sealed class SqliteCentralDatabaseBackupService(
         catch (UnauthorizedAccessException) { }
     }
 
+    private IEnumerable<string> EnumerateBackupFiles(string directory) =>
+        Directory.EnumerateFiles(directory, "MiscelaneaAri-*.db", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(directory, "MiscelaneaAri-*.db.enc", SearchOption.TopDirectoryOnly));
+
+    private async Task<BackupManifest> ReadManifestAsync(BackupDestination destination, string backupFileName,
+        CancellationToken cancellationToken)
+    {
+        var mounted = await RequireMountedVolumeAsync(destination.VolumeId, cancellationToken).ConfigureAwait(false);
+        var root = NormalizeRoot(mounted.MountPath);
+        var directory = Path.GetFullPath(Path.Combine(root, "Miscelanea Ari", "Respaldos"));
+        EnsureInsideVolume(root, directory);
+        var path = Path.GetFullPath(Path.Combine(directory, backupFileName));
+        EnsureInsideVolume(directory, path);
+        return await ReadManifestFromPathAsync(path, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidDataException("No se encontró una ficha válida para la copia.");
+    }
+
+    private static async Task<BackupManifest?> ReadManifestFromPathAsync(string databasePath, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(databasePath + ".json", FileMode.Open, FileAccess.Read,
+            FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        return await JsonSerializer.DeserializeAsync<BackupManifest>(stream, JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private sealed record SourceSnapshotInfo(long EstimatedBytes);
 
     private sealed record BackupManifest(
@@ -510,5 +649,15 @@ public sealed class SqliteCentralDatabaseBackupService(
         string Sha256,
         string SchemaVersion,
         string ApplicationVersion,
-        BackupRetentionGroup RetentionGroup = BackupRetentionGroup.Manual);
+        BackupRetentionGroup RetentionGroup = BackupRetentionGroup.Manual,
+        BackupEncryptionEnvelope? EncryptionEnvelope = null,
+        long? PlaintextSizeBytes = null,
+        string? MetadataMacBase64 = null);
+
+    private static BackupManifestAuthenticationPayload CreateManifestMacPayload(BackupManifest manifest) =>
+        new(manifest.FormatVersion, manifest.BackupId, manifest.CreatedAtUtc, manifest.CreatedAtLocal,
+            manifest.DatabaseFileName, manifest.SizeBytes, manifest.Sha256, manifest.SchemaVersion,
+            manifest.ApplicationVersion, manifest.RetentionGroup,
+            manifest.EncryptionEnvelope ?? throw new InvalidDataException("La ficha no incluye la envoltura de cifrado."),
+            manifest.PlaintextSizeBytes ?? throw new InvalidDataException("La ficha no incluye el tamaño original de la base."));
 }

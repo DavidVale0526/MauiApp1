@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Backups;
@@ -19,6 +20,7 @@ public partial class BackupManagementPage : ContentPage
     private bool _isLoadingDestinations;
     private bool _isLoadingSchedule;
     private bool _isBusy;
+    private bool _selectedBackupIsRestoreCompatible;
     private string? _configuredTargetVolumeId;
     private BackupHistoryEntry? _selectedBackup;
 
@@ -45,6 +47,7 @@ public partial class BackupManagementPage : ContentPage
             UsbPicker.IsEnabled = false;
             SaveScheduleButton.IsEnabled = false;
             ScheduleEnabledSwitch.IsEnabled = false;
+            ConfigureEncryptionButton.IsEnabled = false;
             ValidateBackupButton.IsEnabled = false;
             OperationStatusLabel.Text = "Esta sección solo está disponible para el Administrador en la PC coordinadora.";
             OperationStatusLabel.IsVisible = true;
@@ -68,7 +71,68 @@ public partial class BackupManagementPage : ContentPage
         }
 
         await LoadScheduleAsync();
+        await LoadEncryptionStatusAsync();
         await RefreshDestinationsAsync();
+    }
+
+    private async Task LoadEncryptionStatusAsync()
+    {
+        try
+        {
+            var configured = await _backupService.IsEncryptionConfiguredAsync();
+            EncryptionStatusLabel.Text = configured
+                ? "Cifrado activado. Las nuevas copias se guardan cifradas y el servicio puede crearlas aunque la aplicación esté cerrada."
+                : "Aún no se ha configurado el cifrado. Las copias antiguas seguirán marcadas como no cifradas; las nuevas requieren activar esta protección.";
+            EncryptionStatusLabel.TextColor = configured ? Color.FromArgb("#07805F") : Color.FromArgb("#61738A");
+            RecoveryPhraseEntry.IsVisible = !configured;
+            RecoveryPhraseConfirmationEntry.IsVisible = !configured;
+            ConfigureEncryptionButton.IsVisible = !configured;
+            ConfigureEncryptionButton.IsEnabled = !configured && IsAuthorized;
+        }
+        catch (Exception exception)
+        {
+            EncryptionStatusLabel.Text = GetUserError(exception, "No se pudo leer el estado del cifrado.");
+            EncryptionStatusLabel.TextColor = Color.FromArgb("#B42318");
+            ConfigureEncryptionButton.IsEnabled = false;
+        }
+    }
+
+    private async void OnConfigureEncryptionClicked(object? sender, EventArgs eventArgs)
+    {
+        if (!IsAuthorized) return;
+        var phrase = RecoveryPhraseEntry.Text ?? string.Empty;
+        var confirmation = RecoveryPhraseConfirmationEntry.Text ?? string.Empty;
+        if (phrase.Length < 12)
+        {
+            await DisplayAlertAsync("Frase demasiado corta", "Usa una frase de recuperación de al menos 12 caracteres.", "Aceptar");
+            return;
+        }
+        if (!string.Equals(phrase, confirmation, StringComparison.Ordinal))
+        {
+            await DisplayAlertAsync("Las frases no coinciden", "Escribe la misma frase en ambos campos.", "Aceptar");
+            return;
+        }
+        var confirmed = await DisplayAlertAsync("Guardar frase de recuperación",
+            "La frase no se almacenará. Anótala ahora en un lugar seguro fuera de esta PC y de la USB. Si se pierde, las copias cifradas no podrán recuperarse en otro equipo. ¿Ya la guardaste fuera de ambos?",
+            "Sí, la guardé", "Cancelar");
+        if (!confirmed) return;
+
+        ConfigureEncryptionButton.IsEnabled = false;
+        try
+        {
+            await _backupService.ConfigureEncryptionAsync(phrase);
+            RecoveryPhraseEntry.Text = string.Empty;
+            RecoveryPhraseConfirmationEntry.Text = string.Empty;
+            await LoadEncryptionStatusAsync();
+            await DisplayAlertAsync("Cifrado activado", "Las próximas copias manuales y programadas se guardarán cifradas.", "Aceptar");
+        }
+        catch (Exception exception)
+        {
+            OperationStatusLabel.Text = GetUserError(exception, "No se pudo activar el cifrado.");
+            OperationStatusLabel.TextColor = Color.FromArgb("#B42318");
+            OperationStatusLabel.IsVisible = true;
+            ConfigureEncryptionButton.IsEnabled = IsAuthorized;
+        }
     }
 
     private async Task RefreshDestinationsAsync()
@@ -138,8 +202,10 @@ public partial class BackupManagementPage : ContentPage
     private async Task LoadHistoryAsync(BackupDestination destination)
     {
         _selectedBackup = null;
+        _selectedBackupIsRestoreCompatible = false;
         BackupHistoryView.SelectedItem = null;
         ValidateBackupButton.IsEnabled = false;
+        RestoreBackupButton.IsEnabled = false;
         BackupValidationLabel.IsVisible = false;
         SelectedBackupLabel.Text = "Selecciona una copia válida para comprobarla antes de restaurar.";
         _backupHistory.Clear();
@@ -156,7 +222,9 @@ public partial class BackupManagementPage : ContentPage
     private void OnBackupSelectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
     {
         _selectedBackup = eventArgs.CurrentSelection.FirstOrDefault() as BackupHistoryEntry;
-        ValidateBackupButton.IsEnabled = IsAuthorized && _selectedBackup?.Status == "Creado y verificado";
+        _selectedBackupIsRestoreCompatible = false;
+        ValidateBackupButton.IsEnabled = IsAuthorized && IsBackupReady(_selectedBackup);
+        RestoreBackupButton.IsEnabled = false;
         BackupValidationLabel.IsVisible = false;
         SelectedBackupLabel.Text = _selectedBackup is null
             ? "Selecciona una copia válida para comprobarla antes de restaurar."
@@ -166,7 +234,7 @@ public partial class BackupManagementPage : ContentPage
 
     private async void OnValidateBackupClicked(object? sender, EventArgs eventArgs)
     {
-        if (!IsAuthorized || _selectedBackup is not { Status: "Creado y verificado" } selected ||
+        if (!IsAuthorized || _selectedBackup is not { } selected || !IsBackupReady(selected) ||
             UsbPicker.SelectedItem is not BackupDestination destination)
             return;
 
@@ -176,6 +244,16 @@ public partial class BackupManagementPage : ContentPage
         BackupValidationLabel.IsVisible = true;
         try
         {
+            if (selected.FileName.EndsWith(".db.enc", StringComparison.OrdinalIgnoreCase) &&
+                !await _backupService.IsEncryptionConfiguredAsync())
+            {
+                var phrase = await DisplayPromptAsync("Recuperar frase de respaldo",
+                    "Escribe la frase que se guardó al activar el cifrado. Se usará para abrir la clave en esta PC; no se almacena.",
+                    "Desbloquear", "Cancelar", "Frase de recuperación", maxLength: 256, keyboard: Keyboard.Text,
+                    initialValue: null);
+                if (string.IsNullOrEmpty(phrase)) return;
+                await _backupService.UnlockEncryptionFromBackupAsync(destination, selected.FileName, phrase);
+            }
             var result = await _backupService.ValidateAsync(
                 _desktopMode.GetCentralDatabasePath(), destination, selected.FileName);
             BackupValidationLabel.Text = result.Message +
@@ -183,11 +261,13 @@ public partial class BackupManagementPage : ContentPage
                     ? $" Esquema de copia: {result.BackupSchemaVersion}. Esquema actual: {result.CurrentSchemaVersion}."
                     : string.Empty) +
                 (result.IsValid && result.IsSchemaCompatible
-                    ? " La restauración seguirá deshabilitada hasta completar la pausa segura del coordinador."
+                    ? " Puedes iniciar la restauración controlada de esta copia."
                     : string.Empty);
             BackupValidationLabel.TextColor = result.IsValid && result.IsSchemaCompatible
                 ? Color.FromArgb("#07805F")
                 : Color.FromArgb("#B42318");
+            _selectedBackupIsRestoreCompatible = result.IsValid && result.IsSchemaCompatible;
+            RestoreBackupButton.IsEnabled = IsAuthorized && _selectedBackupIsRestoreCompatible;
         }
         catch (Exception exception)
         {
@@ -197,13 +277,82 @@ public partial class BackupManagementPage : ContentPage
         finally
         {
             BackupValidationLabel.IsVisible = true;
-            ValidateBackupButton.IsEnabled = IsAuthorized && _selectedBackup?.Status == "Creado y verificado";
+            ValidateBackupButton.IsEnabled = IsAuthorized && IsBackupReady(_selectedBackup);
+            RestoreBackupButton.IsEnabled = IsAuthorized && _selectedBackupIsRestoreCompatible;
+        }
+    }
+
+    private async void OnRestoreBackupClicked(object? sender, EventArgs eventArgs)
+    {
+        if (!OperatingSystem.IsWindows() || !IsAuthorized || !_selectedBackupIsRestoreCompatible ||
+            _selectedBackup is not { } selected || !IsBackupReady(selected) ||
+            UsbPicker.SelectedItem is not BackupDestination destination)
+            return;
+
+        var createdAt = selected.CreatedAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "fecha desconocida";
+        var confirmed = await DisplayAlertAsync(
+            "Confirmar restauración",
+            $"Se reemplazará la base central actual por «{selected.FileName}», creada el {createdAt} ({FormatBytes(selected.SizeBytes)}).\n\n" +
+            "Se perderán los cambios centrales posteriores a esa copia. También podrían perderse operaciones que otros dispositivos aún no hayan sincronizado. La aplicación se cerrará mientras Windows pausa el coordinador.\n\n¿Deseas continuar?",
+            "Restaurar copia",
+            "Cancelar");
+        if (!confirmed) return;
+
+        try
+        {
+            var currentDestination = await _destinationProvider.ResolveAsync(destination.VolumeId);
+            if (currentDestination is null)
+                throw new IOException("La memoria USB seleccionada ya no está conectada.");
+
+            var backupPath = Path.Combine(currentDestination.MountPath, "Miscelanea Ari", "Respaldos", selected.FileName);
+            var scriptPath = Path.Combine(AppContext.BaseDirectory, "restore-central-backup.ps1");
+            if (!File.Exists(scriptPath))
+                throw new FileNotFoundException("No se encontró el asistente de restauración. Actualiza la aplicación Windows antes de restaurar.", scriptPath);
+
+            var powershellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+            var startInfo = new ProcessStartInfo(powershellPath)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            startInfo.ArgumentList.Add("-NoProfile");
+            startInfo.ArgumentList.Add("-ExecutionPolicy");
+            startInfo.ArgumentList.Add("Bypass");
+            startInfo.ArgumentList.Add("-File");
+            startInfo.ArgumentList.Add(scriptPath);
+            startInfo.ArgumentList.Add("-BackupPath");
+            startInfo.ArgumentList.Add(backupPath);
+            startInfo.ArgumentList.Add("-VolumeId");
+            startInfo.ArgumentList.Add(destination.VolumeId);
+            startInfo.ArgumentList.Add("-HostProcessId");
+            startInfo.ArgumentList.Add(Process.GetCurrentProcess().Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("-DataDirectory");
+            startInfo.ArgumentList.Add(_desktopMode.CentralDataDirectory ??
+                throw new InvalidOperationException("No se encontró la carpeta central del coordinador."));
+
+            if (Process.Start(startInfo) is null)
+                throw new InvalidOperationException("Windows no inició el asistente de restauración.");
+
+            var window = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+            if (window is not null)
+                Microsoft.Maui.Controls.Application.Current?.CloseWindow(window);
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
+        {
+            await DisplayAlertAsync("Restauración cancelada", "No se concedieron los permisos de Windows. No se modificó la base central.", "Aceptar");
+        }
+        catch (Exception exception)
+        {
+            await DisplayAlertAsync("No se pudo iniciar la restauración",
+                GetUserError(exception, "Windows no pudo iniciar el proceso seguro de restauración."), "Aceptar");
         }
     }
 
     private void UpdateLatestBackupSummary()
     {
-        var latest = _backupHistory.FirstOrDefault(entry => entry.Status == "Creado y verificado");
+        var latest = _backupHistory.FirstOrDefault(IsBackupReady);
         if (latest is null)
         {
             LastBackupDateLabel.Text = "Aún no hay respaldos válidos";
@@ -222,7 +371,7 @@ public partial class BackupManagementPage : ContentPage
         LastBackupDateLabel.Text = latest.CreatedAtUtc?.ToLocalTime()
             .ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.CurrentCulture) ?? "Fecha desconocida";
         LastBackupSizeLabel.Text = $"{FormatBytes(latest.SizeBytes)} · {latest.FileName}";
-        LastBackupStatusLabel.Text = "Correcto";
+        LastBackupStatusLabel.Text = latest.Status == "Creado y cifrado" ? "Cifrado" : "Sin cifrar";
         LastBackupStatusLabel.TextColor = Color.FromArgb("#07805F");
     }
 
@@ -233,6 +382,10 @@ public partial class BackupManagementPage : ContentPage
         {
             CreateBackupButton.IsEnabled = false;
             OpenFolderButton.IsEnabled = false;
+            _selectedBackup = null;
+            _selectedBackupIsRestoreCompatible = false;
+            ValidateBackupButton.IsEnabled = false;
+            RestoreBackupButton.IsEnabled = false;
             _backupHistory.Clear();
             UpdateLatestBackupSummary();
             return;
@@ -321,12 +474,17 @@ public partial class BackupManagementPage : ContentPage
         }
     }
 
+    private static bool IsBackupReady(BackupHistoryEntry? entry) =>
+        entry?.Status is "Creado y cifrado" or "Creado sin cifrar" or "Creado y verificado";
+
     private void SetBusy(bool value)
     {
         _isBusy = value;
         UsbPicker.IsEnabled = !value;
         CreateBackupButton.IsEnabled = !value && UsbPicker.SelectedItem is BackupDestination;
         OpenFolderButton.IsEnabled = !value && UsbPicker.SelectedItem is BackupDestination;
+        ValidateBackupButton.IsEnabled = !value && IsAuthorized && IsBackupReady(_selectedBackup);
+        RestoreBackupButton.IsEnabled = !value && IsAuthorized && _selectedBackupIsRestoreCompatible;
         BackupActivityIndicator.IsVisible = value;
         BackupActivityIndicator.IsRunning = value;
         CreateBackupButton.Text = value ? "Creando respaldo…" : "Crear respaldo";

@@ -52,6 +52,11 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<Content Include="..\MauiApp1.Coordinator\Deployment\restore-central-backup.ps1"
+		         Link="restore-central-backup.ps1"
+		         CopyToOutputDirectory="PreserveNewest"
+		         CopyToPublishDirectory="PreserveNewest"
+		         Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'" />
 	</ItemGroup>
 
 	<ItemGroup>

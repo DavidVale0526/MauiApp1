@@ -31,6 +31,13 @@ public enum BackupRetentionGroup
 
 public interface ICentralDatabaseBackupService
 {
+    Task<bool> IsEncryptionConfiguredAsync(CancellationToken cancellationToken = default);
+
+    Task ConfigureEncryptionAsync(string recoveryPassphrase, CancellationToken cancellationToken = default);
+
+    Task UnlockEncryptionFromBackupAsync(BackupDestination destination, string backupFileName,
+        string recoveryPassphrase, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<BackupHistoryEntry>> GetHistoryAsync(
         BackupDestination destination,
         CancellationToken cancellationToken = default);

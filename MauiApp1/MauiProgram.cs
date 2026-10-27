@@ -33,9 +33,16 @@ namespace MauiApp1
             builder.Services.AddSingleton(desktopMode);
 #if WINDOWS
             builder.Services.AddTransient<BackupManagementPage>();
+            var backupKeyDirectory = desktopMode.IsHost && !string.IsNullOrWhiteSpace(desktopMode.CentralDataDirectory)
+                ? desktopMode.CentralDataDirectory
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Miscelanea Ari", "Coordinator");
+            builder.Services.AddSingleton<MauiApp1.Application.Backups.ICentralBackupEncryptionKeyStore>(
+                _ => new MauiApp1.Infrastructure.Backups.WindowsCentralBackupEncryptionKeyStore(backupKeyDirectory));
             if (desktopMode.IsHost && !string.IsNullOrWhiteSpace(desktopMode.CentralDataDirectory))
+            {
                 builder.Services.AddSingleton<MauiApp1.Application.Backups.ICoordinatorBackupScheduleStore>(
                     _ => new MauiApp1.Infrastructure.Backups.JsonCoordinatorBackupScheduleStore(desktopMode.CentralDataDirectory));
+            }
             builder.Services.AddSingleton<MauiApp1.Application.Backups.IBackupDestinationProvider,
                 MauiApp1.Infrastructure.Windows.WindowsBackupDestinationProvider>();
             builder.Services.AddSingleton<MauiApp1.Application.Backups.ICentralDatabaseBackupService,

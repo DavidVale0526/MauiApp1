@@ -40,6 +40,8 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'MauiApp1.Coordinator\Deployme
     -Destination $scriptsDirectory
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'MauiApp1.Coordinator\Deployment\update-coordinator.ps1') `
     -Destination $scriptsDirectory
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'MauiApp1\Deployment\GUIA_RESPALDOS.md') `
+    -Destination (Join-Path $bundleDirectory 'GUIA_RESPALDOS.md')
 $readme = @'
 MISCELÁNEA ARI — INSTALADOR PARA WINDOWS
 
@@ -48,6 +50,8 @@ MISCELÁNEA ARI — INSTALADOR PARA WINDOWS
 3. Elige una sola PC como coordinadora. Las otras PC y los teléfonos se instalan como clientes.
 4. Para la coordinadora, Windows mostrará su solicitud normal de permisos. El asistente instalará el servicio y preparará la red sin abrir una consola.
 5. En los clientes, instala la app y después usa Sincronización y conexión para vincularlos.
+
+La guía GUIA_RESPALDOS.md explica cómo cifrar copias en USB y recuperar el negocio.
 
 El coordinador puede iniciar un negocio nuevo con una base vacía o importar una base existente de Miscelánea Ari. La base central nunca se sobrescribe.
 Si ejecutas el asistente en una PC que ya tiene el coordinador, ofrece actualizarlo desde la interfaz. Antes de cambiar los binarios, crea una copia de la base y de los binarios actuales.

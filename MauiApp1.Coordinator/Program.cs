@@ -46,6 +46,26 @@ internal static class Program
                 return 0;
             }
 
+            var restoreBackup = ReadOption(args, "--restore-central-backup");
+            var restoreEmergency = ReadOption(args, "--restore-emergency");
+            if (restoreBackup is not null || restoreEmergency is not null)
+            {
+                if (restoreBackup is not null && restoreEmergency is not null)
+                    throw new ArgumentException("Indica un solo archivo de restauración por ejecución.");
+                if (!Environment.UserInteractive)
+                    throw new InvalidOperationException("La restauración debe ejecutarse desde el auxiliar interactivo de Windows.");
+
+                var dataDirectoryOption = ReadOption(args, "--data-directory");
+                var restoreDataDirectory = GetCoordinatorDataDirectory(dataDirectoryOption);
+                await CoordinatorDatabaseRestoreService.RestoreAsync(
+                    restoreDataDirectory,
+                    restoreBackup ?? restoreEmergency!,
+                    requireManifest: restoreBackup is not null,
+                    emergencyCreated: path => Console.WriteLine($"EMERGENCY_BACKUP={path}"));
+                Console.WriteLine("Base central restaurada y validada. Inicia el servicio y comprueba /health.");
+                return 0;
+            }
+
             return await RunCoordinatorAsync(args);
         }
         catch (Exception exception)
@@ -192,6 +212,8 @@ internal static class Program
 
         if (OperatingSystem.IsWindows())
         {
+            builder.Services.AddSingleton<ICentralBackupEncryptionKeyStore>(
+                _ => new WindowsCentralBackupEncryptionKeyStore(dataDirectory));
             builder.Services.AddSingleton<ICoordinatorBackupScheduleStore>(
                 _ => new JsonCoordinatorBackupScheduleStore(dataDirectory));
             builder.Services.AddSingleton<IBackupDestinationProvider, WindowsBackupDestinationProvider>();
