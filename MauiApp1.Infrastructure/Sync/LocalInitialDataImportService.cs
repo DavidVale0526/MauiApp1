@@ -34,6 +34,7 @@ public sealed class LocalInitialDataImportService(
                 .Concat(await context.InventoryMovements.AsNoTracking().Select(item => item.ActorUserId).ToListAsync(cancellationToken))
                 .Concat(await context.Payments.AsNoTracking().Select(item => item.ActorUserId).ToListAsync(cancellationToken))
                 .Concat(await context.InventoryDiscrepancies.AsNoTracking().Select(item => item.ActorUserId).ToListAsync(cancellationToken))
+                .Concat(await context.SaleReversals.AsNoTracking().Select(item => item.ActorUserId).ToListAsync(cancellationToken))
                 .Distinct().ToArray();
             var actors = await context.UserAccounts.AsNoTracking().Where(item => usedActorIds.Contains(item.UserId))
                 .Select(item => new InitialImportActor(item.UserId, item.UserName, item.Role)).ToListAsync(cancellationToken);
@@ -70,6 +71,15 @@ public sealed class LocalInitialDataImportService(
                         payment.AmountMinorUnits, payment.CashReceivedMinorUnits, payment.ChangeMinorUnits)).ToArray() is { Length: > 0 } paymentDetails
                     ? paymentDetails : null)).ToArray();
 
+            var reversalHeaders = await context.SaleReversals.AsNoTracking().OrderBy(item => item.OccurredAtUtc).ToListAsync(cancellationToken);
+            var reversalLines = await context.SaleReversalLines.AsNoTracking().OrderBy(item => item.LineNumber).ToListAsync(cancellationToken);
+            var saleReversals = reversalHeaders.Select(item => new InitialImportSaleReversal(item.OperationId,
+                item.SaleOperationId, AsUtc(item.OccurredAtUtc), item.ActorUserId, item.Kind, item.Reason,
+                item.AmountMinorUnits, item.RefundMethod, reversalLines.Where(line => line.OperationId == item.OperationId)
+                    .Select(line => new InitialImportSaleReversalLine(line.LineNumber, line.SaleLineNumber, line.ProductId,
+                        line.ProductNameSnapshot, line.UnitSnapshot, line.QuantityMilliUnits, line.AmountMinorUnits,
+                        line.ReturnToStock, line.DisposalReason)).ToArray())).ToArray();
+
             var receivables = await context.Receivables.AsNoTracking()
                 .Select(item => new InitialImportReceivable(item.OperationId, item.CustomerId,
                     item.OriginalAmountMinorUnits, item.OutstandingMinorUnits, item.DueAtUtc)).ToListAsync(cancellationToken);
@@ -88,7 +98,7 @@ public sealed class LocalInitialDataImportService(
 
             var snapshot = new InitialDataImportSnapshot(Guid.NewGuid(), 1,
                 await deviceIdentity.GetDeviceIdAsync(cancellationToken), DateTime.UtcNow,
-                actors, categories, products, customers, purchases, sales, receivables, movements, payments, discrepancies);
+                actors, categories, products, customers, purchases, sales, receivables, movements, payments, discrepancies, saleReversals);
             if (snapshot.Products.Sum(item => (long)(item.ImageData?.Length ?? 0)) > ProductImageRules.MaximumInitialImportBytes)
                 return new(false, null,
                     "Las imágenes de este equipo superan el máximo combinado de 24 MB para la importación inicial. Reduce el tamaño de algunas imágenes y vuelve a analizar.");

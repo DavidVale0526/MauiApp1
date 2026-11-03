@@ -1,6 +1,6 @@
 # TASK — Completar facturación para el alcance de la tesis
 
-**Estado general:** Etapas 1, 2 y 3 implementadas en código; migración central y validación funcional integral pendientes de Etapa 4
+**Estado general:** Etapas 1, 2 y 3 implementadas en código; Etapa 4 en curso. Compilaciones y publicación del coordinador verificadas; migración central y pruebas funcionales en dispositivos pendientes
 **Fecha de creación:** 3 de noviembre de 2026  
 **Plataformas:** Windows y Android; sincronización LAN existente  
 **Alcance:** captura de pagos de contado y cambio, comprobante imprimible/compartible, anulaciones y devoluciones con trazabilidad
@@ -157,7 +157,7 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - [x] Compilar Windows, Android y Coordinador; las tres compilaciones finalizaron sin errores.
 - [x] Revisar que EF Core detecte `20261103212753_SaleReversals` como migración pendiente.
 - [ ] Aplicar la migración con el actualizador de la base central y comprobar que conserva los datos existentes.
-- [ ] Actualizar guía de uso y documentar que el comprobante es interno y no fiscal.
+- [x] Actualizar guía de uso y documentar que el comprobante es interno y no fiscal.
 
 **Criterio de cierre:** se cumplen las pruebas en ambos clientes y coordinador, el esquema central puede actualizarse conservando datos, los reintentos son idempotentes y las ventas originales permanecen auditables tras devoluciones y anulaciones.
 
@@ -175,6 +175,8 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - **Etapa 0 completada:** contratos, límites financieros, folio interno y reglas de reversión definidos e implementados.
 - **3 de noviembre de 2026 — Etapa 2 implementada:** comprobante PDF local con datos históricos, folio interno completo, detalle de pagos/cambio y saldo de crédito; acciones nativas para guardar, compartir y abrir/imprimir desde Windows y Android; acceso disponible al confirmar una venta y desde su historial. Ambas plataformas compilaron sin errores. Falta comprobar en dispositivos que el PDF se renderice correctamente y que funcionen los selectores y destinos nativos; esas verificaciones quedan en Etapa 4.
 - **3 de noviembre de 2026 — Etapa 3 implementada en código:** anulaciones/devoluciones append-only, validación de cantidades e importes históricos, reembolso declarado en contado y reducción segura de deuda en crédito; restitución de stock solo para productos vendibles y motivo para productos no vendibles; sincronización validada por coordinador e idempotencia; historial y constancias PDF individuales. Windows, Android y Coordinador compilaron sin errores. Falta aplicar la migración en la base central instalada y ejecutar pruebas funcionales/LAN de Etapa 4.
+- **3 de noviembre de 2026 — Etapa 4, revisión técnica:** Windows y Android compilaron con 0 errores; Coordinador compiló con 0 errores; el coordinador `win-x64` se publicó en Release. La verificación `SyncThreeDevices` compila, pero su ejecución quedó bloqueada por el entorno al intentar abrir conexiones TCP locales (`SocketException 10013`), por lo que no se contabiliza como prueba funcional aprobada. Se corrigió el registro de `ICoordinatorPasswordRecoveryClient` que impedía iniciar dicho verificador. La revisión también encontró y corrigió que la importación inicial no transportaba las auditorías de anulaciones/devoluciones; ahora incluye y valida las reversiones, autores y líneas. `git diff --check` pasó. Siguen pendientes el actualizador sobre la base central instalada, la comprobación de conservación de datos y las pruebas manuales en Windows/Android y LAN.
+- **3 de noviembre de 2026 — Documentación de uso:** se añadió `MauiApp1/GUIA_FACTURACION_INTERNA.md` con el alcance no fiscal y los pasos de cobro, comprobante y reversión.
 
 ## Archivos principales a revisar
 

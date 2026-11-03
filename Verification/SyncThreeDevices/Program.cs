@@ -287,6 +287,7 @@ sealed class Runtime(ServiceProvider services, string path, MemoryLink link, Mem
         services.AddSingleton<ICoordinatorUserSessionStorage>(session);
         services.AddSingleton<CoordinatorPairingClient>();
         services.AddSingleton<ICoordinatorAuthenticationClient>(p => p.GetRequiredService<CoordinatorPairingClient>());
+        services.AddSingleton<ICoordinatorPasswordRecoveryClient>(p => p.GetRequiredService<CoordinatorPairingClient>());
         services.AddSingleton<ICoordinatorChangeClient>(p => p.GetRequiredService<CoordinatorPairingClient>());
         services.AddSingleton<ICoordinatedSignInService, CoordinatedSignInService>();
         services.AddSingleton<ICoordinatorOperationSender, CoordinatorOperationSender>();

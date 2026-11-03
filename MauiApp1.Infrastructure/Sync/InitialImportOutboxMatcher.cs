@@ -73,6 +73,18 @@ public static class InitialImportOutboxMatcher
                             saved.ProductNameSnapshot == line.ProductNameSnapshot && saved.UnitSnapshot == line.UnitSnapshot &&
                             saved.SalePriceMinorUnits == line.SalePriceMinorUnits && saved.LineTotalMinorUnits == line.LineTotalMinorUnits));
                 }
+                case "Sale.Reversed":
+                {
+                    var payload = JsonSerializer.Deserialize<SaleReversalRecordedPayload>(payloadJson, JsonOptions);
+                    var reversal = (snapshot.SaleReversals ?? []).FirstOrDefault(item => item.OperationId == operationId);
+                    return payload?.Lines is not null && reversal is not null && payload.OperationId == reversal.OperationId &&
+                        payload.SaleOperationId == reversal.SaleOperationId && payload.OccurredAtUtc == reversal.OccurredAtUtc &&
+                        payload.Kind == reversal.Kind && payload.Reason == reversal.Reason && payload.RefundMethod == reversal.RefundMethod &&
+                        payload.Lines.Count == reversal.Lines.Count && payload.Lines.All(line => reversal.Lines.Any(saved =>
+                            saved.LineNumber == line.LineNumber && saved.SaleLineNumber == line.SaleLineNumber &&
+                            saved.QuantityMilliUnits == line.QuantityMilliUnits && saved.ReturnToStock == line.ReturnToStock &&
+                            saved.DisposalReason == line.DisposalReason));
+                }
                 case "Inventory.Recorded":
                 case "Inventory.MixedWasteRecorded":
                 {

@@ -234,7 +234,7 @@ internal sealed class CoordinatorInitialDataImportService(
 
         if (snapshot.Categories.Count + snapshot.Products.Count + snapshot.Customers.Count + snapshot.Purchases.Count +
             snapshot.Sales.Count + snapshot.Receivables.Count + snapshot.Movements.Count + snapshot.Payments.Count +
-            snapshot.Discrepancies.Count == 0)
+            snapshot.Discrepancies.Count + (snapshot.SaleReversals?.Count ?? 0) == 0)
             blockers.Add("No se encontraron datos de negocio para importar. No se requiere ninguna acción.");
 
         var exactMatchCount = 0;
@@ -252,6 +252,7 @@ internal sealed class CoordinatorInitialDataImportService(
         CheckUnique(snapshot.Movements.Select(item => item.MovementId), "movimientos", blockers);
         CheckUnique(snapshot.Payments.Select(item => item.PaymentId), "pagos", blockers);
         CheckUnique(snapshot.Discrepancies.Select(item => item.DiscrepancyId), "diferencias de inventario", blockers);
+        CheckUnique((snapshot.SaleReversals ?? []).Select(item => item.OperationId), "anulaciones y devoluciones", blockers);
         if (snapshot.Movements.GroupBy(item => (item.OperationId, item.LineNumber)).Any(group => group.Count() > 1))
             blockers.Add("El paquete contiene dos movimientos para la misma operación y renglón.");
 
@@ -260,7 +261,8 @@ internal sealed class CoordinatorInitialDataImportService(
             .Concat(snapshot.Sales.Select(item => item.ActorLocalUserId))
             .Concat(snapshot.Movements.Select(item => item.ActorLocalUserId))
             .Concat(snapshot.Payments.Select(item => item.ActorLocalUserId))
-            .Concat(snapshot.Discrepancies.Select(item => item.ActorLocalUserId)).Distinct();
+            .Concat(snapshot.Discrepancies.Select(item => item.ActorLocalUserId))
+            .Concat((snapshot.SaleReversals ?? []).Select(item => item.ActorLocalUserId)).Distinct();
         if (referencedActors.Any(id => id == Guid.Empty || !localActorIds.Contains(id)))
             blockers.Add("Hay registros históricos cuyo autor local no está disponible para conciliar.");
 
@@ -275,6 +277,8 @@ internal sealed class CoordinatorInitialDataImportService(
         var centralSales = await context.Sales.AsNoTracking().ToListAsync(cancellationToken);
         var centralSaleLines = await context.SaleLines.AsNoTracking().ToListAsync(cancellationToken);
         var centralSalePayments = await context.SalePayments.AsNoTracking().ToListAsync(cancellationToken);
+        var centralSaleReversals = await context.SaleReversals.AsNoTracking().ToListAsync(cancellationToken);
+        var centralSaleReversalLines = await context.SaleReversalLines.AsNoTracking().ToListAsync(cancellationToken);
         var centralReceivables = await context.Receivables.AsNoTracking().ToListAsync(cancellationToken);
         var centralMovements = await context.InventoryMovements.AsNoTracking().ToListAsync(cancellationToken);
         var centralPayments = await context.Payments.AsNoTracking().ToListAsync(cancellationToken);
@@ -401,6 +405,95 @@ internal sealed class CoordinatorInitialDataImportService(
                         saved.QuantityMilliUnits == line.QuantityMilliUnits && saved.SalePriceMinorUnits == line.SalePriceMinorUnits &&
                         saved.LineTotalMinorUnits == line.LineTotalMinorUnits)))
                     blockers.Add($"La venta {sale.OperationId} ya existe con datos distintos.");
+                else exactMatchCount++;
+            }
+        }
+
+        var importedReversalQuantities = new Dictionary<(Guid Sale, int Line), long>();
+        var importedReversalAmounts = new Dictionary<(Guid Sale, int Line), long>();
+        var importedReversalCounts = new Dictionary<Guid, int>();
+        foreach (var reversal in (snapshot.SaleReversals ?? []).OrderBy(item => item.OccurredAtUtc).ThenBy(item => item.OperationId))
+        {
+            var sourceSale = snapshot.Sales.FirstOrDefault(item => item.OperationId == reversal.SaleOperationId);
+            var centralSale = centralSales.FirstOrDefault(item => item.OperationId == reversal.SaleOperationId);
+            var sourceLines = sourceSale?.Lines.ToDictionary(item => item.LineNumber) ??
+                centralSaleLines.Where(item => item.OperationId == reversal.SaleOperationId).ToDictionary(item => item.LineNumber,
+                    item => new InitialImportSaleLine(item.LineNumber, item.ProductId, item.ProductNameSnapshot,
+                        item.UnitSnapshot, item.QuantityMilliUnits, item.SalePriceMinorUnits, item.LineTotalMinorUnits));
+            if (reversal.OperationId == Guid.Empty || reversal.SaleOperationId == Guid.Empty ||
+                reversal.OccurredAtUtc.Kind != DateTimeKind.Utc || !Enum.IsDefined(typeof(SaleReversalKind), reversal.Kind) ||
+                string.IsNullOrWhiteSpace(reversal.Reason) || reversal.Reason.Trim().Length > 500 ||
+                reversal.AmountMinorUnits < 0 || reversal.Lines is null || reversal.Lines.Count == 0 ||
+                sourceSale is null && centralSale is null ||
+                reversal.Lines.Select(item => item.LineNumber).Distinct().Count() != reversal.Lines.Count ||
+                reversal.Lines.Select(item => item.SaleLineNumber).Distinct().Count() != reversal.Lines.Count ||
+                reversal.Lines.Any(line => line.LineNumber < 0 || line.SaleLineNumber < 0 || line.ProductId == Guid.Empty ||
+                    line.QuantityMilliUnits <= 0 || line.AmountMinorUnits < 0 || string.IsNullOrWhiteSpace(line.ProductNameSnapshot) ||
+                    string.IsNullOrWhiteSpace(line.UnitSnapshot) || !sourceLines.ContainsKey(line.SaleLineNumber) ||
+                    !productIds.Contains(line.ProductId) || (line.ReturnToStock && !string.IsNullOrWhiteSpace(line.DisposalReason)) ||
+                    (!line.ReturnToStock && string.IsNullOrWhiteSpace(line.DisposalReason))))
+            {
+                blockers.Add($"La anulación/devolución {reversal.OperationId} está incompleta o no corresponde a su venta.");
+                continue;
+            }
+
+            var actor = snapshot.Actors.FirstOrDefault(item => item.LocalUserId == reversal.ActorLocalUserId);
+            if (actor is null || actor.Role != (int)MauiApp1.Domain.Users.UserRole.Administrator)
+                blockers.Add($"La reversión {reversal.OperationId} no tiene un autor Administrador válido.");
+            var reversalSaleIsCredit = sourceSale?.IsCredit ?? centralSale?.IsCredit ?? false;
+            if (reversalSaleIsCredit ? reversal.RefundMethod is not null :
+                reversal.RefundMethod is not int refund || refund is < 1 or > 3)
+                blockers.Add($"El método de reembolso de la reversión {reversal.OperationId} no coincide con la modalidad de la venta.");
+            if (reversal.Lines.Sum(line => line.AmountMinorUnits) != reversal.AmountMinorUnits)
+                blockers.Add($"El importe de la reversión {reversal.OperationId} no coincide con sus renglones.");
+
+            var priorCount = importedReversalCounts.GetValueOrDefault(reversal.SaleOperationId);
+            if ((SaleReversalKind)reversal.Kind == SaleReversalKind.Cancellation && priorCount > 0)
+                blockers.Add($"La venta {reversal.SaleOperationId} contiene más de una reversión antes de la anulación.");
+            foreach (var line in reversal.Lines)
+            {
+                if (!sourceLines.TryGetValue(line.SaleLineNumber, out var original) || line.ProductId != original.ProductId ||
+                    line.ProductNameSnapshot != original.ProductNameSnapshot || line.UnitSnapshot != original.UnitSnapshot)
+                {
+                    blockers.Add($"El renglón de la reversión {reversal.OperationId} no coincide con la venta original.");
+                    continue;
+                }
+                var key = (reversal.SaleOperationId, line.SaleLineNumber);
+                var previousQuantity = importedReversalQuantities.GetValueOrDefault(key);
+                var previousAmount = importedReversalAmounts.GetValueOrDefault(key);
+                if (line.QuantityMilliUnits > original.QuantityMilliUnits - previousQuantity)
+                    blockers.Add($"La devolución {reversal.OperationId} excede la cantidad vendida de {original.ProductNameSnapshot}.");
+                try
+                {
+                    var expected = SaleAmountCalculator.CalculateLineTotalMinorUnits(new MauiApp1.Domain.Values.MoneyAmount(original.SalePriceMinorUnits),
+                        new MauiApp1.Domain.Values.Quantity(checked(previousQuantity + line.QuantityMilliUnits))) - previousAmount;
+                    if (expected != line.AmountMinorUnits || checked(previousAmount + line.AmountMinorUnits) > original.LineTotalMinorUnits)
+                        blockers.Add($"El importe de la devolución {reversal.OperationId} no coincide con el precio histórico.");
+                    importedReversalQuantities[key] = checked(previousQuantity + line.QuantityMilliUnits);
+                    importedReversalAmounts[key] = checked(previousAmount + line.AmountMinorUnits);
+                }
+                catch (OverflowException) { blockers.Add($"La reversión {reversal.OperationId} supera el rango monetario permitido."); }
+            }
+            if ((SaleReversalKind)reversal.Kind == SaleReversalKind.Cancellation &&
+                (priorCount != 0 || reversal.Lines.Count != sourceLines.Count || reversal.Lines.Any(line =>
+                    !sourceLines.TryGetValue(line.SaleLineNumber, out var original) || line.QuantityMilliUnits != original.QuantityMilliUnits)))
+                blockers.Add($"La anulación {reversal.OperationId} no cubre una sola vez toda la venta.");
+            importedReversalCounts[reversal.SaleOperationId] = priorCount + 1;
+
+            var existing = centralSaleReversals.FirstOrDefault(item => item.OperationId == reversal.OperationId);
+            if (existing is not null)
+            {
+                var existingLines = centralSaleReversalLines.Where(item => item.OperationId == reversal.OperationId).ToList();
+                if (existing.SaleOperationId != reversal.SaleOperationId || existing.Kind != reversal.Kind ||
+                    existing.OccurredAtUtc != reversal.OccurredAtUtc || existing.Reason != reversal.Reason.Trim() ||
+                    existing.AmountMinorUnits != reversal.AmountMinorUnits || existing.RefundMethod != reversal.RefundMethod ||
+                    existingLines.Count != reversal.Lines.Count || reversal.Lines.Any(line => !existingLines.Any(saved =>
+                        saved.LineNumber == line.LineNumber && saved.SaleLineNumber == line.SaleLineNumber &&
+                        saved.ProductId == line.ProductId && saved.ProductNameSnapshot == line.ProductNameSnapshot &&
+                        saved.UnitSnapshot == line.UnitSnapshot && saved.QuantityMilliUnits == line.QuantityMilliUnits &&
+                        saved.AmountMinorUnits == line.AmountMinorUnits && saved.ReturnToStock == line.ReturnToStock &&
+                        saved.DisposalReason == line.DisposalReason)))
+                    blockers.Add($"La reversión {reversal.OperationId} ya existe con datos centrales distintos.");
                 else exactMatchCount++;
             }
         }
@@ -557,6 +650,19 @@ internal sealed class CoordinatorInitialDataImportService(
         if (snapshot.Discrepancies.Any(item => existingDiscrepancies.TryGetValue(item.DiscrepancyId, out var actor) &&
                 actor != actorMap[item.ActorLocalUserId]))
             return "Una diferencia de inventario con el mismo identificador ya existe con otro responsable central. Ajusta la asignación de autores y vuelve a analizar.";
+
+        var reversalIds = (snapshot.SaleReversals ?? []).Select(item => item.OperationId).ToArray();
+        var existingReversals = await context.SaleReversals.AsNoTracking().Where(item => reversalIds.Contains(item.OperationId))
+            .ToDictionaryAsync(item => item.OperationId, item => item.ActorUserId, ct);
+        if ((snapshot.SaleReversals ?? []).Any(item => existingReversals.TryGetValue(item.OperationId, out var author) &&
+                author != actorMap[item.ActorLocalUserId]))
+            return "Una anulación o devolución con el mismo identificador ya existe con otro responsable central. Ajusta la asignación y vuelve a analizar.";
+        var reversalActorIds = (snapshot.SaleReversals ?? []).Select(item => actorMap[item.ActorLocalUserId]).Distinct().ToArray();
+        var administratorIds = await context.UserAccounts.AsNoTracking()
+            .Where(item => reversalActorIds.Contains(item.UserId) && item.Role == (int)MauiApp1.Domain.Users.UserRole.Administrator)
+            .Select(item => item.UserId).ToListAsync(ct);
+        if (reversalActorIds.Any(id => !administratorIds.Contains(id)))
+            return "Cada autor de una anulación o devolución debe asignarse a una cuenta central de Administrador.";
         return null;
     }
 
@@ -619,6 +725,11 @@ internal sealed class CoordinatorInitialDataImportService(
                 item.DiscrepancyId, item.OperationId, item.ProductId, item.ShortageMilliUnits,
                 item.CreatedAtUtc, item.IsResolved),
                 actorMap[item.ActorLocalUserId], item.CreatedAtUtc);
+        foreach (var item in (snapshot.SaleReversals ?? []).OrderBy(item => item.OccurredAtUtc).ThenBy(item => item.OperationId))
+            Add("sale-reversal", item.OperationId, "Import.SaleReversal", new InitialImportSaleReversalPayload(
+                item.OperationId, item.SaleOperationId, item.OccurredAtUtc, actorMap[item.ActorLocalUserId],
+                item.Kind, item.Reason, item.AmountMinorUnits, item.RefundMethod, item.Lines),
+                actorMap[item.ActorLocalUserId], item.OccurredAtUtc);
         return operations;
     }
 

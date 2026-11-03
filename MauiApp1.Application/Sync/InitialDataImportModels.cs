@@ -18,7 +18,8 @@ public sealed record InitialDataImportSnapshot(
     IReadOnlyList<InitialImportReceivable> Receivables,
     IReadOnlyList<InitialImportMovement> Movements,
     IReadOnlyList<InitialImportPayment> Payments,
-    IReadOnlyList<InitialImportDiscrepancy> Discrepancies);
+    IReadOnlyList<InitialImportDiscrepancy> Discrepancies,
+    IReadOnlyList<InitialImportSaleReversal>? SaleReversals = null);
 
 public sealed record InitialImportActor(Guid LocalUserId, string UserName, int Role);
 public sealed record InitialImportCategory(Guid CategoryId, string Name);
@@ -37,6 +38,12 @@ public sealed record InitialImportSaleLine(int LineNumber, Guid ProductId, strin
     string UnitSnapshot, long QuantityMilliUnits, long SalePriceMinorUnits, long LineTotalMinorUnits);
 public sealed record InitialImportSalePayment(Guid PaymentId, int Method, long AmountMinorUnits,
     long CashReceivedMinorUnits, long ChangeMinorUnits);
+public sealed record InitialImportSaleReversal(Guid OperationId, Guid SaleOperationId, DateTime OccurredAtUtc,
+    Guid ActorLocalUserId, int Kind, string Reason, long AmountMinorUnits, int? RefundMethod,
+    IReadOnlyList<InitialImportSaleReversalLine> Lines);
+public sealed record InitialImportSaleReversalLine(int LineNumber, int SaleLineNumber, Guid ProductId,
+    string ProductNameSnapshot, string UnitSnapshot, long QuantityMilliUnits, long AmountMinorUnits,
+    bool ReturnToStock, string? DisposalReason);
 public sealed record InitialImportReceivable(Guid OperationId, Guid CustomerId, long OriginalAmountMinorUnits,
     long OutstandingMinorUnits, DateTime DueAtUtc);
 public sealed record InitialImportMovement(Guid MovementId, Guid OperationId, int LineNumber, Guid? ProductId,
@@ -52,6 +59,9 @@ public sealed record InitialImportPurchasePayload(Guid OperationId, DateTime Occ
 public sealed record InitialImportSalePayload(Guid OperationId, DateTime OccurredAtUtc,
     long TotalMinorUnits, bool IsCredit, Guid? CustomerId, IReadOnlyList<InitialImportSaleLine> Lines,
     IReadOnlyList<InitialImportSalePayment>? Payments = null);
+public sealed record InitialImportSaleReversalPayload(Guid OperationId, Guid SaleOperationId, DateTime OccurredAtUtc,
+    Guid ActorUserId, int Kind, string Reason, long AmountMinorUnits, int? RefundMethod,
+    IReadOnlyList<InitialImportSaleReversalLine> Lines);
 public sealed record InitialImportMovementPayload(Guid MovementId, Guid OperationId, int LineNumber,
     Guid? ProductId, string ProductNameSnapshot, string UnitSnapshot, int Type, long QuantityMilliUnits,
     string? Reason, DateTime OccurredAtUtc);

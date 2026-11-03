@@ -91,6 +91,9 @@ public sealed class CoordinatorBusinessOperationApplier
                 case "Import.Sale":
                     await ApplyImportedSaleAsync(context, payloadJson, actorUserId, cancellationToken);
                     break;
+                case "Import.SaleReversal":
+                    await ApplyImportedSaleReversalAsync(context, payloadJson, actorUserId, cancellationToken);
+                    break;
                 case "Import.Receivable":
                     await ApplyImportedReceivableAsync(context, payloadJson, cancellationToken);
                     break;
@@ -699,6 +702,93 @@ public sealed class CoordinatorBusinessOperationApplier
             item.AmountMinorUnits == payment.AmountMinorUnits &&
             item.CashReceivedMinorUnits == payment.CashReceivedMinorUnits &&
             item.ChangeMinorUnits == payment.ChangeMinorUnits));
+    }
+
+    private static async Task ApplyImportedSaleReversalAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InitialImportSaleReversalPayload>(json);
+        if (payload.OperationId == Guid.Empty || payload.SaleOperationId == Guid.Empty ||
+            payload.OccurredAtUtc.Kind != DateTimeKind.Utc || !Enum.IsDefined(typeof(SaleReversalKind), payload.Kind) ||
+            string.IsNullOrWhiteSpace(payload.Reason) || payload.Reason.Trim().Length > 500 ||
+            payload.AmountMinorUnits < 0 || payload.Lines is null || payload.Lines.Count == 0 ||
+            payload.Lines.Any(line => line is null || line.LineNumber < 0 || line.SaleLineNumber < 0 ||
+                line.ProductId == Guid.Empty || line.QuantityMilliUnits <= 0 || line.AmountMinorUnits < 0 ||
+                string.IsNullOrWhiteSpace(line.ProductNameSnapshot) || string.IsNullOrWhiteSpace(line.UnitSnapshot) ||
+                (line.ReturnToStock && !string.IsNullOrWhiteSpace(line.DisposalReason)) ||
+                (!line.ReturnToStock && string.IsNullOrWhiteSpace(line.DisposalReason))) ||
+            payload.Lines.Select(line => line.LineNumber).Distinct().Count() != payload.Lines.Count ||
+            payload.Lines.Select(line => line.SaleLineNumber).Distinct().Count() != payload.Lines.Count ||
+            payload.Lines.Sum(line => line.AmountMinorUnits) != payload.AmountMinorUnits || payload.ActorUserId != actor)
+            throw new BusinessOperationConflictException("La reversión importada está incompleta o no coincide con su responsable.");
+
+        var sale = await context.Sales.SingleOrDefaultAsync(item => item.OperationId == payload.SaleOperationId, ct)
+            ?? throw new BusinessOperationConflictException("La venta original de la reversión importada no existe.");
+        var actorIsAdministrator = await context.UserAccounts.AsNoTracking()
+            .AnyAsync(item => item.UserId == actor && item.Role == (int)MauiApp1.Domain.Users.UserRole.Administrator, ct);
+        if (!actorIsAdministrator)
+            throw new BusinessOperationConflictException("El responsable importado de una reversión no es Administrador.");
+        if (sale.IsCredit ? payload.RefundMethod is not null : payload.RefundMethod is not int method || method is < 1 or > 3)
+            throw new BusinessOperationConflictException("El método de reembolso importado no corresponde a la modalidad de la venta.");
+
+        var originalLines = await context.SaleLines.AsNoTracking().Where(item => item.OperationId == sale.OperationId)
+            .ToDictionaryAsync(item => item.LineNumber, ct);
+        var existing = await context.SaleReversals.AsNoTracking().SingleOrDefaultAsync(item => item.OperationId == payload.OperationId, ct);
+        if (existing is not null)
+        {
+            var saved = await context.SaleReversalLines.AsNoTracking().Where(item => item.OperationId == payload.OperationId).ToListAsync(ct);
+            if (existing.SaleOperationId != payload.SaleOperationId || existing.ActorUserId != actor ||
+                existing.OccurredAtUtc != payload.OccurredAtUtc || existing.Kind != payload.Kind ||
+                existing.Reason != payload.Reason.Trim() || existing.AmountMinorUnits != payload.AmountMinorUnits ||
+                existing.RefundMethod != payload.RefundMethod || saved.Count != payload.Lines.Count ||
+                payload.Lines.Any(line => !saved.Any(item => item.LineNumber == line.LineNumber &&
+                    item.SaleLineNumber == line.SaleLineNumber && item.ProductId == line.ProductId &&
+                    item.QuantityMilliUnits == line.QuantityMilliUnits && item.AmountMinorUnits == line.AmountMinorUnits &&
+                    item.ReturnToStock == line.ReturnToStock && item.DisposalReason == line.DisposalReason?.Trim())))
+                throw new BusinessOperationConflictException("La reversión ya existe con datos distintos.");
+            return;
+        }
+
+        var priorLines = await context.SaleReversalLines.AsNoTracking().Where(item => item.SaleOperationId == sale.OperationId)
+            .ToListAsync(ct);
+        foreach (var line in payload.Lines)
+        {
+            if (!originalLines.TryGetValue(line.SaleLineNumber, out var original) || original.ProductId != line.ProductId ||
+                original.ProductNameSnapshot != line.ProductNameSnapshot || original.UnitSnapshot != line.UnitSnapshot ||
+                line.QuantityMilliUnits > original.QuantityMilliUnits - priorLines.Where(item => item.SaleLineNumber == line.SaleLineNumber)
+                    .Sum(item => item.QuantityMilliUnits))
+                throw new BusinessOperationConflictException("La reversión importada excede o no coincide con el renglón original.");
+            var alreadyReturned = priorLines.Where(item => item.SaleLineNumber == line.SaleLineNumber).Sum(item => item.QuantityMilliUnits);
+            var alreadyRefunded = priorLines.Where(item => item.SaleLineNumber == line.SaleLineNumber).Sum(item => item.AmountMinorUnits);
+            var expectedAmount = SaleAmountCalculator.CalculateLineTotalMinorUnits(
+                new MauiApp1.Domain.Values.MoneyAmount(original.SalePriceMinorUnits),
+                new MauiApp1.Domain.Values.Quantity(checked(alreadyReturned + line.QuantityMilliUnits))) - alreadyRefunded;
+            if (expectedAmount != line.AmountMinorUnits || alreadyRefunded + line.AmountMinorUnits > original.LineTotalMinorUnits)
+                throw new BusinessOperationConflictException("El importe importado no coincide con el precio histórico de la venta.");
+            if (!await context.Products.AnyAsync(item => item.ProductId == line.ProductId, ct))
+                throw new BusinessOperationConflictException("Un producto de la reversión importada no existe.");
+        }
+
+        var priorCancellations = await context.SaleReversals.AsNoTracking()
+            .AnyAsync(item => item.SaleOperationId == sale.OperationId && item.Kind == (int)SaleReversalKind.Cancellation, ct);
+        if (priorCancellations || (SaleReversalKind)payload.Kind == SaleReversalKind.Cancellation &&
+            (priorLines.Count > 0 || payload.Lines.Count != originalLines.Count || payload.Lines.Any(line =>
+                !originalLines.TryGetValue(line.SaleLineNumber, out var original) || line.QuantityMilliUnits != original.QuantityMilliUnits)))
+            throw new BusinessOperationConflictException("La anulación importada es duplicada o no cubre la venta completa.");
+
+        context.SaleReversals.Add(new SaleReversalEntity
+        {
+            OperationId = payload.OperationId, SaleOperationId = payload.SaleOperationId,
+            OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor, Kind = payload.Kind,
+            Reason = payload.Reason.Trim(), AmountMinorUnits = payload.AmountMinorUnits, RefundMethod = payload.RefundMethod
+        });
+        context.SaleReversalLines.AddRange(payload.Lines.Select(line => new SaleReversalLineEntity
+        {
+            OperationId = payload.OperationId, LineNumber = line.LineNumber, SaleLineNumber = line.SaleLineNumber,
+            SaleOperationId = payload.SaleOperationId, ProductId = line.ProductId,
+            ProductNameSnapshot = line.ProductNameSnapshot, UnitSnapshot = line.UnitSnapshot,
+            QuantityMilliUnits = line.QuantityMilliUnits, AmountMinorUnits = line.AmountMinorUnits,
+            ReturnToStock = line.ReturnToStock, DisposalReason = line.DisposalReason?.Trim()
+        }));
     }
 
     private static async Task ApplyImportedReceivableAsync(LocalDbContext context, string json, CancellationToken ct)
