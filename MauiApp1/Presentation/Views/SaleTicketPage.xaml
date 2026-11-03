@@ -18,10 +18,13 @@
           <Button x:Name="OpenPdfButton" Grid.Row="1" Grid.ColumnSpan="2" Text="Abrir PDF / imprimir"
                   Clicked="OnOpenPdfClicked" BackgroundColor="#007F60" TextColor="White"
                   FontAttributes="Bold" CornerRadius="10" Padding="12,14" />
+          <Button x:Name="ReversalPdfButton" Grid.Row="2" Grid.ColumnSpan="2" Text="Constancia de anulación / devolución"
+                  IsVisible="{Binding HasReversals}" Clicked="OnReversalPdfClicked"
+                  BackgroundColor="#FFF7ED" TextColor="#9A3412" CornerRadius="10" Padding="12,13" />
         </Grid>
         <VerticalStackLayout Spacing="12" Padding="0,8">
           <Border BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="16,7" HorizontalOptions="Center">
-            <Label Text="✓  VENTA REGISTRADA" FontSize="12" FontAttributes="Bold" TextColor="#007F60" />
+            <Label Text="{Binding SaleStatusBadgeText, StringFormat='✓  {0}'}" FontSize="12" FontAttributes="Bold" TextColor="#007F60" />
           </Border>
           <Border BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="18" HorizontalOptions="Center">
             <Label Text="✓" FontSize="32" FontAttributes="Bold" TextColor="#007F60" />
@@ -64,6 +67,9 @@
               </Grid>
               <Border BackgroundColor="#F4F7FA" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14">
                 <Label Text="{Binding CreditDetailsText}" FontSize="13" TextColor="#45556B" LineBreakMode="WordWrap" />
+              </Border>
+              <Border IsVisible="{Binding HasReversals}" BackgroundColor="#FFF7ED" Stroke="#FED7AA" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="14">
+                <Label Text="{Binding ReversalDetailsText}" FontSize="13" TextColor="#7C2D12" LineBreakMode="WordWrap" />
               </Border>
               <Label Text="{Binding ReferenceText}" FontSize="12" TextColor="#94A3B8" HorizontalTextAlignment="Center" />
             </VerticalStackLayout>

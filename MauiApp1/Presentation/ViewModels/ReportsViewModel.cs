@@ -49,6 +49,7 @@ public sealed class ReportsViewModel : INotifyPropertyChanged
         [
             new(null, "Todos"),
             new(InventoryMovementType.PurchaseEntry, "Entrada por compra"),
+            new(InventoryMovementType.SaleReturnEntry, "Entrada por devolución"),
             new(InventoryMovementType.SaleExit, "Salida por venta"),
             new(InventoryMovementType.OtherExit, "Otra salida"),
             new(InventoryMovementType.MixedWaste, "Merma mixta")
@@ -291,6 +292,7 @@ public sealed record MovementReportCard(MovementReportRow Row)
     public string TypeText => Row.Type switch
     {
         InventoryMovementType.PurchaseEntry => "Entrada por compra",
+        InventoryMovementType.SaleReturnEntry => "Entrada por devolución de venta",
         InventoryMovementType.SaleExit => "Salida por venta",
         InventoryMovementType.OtherExit => "Otra salida",
         InventoryMovementType.MixedWaste => "Merma mixta",
@@ -300,7 +302,7 @@ public sealed record MovementReportCard(MovementReportRow Row)
     {
         get
         {
-            var sign = Row.Type == InventoryMovementType.PurchaseEntry ? "+" : "−";
+            var sign = Row.Type is InventoryMovementType.PurchaseEntry or InventoryMovementType.SaleReturnEntry ? "+" : "−";
             return $"{sign}{(Row.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Row.Unit}";
         }
     }

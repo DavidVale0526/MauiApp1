@@ -3,10 +3,12 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using MauiApp1.Application.Sales;
+using MauiApp1.Application.Authentication;
+using MauiApp1.Domain.Users;
 
 namespace MauiApp1.Presentation.ViewModels;
 
-public sealed class SaleHistoryViewModel(ISaleService saleService) : INotifyPropertyChanged
+public sealed class SaleHistoryViewModel(ISaleService saleService, IAuthenticationService authenticationService) : INotifyPropertyChanged
 {
     private string _errorMessage = string.Empty;
     private bool _isBusy;
@@ -14,6 +16,8 @@ public sealed class SaleHistoryViewModel(ISaleService saleService) : INotifyProp
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<SaleHistoryCard> Sales { get; } = [];
+
+    public bool CanManageReversals => authenticationService.CurrentUser?.Role == UserRole.Administrator;
 
     public string ErrorMessage
     {
@@ -38,7 +42,7 @@ public sealed class SaleHistoryViewModel(ISaleService saleService) : INotifyProp
             Sales.Clear();
             foreach (var sale in history)
             {
-                Sales.Add(new SaleHistoryCard(sale));
+                Sales.Add(new SaleHistoryCard(sale, CanManageReversals));
             }
         }
         catch
@@ -60,7 +64,7 @@ public sealed class SaleHistoryViewModel(ISaleService saleService) : INotifyProp
     }
 }
 
-public sealed record SaleHistoryCard(SaleHistoryEntry Sale)
+public sealed record SaleHistoryCard(SaleHistoryEntry Sale, bool CanManageReversals)
 {
     public string DateText => Sale.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
 
@@ -71,6 +75,27 @@ public sealed record SaleHistoryCard(SaleHistoryEntry Sale)
     public string TotalText => $"Total: {(Sale.TotalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}";
 
     public string SaleTypeText => Sale.IsCredit ? "Venta a crédito" : "Venta de contado";
+
+    public string StatusText
+    {
+        get
+        {
+            var reversals = Sale.Reversals ?? [];
+            if (reversals.Any(item => item.Kind == SaleReversalKind.Cancellation)) return "Anulada";
+            if (reversals.Count == 0) return "Activa";
+            var returned = reversals.SelectMany(item => item.Lines).GroupBy(item => item.SaleLineNumber)
+                .ToDictionary(group => group.Key, group => group.Sum(line => line.QuantityMilliUnits));
+            return Sale.Lines.Select((line, index) => returned.GetValueOrDefault(index) >= line.QuantityMilliUnits).All(value => value)
+                ? "Devuelta" : "Parcialmente devuelta";
+        }
+    }
+
+    public string ReversalDetailsText => string.Join(Environment.NewLine, (Sale.Reversals ?? []).Select(item =>
+        $"{(item.Kind == SaleReversalKind.Cancellation ? "Anulación" : "Devolución")} · C$ {item.AmountMinorUnits / 100m:0.00} · {item.Reason} · {item.ActorUserName}"));
+
+    public bool HasReversals => Sale.Reversals is { Count: > 0 };
+
+    public bool CanCreateReversal => CanManageReversals && StatusText is not ("Anulada" or "Devuelta");
 
     public string PaymentText => Sale.IsCredit
         ? "Cuenta por cobrar; los abonos aparecen por separado."

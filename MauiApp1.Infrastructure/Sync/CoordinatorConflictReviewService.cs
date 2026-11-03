@@ -215,6 +215,14 @@ internal sealed class CoordinatorConflictReviewService(
     private static async Task<(string Current, string Proposed, bool CanApply)> SummarizeAsync(SqliteConnection connection, string type, string payload, CancellationToken ct)
     {
         using var document = JsonDocument.Parse(payload);
+        if (type == "Sale.Reversed")
+        {
+            var saleId = Find(document.RootElement, "SaleOperationId");
+            var reason = Find(document.RootElement, "Reason");
+            var count = Find(document.RootElement, "Lines");
+            return ("La venta y sus existencias conservan la versión central.",
+                $"Reversión de {saleId.GetString() ?? "venta desconocida"}; motivo: {reason.GetString() ?? "no especificado"}; renglones: {(count.ValueKind == JsonValueKind.Array ? count.GetArrayLength() : 0)}. Requiere revisar cantidades, saldo y existencias.", false);
+        }
         var property = type.StartsWith("Product.", StringComparison.Ordinal) ? "ProductId" : "CategoryId";
         var element = Find(document.RootElement, property);
         if (element.ValueKind != JsonValueKind.String || !Guid.TryParse(element.GetString(), out var id))

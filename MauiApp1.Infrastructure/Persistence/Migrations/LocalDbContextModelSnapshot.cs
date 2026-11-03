@@ -296,8 +296,7 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PaymentEntity", b =>
                 {
                     b.Property<Guid>("PaymentId")
-                        .HasColumnType("TEXT")
-                        .ValueGeneratedNever();
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ActorUserId")
                         .HasColumnType("TEXT");
@@ -331,11 +330,11 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("TEXT");
 
+                    b.Property<byte[]>("ImageData")
+                        .HasColumnType("BLOB");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
-
-                      b.Property<byte[]>("ImageData")
-                          .HasColumnType("BLOB");
 
                     b.Property<long>("MinimumStockMilliUnits")
                         .HasColumnType("INTEGER");
@@ -528,8 +527,7 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SalePaymentEntity", b =>
                 {
                     b.Property<Guid>("PaymentId")
-                        .HasColumnType("TEXT")
-                        .ValueGeneratedNever();
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("AmountMinorUnits")
                         .HasColumnType("INTEGER");
@@ -553,8 +551,6 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SalePayments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_SalePayments_Method_Valid", "\"Method\" BETWEEN 1 AND 3");
-
                             t.HasCheckConstraint("CK_SalePayments_Amount_Positive", "\"AmountMinorUnits\" > 0");
 
                             t.HasCheckConstraint("CK_SalePayments_Cash_NonNegative", "\"CashReceivedMinorUnits\" >= 0");
@@ -562,6 +558,106 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_SalePayments_Change_NonNegative", "\"ChangeMinorUnits\" >= 0");
 
                             t.HasCheckConstraint("CK_SalePayments_Method_Amounts", "(\"Method\" = 1 AND \"CashReceivedMinorUnits\" >= \"AmountMinorUnits\" AND \"ChangeMinorUnits\" = \"CashReceivedMinorUnits\" - \"AmountMinorUnits\") OR (\"Method\" <> 1 AND \"CashReceivedMinorUnits\" = 0 AND \"ChangeMinorUnits\" = 0)");
+
+                            t.HasCheckConstraint("CK_SalePayments_Method_Valid", "\"Method\" BETWEEN 1 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleReversalEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AmountMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("RefundMethod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("SaleOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("SaleOperationId");
+
+                    b.ToTable("SaleReversals", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SaleReversals_Amount_NonNegative", "\"AmountMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_SaleReversals_Kind_Valid", "\"Kind\" BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("CK_SaleReversals_RefundMethod_Valid", "\"RefundMethod\" IS NULL OR \"RefundMethod\" BETWEEN 1 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleReversalLineEntity", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("AmountMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisposalReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QuantityMilliUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ReturnToStock")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SaleLineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("SaleOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UnitSnapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OperationId", "LineNumber");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("OperationId", "SaleLineNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SaleOperationId", "SaleLineNumber");
+
+                    b.ToTable("SaleReversalLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SaleReversalLines_Amount_NonNegative", "\"AmountMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_SaleReversalLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
                         });
                 });
 
@@ -591,6 +687,10 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.Property<int>("PasswordIterations")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte[]>("PasswordSalt")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
                     b.Property<byte[]>("RecoveryCodeHash")
                         .HasColumnType("BLOB");
 
@@ -598,10 +698,6 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<byte[]>("RecoveryCodeSalt")
-                        .HasColumnType("BLOB");
-
-                    b.Property<byte[]>("PasswordSalt")
-                        .IsRequired()
                         .HasColumnType("BLOB");
 
                     b.Property<int>("Role")
@@ -749,6 +845,42 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
                         .WithMany()
                         .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleReversalEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SaleOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SaleReversalLineEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleReversalEntity", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SaleOperationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

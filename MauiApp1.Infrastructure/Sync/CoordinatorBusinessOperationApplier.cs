@@ -64,6 +64,9 @@ public sealed class CoordinatorBusinessOperationApplier
                 case "Sale.Recorded":
                     await ApplySaleAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
                     break;
+                case "Sale.Reversed":
+                    await ApplySaleReversalAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
+                    break;
                 case "Inventory.Recorded":
                     await ApplyInventoryAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
                     break;
@@ -325,6 +328,117 @@ public sealed class CoordinatorBusinessOperationApplier
         if (payload.IsCredit)
             context.Receivables.Add(new ReceivableEntity { OperationId = operationId, CustomerId = payload.CustomerId!.Value,
                 OriginalAmountMinorUnits = payload.TotalMinorUnits, OutstandingMinorUnits = payload.TotalMinorUnits, DueAtUtc = payload.CreditDueAtUtc!.Value });
+    }
+
+    private static async Task ApplySaleReversalAsync(LocalDbContext context, Guid operationId, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<SaleReversalRecordedPayload>(json);
+        var administrator = await context.UserAccounts.AsNoTracking()
+            .AnyAsync(user => user.UserId == actor && user.Role == (int)MauiApp1.Domain.Users.UserRole.Administrator, ct);
+        if (!administrator)
+            throw new BusinessOperationConflictException("Solo un Administrador activo puede anular o devolver una venta.");
+        if (payload.OperationId != operationId || payload.SaleOperationId == Guid.Empty || payload.OperationId == payload.SaleOperationId ||
+            payload.OccurredAtUtc.Kind != DateTimeKind.Utc || !Enum.IsDefined(typeof(SaleReversalKind), payload.Kind) ||
+            string.IsNullOrWhiteSpace(payload.Reason) || payload.Reason.Length > 500 || payload.Lines is null || payload.Lines.Count == 0 ||
+            payload.Lines.Any(line => line is null || line.SaleLineNumber < 0 || line.QuantityMilliUnits <= 0 ||
+                (line.ReturnToStock && !string.IsNullOrWhiteSpace(line.DisposalReason)) ||
+                (!line.ReturnToStock && string.IsNullOrWhiteSpace(line.DisposalReason))) ||
+            payload.Lines.Select(line => line.SaleLineNumber).Distinct().Count() != payload.Lines.Count)
+            throw new BusinessOperationConflictException("La anulación o devolución contiene datos incompletos o inválidos.");
+
+        var sale = await context.Sales.SingleOrDefaultAsync(item => item.OperationId == payload.SaleOperationId, ct)
+            ?? throw new BusinessOperationConflictException("La venta original no existe en el coordinador.");
+        var existing = await context.SaleReversals.AsNoTracking().SingleOrDefaultAsync(item => item.OperationId == operationId, ct);
+        if (existing is not null)
+        {
+            var savedLines = await context.SaleReversalLines.AsNoTracking().Where(item => item.OperationId == operationId).ToListAsync(ct);
+            if (existing.SaleOperationId != sale.OperationId || existing.ActorUserId != actor || existing.Kind != payload.Kind ||
+                existing.Reason != payload.Reason.Trim() || savedLines.Count != payload.Lines.Count ||
+                payload.Lines.Any(line => !savedLines.Any(saved => saved.SaleLineNumber == line.SaleLineNumber &&
+                    saved.QuantityMilliUnits == line.QuantityMilliUnits && saved.ReturnToStock == line.ReturnToStock &&
+                    saved.DisposalReason == line.DisposalReason?.Trim())))
+                throw new BusinessOperationConflictException("El identificador de reversión ya existe con contenido diferente.");
+            return;
+        }
+
+        var originalLines = await context.SaleLines.AsNoTracking().Where(item => item.OperationId == sale.OperationId)
+            .ToDictionaryAsync(item => item.LineNumber, ct);
+        var priorQuantities = await context.SaleReversalLines.AsNoTracking().Where(item => item.SaleOperationId == sale.OperationId)
+            .GroupBy(item => item.SaleLineNumber).ToDictionaryAsync(group => group.Key, group => group.Sum(item => item.QuantityMilliUnits), ct);
+        var priorAmounts = await context.SaleReversalLines.AsNoTracking().Where(item => item.SaleOperationId == sale.OperationId)
+            .GroupBy(item => item.SaleLineNumber).ToDictionaryAsync(group => group.Key, group => group.Sum(item => item.AmountMinorUnits), ct);
+        var selected = new List<(SaleLineEntity SaleLine, SaleReversalRecordedLinePayload Request, long Amount)>();
+        long total;
+        try
+        {
+            foreach (var line in payload.Lines)
+            {
+                if (!originalLines.TryGetValue(line.SaleLineNumber, out var original) ||
+                    line.QuantityMilliUnits > original.QuantityMilliUnits - priorQuantities.GetValueOrDefault(line.SaleLineNumber))
+                    throw new BusinessOperationConflictException("La devolución excede la cantidad disponible de la venta original.");
+                if (!line.ReturnToStock && line.DisposalReason!.Trim().Length > 500)
+                    throw new BusinessOperationConflictException("El motivo de disposición es demasiado largo.");
+                var priorQuantity = priorQuantities.GetValueOrDefault(line.SaleLineNumber);
+                var cumulative = SaleAmountCalculator.CalculateLineTotalMinorUnits(new MauiApp1.Domain.Values.MoneyAmount(original.SalePriceMinorUnits),
+                    new MauiApp1.Domain.Values.Quantity(checked(priorQuantity + line.QuantityMilliUnits)));
+                var amount = checked(cumulative - priorAmounts.GetValueOrDefault(line.SaleLineNumber));
+                if (amount < 0 || checked(priorAmounts.GetValueOrDefault(line.SaleLineNumber) + amount) > original.LineTotalMinorUnits)
+                    throw new BusinessOperationConflictException("El cálculo supera el importe del renglón de venta original.");
+                selected.Add((original, line, amount));
+            }
+            total = selected.Aggregate(0L, (sum, item) => checked(sum + item.Amount));
+        }
+        catch (OverflowException)
+        {
+            throw new BusinessOperationConflictException("El importe de la devolución supera el límite permitido.");
+        }
+
+        if ((SaleReversalKind)payload.Kind == SaleReversalKind.Cancellation &&
+            (priorQuantities.Count > 0 || selected.Count != originalLines.Count ||
+             selected.Any(item => item.Request.QuantityMilliUnits != item.SaleLine.QuantityMilliUnits)))
+            throw new BusinessOperationConflictException("La anulación completa solo se permite una vez e incluye todos los renglones.");
+
+        var receivable = sale.IsCredit ? await context.Receivables.SingleOrDefaultAsync(item => item.OperationId == sale.OperationId, ct) : null;
+        if (sale.IsCredit)
+        {
+            if (receivable is null || payload.RefundMethod is not null || total > receivable.OutstandingMinorUnits)
+                throw new BusinessOperationConflictException("La devolución a crédito supera la deuda abierta o no coincide con su cuenta por cobrar.");
+            receivable.OutstandingMinorUnits = checked(receivable.OutstandingMinorUnits - total);
+        }
+        else if (payload.RefundMethod is not int method || method is < 1 or > 3)
+        {
+            throw new BusinessOperationConflictException("La devolución de contado requiere un método de reembolso válido.");
+        }
+
+        context.SaleReversals.Add(new SaleReversalEntity
+        {
+            OperationId = operationId, SaleOperationId = sale.OperationId, OccurredAtUtc = payload.OccurredAtUtc,
+            ActorUserId = actor, Kind = payload.Kind, Reason = payload.Reason.Trim(), AmountMinorUnits = total,
+            RefundMethod = sale.IsCredit ? null : payload.RefundMethod
+        });
+        foreach (var (item, index) in selected.Select((item, index) => (item, index)))
+        {
+            context.SaleReversalLines.Add(new SaleReversalLineEntity
+            {
+                OperationId = operationId, LineNumber = index, SaleLineNumber = item.SaleLine.LineNumber,
+                SaleOperationId = sale.OperationId, ProductId = item.SaleLine.ProductId,
+                ProductNameSnapshot = item.SaleLine.ProductNameSnapshot, UnitSnapshot = item.SaleLine.UnitSnapshot,
+                QuantityMilliUnits = item.Request.QuantityMilliUnits, AmountMinorUnits = item.Amount,
+                ReturnToStock = item.Request.ReturnToStock, DisposalReason = item.Request.DisposalReason?.Trim()
+            });
+            if (!item.Request.ReturnToStock) continue;
+            var product = await context.Products.SingleOrDefaultAsync(product => product.ProductId == item.SaleLine.ProductId, ct)
+                ?? throw new BusinessOperationConflictException("El producto que debe restituirse ya no existe en el coordinador.");
+            product.StockMilliUnits = checked(product.StockMilliUnits + item.Request.QuantityMilliUnits);
+            context.InventoryMovements.Add(new InventoryMovementEntity
+            {
+                MovementId = Guid.NewGuid(), OperationId = operationId, LineNumber = index,
+                ProductId = product.ProductId, ProductNameSnapshot = item.SaleLine.ProductNameSnapshot,
+                UnitSnapshot = item.SaleLine.UnitSnapshot, Type = (int)InventoryMovementType.SaleReturnEntry,
+                QuantityMilliUnits = item.Request.QuantityMilliUnits,
+                Reason = $"Devolución de venta {sale.OperationId:N}", OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor
+            });
+        }
     }
 
     private static async Task ApplyInventoryAsync(LocalDbContext context, Guid operationId, string json, Guid actor, CancellationToken ct)

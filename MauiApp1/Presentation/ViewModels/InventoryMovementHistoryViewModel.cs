@@ -68,6 +68,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
     {
         InventoryMovementType.PurchaseEntry => "Entrada por compra",
         InventoryMovementType.SaleExit => "Salida por venta",
+        InventoryMovementType.SaleReturnEntry => "Entrada por devolución de venta",
         InventoryMovementType.OtherExit => "Otra salida",
         InventoryMovementType.MixedWaste => "Merma mixta",
         _ => "Movimiento"
@@ -76,6 +77,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
     public Color TypeBackgroundColor => Movement.Type switch
     {
         InventoryMovementType.PurchaseEntry => Color.FromArgb("#E8F5EE"),
+        InventoryMovementType.SaleReturnEntry => Color.FromArgb("#E8F5EE"),
         InventoryMovementType.SaleExit => Color.FromArgb("#EAF1FF"),
         InventoryMovementType.OtherExit => Color.FromArgb("#FFF3E6"),
         InventoryMovementType.MixedWaste => Color.FromArgb("#FDECEC"),
@@ -85,13 +87,14 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
     public Color TypeTextColor => Movement.Type switch
     {
         InventoryMovementType.PurchaseEntry => Color.FromArgb("#18794E"),
+        InventoryMovementType.SaleReturnEntry => Color.FromArgb("#18794E"),
         InventoryMovementType.SaleExit => Color.FromArgb("#315CB8"),
         InventoryMovementType.OtherExit => Color.FromArgb("#A85B00"),
         InventoryMovementType.MixedWaste => Color.FromArgb("#B42318"),
         _ => Color.FromArgb("#52657D")
     };
 
-    public Color QuantityTextColor => Movement.Type == InventoryMovementType.PurchaseEntry
+    public Color QuantityTextColor => Movement.Type is InventoryMovementType.PurchaseEntry or InventoryMovementType.SaleReturnEntry
         ? Color.FromArgb("#18794E")
         : Color.FromArgb("#B42318");
 
@@ -101,7 +104,7 @@ public sealed record InventoryMovementHistoryCard(InventoryMovementHistoryEntry 
     {
         get
         {
-            var sign = Movement.Type == InventoryMovementType.PurchaseEntry ? "+" : "−";
+            var sign = Movement.Type is InventoryMovementType.PurchaseEntry or InventoryMovementType.SaleReturnEntry ? "+" : "−";
             return $"{sign}{(Movement.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {Movement.Unit}";
         }
     }

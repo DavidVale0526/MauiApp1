@@ -45,6 +45,24 @@ public sealed class SaleTicketViewModel
                 _ => "Método de pago no disponible"
             }));
 
+    public string ReversalDetailsText
+    {
+        get
+        {
+            var reversals = Sale.Reversals ?? [];
+            if (reversals.Count == 0) return string.Empty;
+            var status = reversals.Any(item => item.Kind == SaleReversalKind.Cancellation) ? "ANULADA" : "DEVOLUCIÓN REGISTRADA";
+            return $"{status}{Environment.NewLine}" + string.Join(Environment.NewLine, reversals.Select(item =>
+                $"{item.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · {item.ActorUserName} · C$ {FormatMoney(item.AmountMinorUnits)} · {item.Reason}"));
+        }
+    }
+
+    public bool HasReversals => Sale.Reversals is { Count: > 0 };
+
+    public string SaleStatusBadgeText => (Sale.Reversals ?? []).Any(item => item.Kind == SaleReversalKind.Cancellation)
+        ? "VENTA ANULADA"
+        : HasReversals ? "VENTA CON DEVOLUCIONES" : "VENTA REGISTRADA";
+
     public string TotalText => $"C$ {FormatMoney(Sale.TotalMinorUnits)}";
 
     internal static string FormatMoney(long minorUnits) =>

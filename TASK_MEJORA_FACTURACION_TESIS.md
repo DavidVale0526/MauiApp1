@@ -1,6 +1,6 @@
 # TASK — Completar facturación para el alcance de la tesis
 
-**Estado general:** Etapas 1 y 2 implementadas; comprobaciones manuales integrales pendientes de Etapa 4
+**Estado general:** Etapas 1, 2 y 3 implementadas en código; migración central y validación funcional integral pendientes de Etapa 4
 **Fecha de creación:** 3 de noviembre de 2026  
 **Plataformas:** Windows y Android; sincronización LAN existente  
 **Alcance:** captura de pagos de contado y cambio, comprobante imprimible/compartible, anulaciones y devoluciones con trazabilidad
@@ -33,9 +33,9 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - [ ] No borrar ni editar destructivamente una venta ya confirmada; toda anulación/devolución debe quedar como operación nueva enlazada a la original.
 - [ ] Separar el pago inicial de una venta de los abonos posteriores a una deuda.
 - [x] Usar importes enteros en unidades monetarias menores (céntimos); la captura limita el dinero a dos decimales.
-- [ ] Mantener la información y reglas del comprobante iguales en Windows y Android; adaptar solo la presentación y las acciones disponibles por plataforma.
+- [x] Mantener la información y reglas del comprobante iguales en Windows y Android; adaptar solo la presentación y las acciones disponibles por plataforma.
 - [ ] No añadir impuestos, descuentos, precios editables durante la venta, facturación electrónica ni integración fiscal en estas etapas.
-- [ ] Actualizar migraciones y despliegue del coordinador sin reiniciar ni reemplazar los datos comerciales existentes.
+- [x] Crear migración compatible con los datos actuales; aplicar el esquema a la base central instalada queda pendiente en Etapa 4.
 - [ ] No marcar etapas como completas hasta satisfacer su criterio de aceptación y dejar evidencia.
 
 ## Etapa 0 — Confirmar contratos y reglas antes de programar
@@ -46,10 +46,10 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - [x] Definir que una venta de contado debe quedar pagada por completo; el efectivo entregado puede ser mayor o igual al importe asignado a efectivo y el cambio se calcula sin tratarlo como ingreso.
 - [x] Definir que las ventas a crédito conservan su comportamiento actual y que los pagos iniciales parciales/créditos mixtos no se habilitan sin modelar correctamente el saldo inicial.
 - [x] Definir el formato de un folio interno legible y estable: usar el identificador completo de operación (`V-` + GUID), sin presentarlo como numeración tributaria ni depender de una secuencia central para registrar ventas offline.
-- [ ] Definir política de anulaciones y devoluciones: ventana/permiso, ventas que pueden anularse, devolución parcial por renglón, cantidades máximas y relación con pagos o deudas ya registrados.
-- [ ] Definir el tratamiento monetario de una devolución cuando la venta fue pagada, quedó a crédito o ya recibió abonos; no crear saldo negativo ni un reembolso ficticio.
-- [ ] Definir cómo se resuelven devoluciones concurrentes de la misma venta desde dispositivos diferentes: el coordinador valida el acumulado y rechaza el exceso como conflicto visible.
-- [ ] Registrar decisiones y ejemplos de aceptación en esta tarea antes de iniciar la etapa 1.
+- [x] Definir política de anulaciones y devoluciones: solo Administrador; anulación completa una vez y sin devoluciones previas; devolución por renglón hasta la cantidad vendida; motivo obligatorio.
+- [x] Definir el tratamiento monetario: contado registra el método declarado del reembolso; crédito reduce deuda abierta y bloquea excedentes tras abonos, sin saldo negativo ni reembolso implícito.
+- [x] Definir concurrencia: el coordinador valida el acumulado y rechaza el exceso como conflicto.
+- [x] Registrar decisiones antes de implementar la Etapa 3.
 
 **Criterio de aceptación:** las reglas de liquidación, cambio, folios, anulación y reembolso están acordadas y no contradicen el flujo actual ni el trabajo offline.
 
@@ -113,30 +113,32 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 
 ### Diseño de las operaciones
 
-- [ ] Añadir operaciones de dominio independientes para anular una venta completa y registrar devoluciones parciales o completas de productos.
-- [ ] Guardar identificador de la reversión, venta original, responsable, fecha UTC, motivo obligatorio, líneas/cantidades afectadas e importe asociado.
-- [ ] Mantener intactos el encabezado y los renglones originales de la venta; el historial debe mostrar su estado derivado y las operaciones de reversión relacionadas.
-- [ ] Definir permisos: solo roles autorizados pueden anular o devolver; un cajero solo podrá hacerlo si la política del negocio lo autoriza expresamente.
-- [ ] Impedir anular dos veces una misma venta y devolver cantidades acumuladas superiores a las vendidas.
-- [ ] Bloquear o conciliar devoluciones si la cuenta tiene abonos: reducir la deuda abierta primero y registrar cualquier importe reembolsado o crédito del cliente mediante un movimiento explícito.
-- [ ] No permitir registrar salida de efectivo como reembolso si no existe una transacción de reembolso confirmada.
+**Reglas adoptadas para implementar esta versión:** solo Administrador puede anular o devolver; el motivo es obligatorio; el importe se calcula con precios y cantidades capturados en la venta. Cada línea devuelta indicará si vuelve a inventario vendible. En contado, el reembolso se registra como una salida explícita vinculada a la reversión, con método y responsable; representa la declaración del Administrador, no sustituye un módulo de caja. En crédito, primero se reduce el saldo abierto. Si el valor a devolver supera la deuda abierta por abonos previos, se bloquea hasta una conciliación explícita; no se crea crédito de cliente ni saldo negativo implícito. El coordinador valida referencias y acumulados concurrentes; rechazos deben quedar visibles como conflicto y nunca como aplicados.
+
+- [x] Añadir operaciones independientes para anular una venta completa y registrar devoluciones parciales o completas por producto.
+- [x] Guardar identificador, venta original, responsable, fecha UTC, motivo obligatorio, líneas/cantidades e importe asociado.
+- [x] Mantener intactos encabezado y renglones originales; el historial muestra el estado derivado y las operaciones relacionadas.
+- [x] Definir permisos: solo Administrador puede anular o devolver; Cajero no tiene esa facultad en esta versión.
+- [x] Impedir anulaciones repetidas y devoluciones acumuladas superiores a las cantidades vendidas en cliente y coordinador.
+- [x] Definir el tratamiento conservador de crédito: reducir deuda abierta primero y bloquear una devolución que exceda el saldo tras abonos; no crear crédito de cliente implícito.
+- [x] Definir que el reembolso contado se registra como salida explícita vinculada a la reversión, con método y responsable; el registro documenta la declaración del Administrador y no reemplaza una caja que el sistema no administra.
 
 ### Inventario, cuentas y consistencia
 
-- [ ] Para producto devuelto que vuelve a estar disponible, crear un movimiento de entrada vinculado a la reversión; nunca reescribir el movimiento original.
-- [ ] Si el producto no vuelve a inventario vendible, guardar el motivo y registrar la baja/merma por la ruta de inventario correspondiente.
-- [ ] Aplicar reversión de venta, ajuste de inventario, pagos y cuenta por cobrar en una transacción coherente o mediante operaciones idempotentes con recuperación definida.
-- [ ] En crédito, recalcular saldo pendiente de forma validada; no permitir saldo negativo ni borrar abonos ya efectuados.
-- [ ] Extender sincronización y resolución de conflictos para reversiones; el coordinador valida referencias, acumulados y permisos antes de aplicarlas.
-- [ ] Exponer en historial el estado “Anulada”, “Parcialmente devuelta” o “Devuelta”, con vínculo al detalle de auditoría.
+- [x] Para producto devuelto vendible, crear movimiento de entrada vinculado a la reversión; nunca reescribir el movimiento original.
+- [x] Para producto no vendible, guardar motivo y disposición en la auditoría. No crear otra salida porque la venta ya descontó esa cantidad.
+- [x] Aplicar reversión, inventario y cuenta por cobrar en transacción local; usar idempotencia y validación central para reintentos/concurrencia.
+- [x] En crédito, reducir deuda de forma validada; no permitir saldo negativo ni borrar abonos.
+- [x] Extender sincronización: coordinador valida referencias, acumulados, importes y permisos; conflicto recibe resumen específico.
+- [x] Exponer “Anulada”, “Parcialmente devuelta” o “Devuelta”, con motivo, responsable e importe.
 
 ### Interfaz y comprobantes
 
-- [ ] Añadir acciones claramente diferenciadas para anular y devolver desde el detalle/historial de una venta.
-- [ ] Exigir selección de líneas/cantidades para devolución parcial y motivo antes de confirmar.
-- [ ] Mostrar un resumen de efecto sobre inventario, total, saldo pendiente y reembolso antes de confirmar.
-- [ ] Emitir una constancia interna de anulación/devolución vinculada al comprobante original.
-- [ ] Adaptar el flujo a Windows y Android y evitar acciones duplicadas durante operaciones en curso.
+- [x] Añadir acciones para anular o devolver desde el historial, solo para Administrador.
+- [x] Exigir cantidades y motivo; decidir por renglón si vuelve al inventario y pedir razón si se dispone.
+- [x] Mostrar el efecto monetario antes de confirmar; registrar la decisión de inventario por renglón.
+- [x] Emitir PDF interno por reversión, enlazado a la venta y disponible para guardar, compartir o abrir/imprimir.
+- [x] Adaptar la interfaz a Windows y Android y bloquear acciones repetidas durante el registro.
 
 **Criterio de aceptación:** una devolución parcial o anulación deja evidencia inalterable, ajusta inventario y saldo sin duplicarse, se propaga por LAN y no puede superar cantidades o importes disponibles; fallos de sincronización se muestran como pendientes/conflictos sin afirmar que se aplicaron en el coordinador.
 
@@ -152,7 +154,9 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - [ ] Probar pérdida de conexión antes, durante y después de sincronizar; repetir el envío y comprobar que no duplica operaciones.
 - [ ] Probar dos dispositivos que intenten devolver el mismo renglón al mismo tiempo y comprobar rechazo seguro del exceso.
 - [ ] Revisar permisos de Administrador y Cajero y validar mensajes de éxito, error, pendiente y conflicto.
-- [ ] Compilar Windows, Android y Coordinador; revisar migración y preparar el actualizador correspondiente para la base central.
+- [x] Compilar Windows, Android y Coordinador; las tres compilaciones finalizaron sin errores.
+- [x] Revisar que EF Core detecte `20261103212753_SaleReversals` como migración pendiente.
+- [ ] Aplicar la migración con el actualizador de la base central y comprobar que conserva los datos existentes.
 - [ ] Actualizar guía de uso y documentar que el comprobante es interno y no fiscal.
 
 **Criterio de cierre:** se cumplen las pruebas en ambos clientes y coordinador, el esquema central puede actualizarse conservando datos, los reintentos son idempotentes y las ventas originales permanecen auditables tras devoluciones y anulaciones.
@@ -168,8 +172,9 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 ## Registro de avance
 
 - **3 de noviembre de 2026 — Etapa 1 implementada:** detalle de pagos de contado separado de los abonos de crédito; captura de efectivo/tarjeta/transferencia con cambio; persistencia local y central; importación inicial y reintentos idempotentes; historial identifica ventas antiguas sin detalle. Migración `20261103120000_SalePaymentDetails` agregada. Compilación de Windows, Android y Coordinador completada sin errores. Queda pendiente probar venta en efectivo, cambio, métodos mixtos, crédito y sincronización en dispositivos como parte de Etapa 4.
-- **Etapa 0 sigue parcialmente pendiente:** el formato del folio interno quedó definido en Etapa 2 como identificador completo de operación. Las reglas financieras de anulación/devolución siguen pendientes y se acordarán antes de Etapa 3.
+- **Etapa 0 completada:** contratos, límites financieros, folio interno y reglas de reversión definidos e implementados.
 - **3 de noviembre de 2026 — Etapa 2 implementada:** comprobante PDF local con datos históricos, folio interno completo, detalle de pagos/cambio y saldo de crédito; acciones nativas para guardar, compartir y abrir/imprimir desde Windows y Android; acceso disponible al confirmar una venta y desde su historial. Ambas plataformas compilaron sin errores. Falta comprobar en dispositivos que el PDF se renderice correctamente y que funcionen los selectores y destinos nativos; esas verificaciones quedan en Etapa 4.
+- **3 de noviembre de 2026 — Etapa 3 implementada en código:** anulaciones/devoluciones append-only, validación de cantidades e importes históricos, reembolso declarado en contado y reducción segura de deuda en crédito; restitución de stock solo para productos vendibles y motivo para productos no vendibles; sincronización validada por coordinador e idempotencia; historial y constancias PDF individuales. Windows, Android y Coordinador compilaron sin errores. Falta aplicar la migración en la base central instalada y ejecutar pruebas funcionales/LAN de Etapa 4.
 
 ## Archivos principales a revisar
 

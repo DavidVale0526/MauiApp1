@@ -10,7 +10,8 @@ public sealed record SaleHistoryEntry(
     string? CustomerName = null,
     DateTime? CreditDueAtUtc = null,
     IReadOnlyList<SaleHistoryPayment>? Payments = null,
-    long? OutstandingMinorUnits = null);
+    long? OutstandingMinorUnits = null,
+    IReadOnlyList<SaleReversalEntry>? Reversals = null);
 
 public sealed record SaleHistoryLine(
     string ProductName,

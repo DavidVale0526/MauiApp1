@@ -33,6 +33,10 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<SalePaymentEntity> SalePayments => Set<SalePaymentEntity>();
 
+    internal DbSet<SaleReversalEntity> SaleReversals => Set<SaleReversalEntity>();
+
+    internal DbSet<SaleReversalLineEntity> SaleReversalLines => Set<SaleReversalLineEntity>();
+
     internal DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
 
     internal DbSet<ReceivableEntity> Receivables => Set<ReceivableEntity>();
@@ -295,6 +299,47 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasForeignKey(item => item.OperationId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.OperationId, item.Method }).IsUnique();
+        });
+
+        modelBuilder.Entity<SaleReversalEntity>(entity =>
+        {
+            entity.ToTable("SaleReversals", table =>
+            {
+                table.HasCheckConstraint("CK_SaleReversals_Kind_Valid", "\"Kind\" BETWEEN 1 AND 2");
+                table.HasCheckConstraint("CK_SaleReversals_Amount_NonNegative", "\"AmountMinorUnits\" >= 0");
+                table.HasCheckConstraint("CK_SaleReversals_RefundMethod_Valid", "\"RefundMethod\" IS NULL OR \"RefundMethod\" BETWEEN 1 AND 3");
+            });
+            entity.HasKey(item => item.OperationId);
+            entity.Property(item => item.OperationId).ValueGeneratedNever();
+            entity.Property(item => item.SaleOperationId).IsRequired();
+            entity.Property(item => item.OccurredAtUtc).HasConversion(UtcDateTimeConverter).HasColumnType("INTEGER").IsRequired();
+            entity.Property(item => item.ActorUserId).IsRequired();
+            entity.Property(item => item.Kind).IsRequired();
+            entity.Property(item => item.Reason).HasMaxLength(500).IsRequired();
+            entity.Property(item => item.AmountMinorUnits).IsRequired();
+            entity.HasOne<SaleEntity>().WithMany().HasForeignKey(item => item.SaleOperationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccountEntity>().WithMany().HasForeignKey(item => item.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.SaleOperationId);
+        });
+
+        modelBuilder.Entity<SaleReversalLineEntity>(entity =>
+        {
+            entity.ToTable("SaleReversalLines", table =>
+            {
+                table.HasCheckConstraint("CK_SaleReversalLines_Quantity_Positive", "\"QuantityMilliUnits\" > 0");
+                table.HasCheckConstraint("CK_SaleReversalLines_Amount_NonNegative", "\"AmountMinorUnits\" >= 0");
+            });
+            entity.HasKey(item => new { item.OperationId, item.LineNumber });
+            entity.Property(item => item.ProductNameSnapshot).IsRequired();
+            entity.Property(item => item.UnitSnapshot).IsRequired();
+            entity.Property(item => item.QuantityMilliUnits).IsRequired();
+            entity.Property(item => item.AmountMinorUnits).IsRequired();
+            entity.Property(item => item.ReturnToStock).IsRequired();
+            entity.HasOne<SaleReversalEntity>().WithMany().HasForeignKey(item => item.OperationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<SaleEntity>().WithMany().HasForeignKey(item => item.SaleOperationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductEntity>().WithMany().HasForeignKey(item => item.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.OperationId, item.SaleLineNumber }).IsUnique();
+            entity.HasIndex(item => new { item.SaleOperationId, item.SaleLineNumber });
         });
 
         modelBuilder.Entity<CustomerEntity>(entity =>

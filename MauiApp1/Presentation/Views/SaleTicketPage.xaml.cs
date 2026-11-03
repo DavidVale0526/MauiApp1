@@ -47,6 +47,40 @@ public partial class SaleTicketPage : ContentPage
         });
     }
 
+    private async void OnReversalPdfClicked(object? sender, EventArgs eventArgs)
+    {
+        var viewModel = (SaleTicketViewModel)BindingContext;
+        var reversals = (viewModel.Sale.Reversals ?? []).OrderByDescending(item => item.OccurredAtUtc).ToArray();
+        if (reversals.Length == 0) return;
+        var labels = reversals.Select(item =>
+            $"{(item.Kind == SaleReversalKind.Cancellation ? "Anulación" : "Devolución")} · {item.OccurredAtUtc.ToLocalTime().ToString("g")} · C$ {SaleTicketViewModel.FormatMoney(item.AmountMinorUnits)} · {item.OperationId:N}".ToUpperInvariant()).ToArray();
+        var selected = await DisplayActionSheetAsync("Elegir constancia", "Cancelar", null, labels);
+        var index = Array.IndexOf(labels, selected);
+        if (index < 0) return;
+
+        var reversal = reversals[index];
+        var fileName = $"Constancia-{reversal.OperationId:N}.pdf";
+        var pdfPath = Path.Combine(FileSystem.CacheDirectory, fileName);
+        await RunDocumentActionAsync(async () =>
+        {
+            await File.WriteAllBytesAsync(pdfPath, SaleReceiptPdfGenerator.GenerateReversal(viewModel.Sale, reversal));
+            var action = await DisplayActionSheetAsync("Constancia lista", "Cancelar", null,
+                "Guardar PDF", "Compartir PDF", "Abrir / imprimir PDF");
+            switch (action)
+            {
+                case "Guardar PDF":
+                    await _documentActions.SavePdfAsync(fileName, await File.ReadAllBytesAsync(pdfPath));
+                    break;
+                case "Compartir PDF":
+                    await _documentActions.SharePdfAsync(pdfPath);
+                    break;
+                case "Abrir / imprimir PDF":
+                    await _documentActions.OpenPdfAsync(pdfPath);
+                    break;
+            }
+        });
+    }
+
     private async Task<string> GetPdfAsync()
     {
         if (_pdfPath is not null && File.Exists(_pdfPath)) return _pdfPath;
@@ -91,6 +125,7 @@ public partial class SaleTicketPage : ContentPage
         SavePdfButton.IsEnabled = enabled;
         SharePdfButton.IsEnabled = enabled;
         OpenPdfButton.IsEnabled = enabled;
+        ReversalPdfButton.IsEnabled = enabled;
     }
 
     private void OnPageSizeChanged(object? sender, EventArgs eventArgs)

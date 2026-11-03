@@ -19,11 +19,22 @@ public static class SaleReceiptPdfGenerator
     private const string Rule = "0.85 0.89 0.93";
 
     public static byte[] Generate(SaleHistoryEntry sale)
+        => GenerateDocument(sale, null);
+
+    public static byte[] GenerateReversal(SaleHistoryEntry sale, SaleReversalEntry reversal)
+    {
+        ArgumentNullException.ThrowIfNull(reversal);
+        if (reversal.SaleOperationId != sale.OperationId)
+            throw new ArgumentException("La reversión no pertenece a la venta indicada.", nameof(reversal));
+        return GenerateDocument(sale, reversal);
+    }
+
+    private static byte[] GenerateDocument(SaleHistoryEntry sale, SaleReversalEntry? reversal)
     {
         ArgumentNullException.ThrowIfNull(sale);
         if (sale.OperationId == Guid.Empty) throw new ArgumentException("La venta no tiene una referencia válida.", nameof(sale));
 
-        var rows = BuildRows(sale);
+        var rows = BuildRows(sale, reversal);
         var pages = Paginate(rows);
         var objects = new List<byte[]>
         {
@@ -42,7 +53,7 @@ public static class SaleReceiptPdfGenerator
             var pageId = 5 + index * 2;
             var contentId = pageId + 1;
             objects.Add(Ascii($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PageWidth} {PageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {contentId} 0 R >>"));
-            var content = BuildPageContent(sale, pages[index], index + 1, pages.Count);
+            var content = BuildPageContent(sale, reversal, pages[index], index + 1, pages.Count);
             objects.Add(Ascii($"<< /Length {content.Length} >>\nstream\n{content}\nendstream"));
         }
 
@@ -65,8 +76,43 @@ public static class SaleReceiptPdfGenerator
         return output.ToArray();
     }
 
-    private static List<PdfRow> BuildRows(SaleHistoryEntry sale)
+    private static List<PdfRow> BuildRows(SaleHistoryEntry sale, SaleReversalEntry? reversal)
     {
+        if (reversal is not null)
+        {
+            var reversalRows = new List<PdfRow>
+            {
+                new("CONSTANCIA INTERNA DE ANULACION / DEVOLUCION", 11, true, Ink, IsSection: true),
+                new($"Referencia de reversión: R-{reversal.OperationId:N}".ToUpperInvariant(), 9, true, Muted),
+                new($"Venta original: V-{sale.OperationId:N}".ToUpperInvariant(), 9, true, Muted),
+                new($"Tipo: {(reversal.Kind == SaleReversalKind.Cancellation ? "Anulación completa" : "Devolución")}", 10, true, Ink),
+                new($"Fecha: {reversal.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}", 10, false, Muted),
+                new($"Responsable: {reversal.ActorUserName}", 10, false, Muted)
+            };
+            reversalRows.AddRange(Wrapped($"Motivo: {reversal.Reason}", 10, Muted));
+            reversalRows.Add(new(string.Empty, 8, false, Rule, IsSeparator: true));
+            reversalRows.Add(new("PRODUCTOS AFECTADOS", 11, true, Ink, IsSection: true));
+            foreach (var returned in reversal.Lines)
+            {
+                if (returned.SaleLineNumber < 0 || returned.SaleLineNumber >= sale.Lines.Count) continue;
+                var line = sale.Lines[returned.SaleLineNumber];
+                reversalRows.AddRange(Wrapped(line.ProductName, 10, Ink, true));
+                reversalRows.Add(new($"Cantidad: {Quantity(returned.QuantityMilliUnits)} {line.Unit}", 9, false, Muted,
+                    RightText: $"C$ {Money(returned.AmountMinorUnits)}"));
+                reversalRows.Add(new(returned.ReturnToStock ? "Destino: regresa a inventario vendible" : $"Destino: no vendible · {returned.DisposalReason}", 9, false, Muted));
+                reversalRows.Add(new(string.Empty, 5, false, Rule, IsSeparator: true));
+            }
+            reversalRows.Add(new(reversal.RefundMethod is SaleRefundMethod method
+                ? $"Reembolso declarado: {method switch { SaleRefundMethod.Cash => "Efectivo", SaleRefundMethod.Transfer => "Transferencia", SaleRefundMethod.Card => "Tarjeta", _ => "No disponible" }}"
+                : "Aplicación financiera: reducción de saldo de crédito", 9, false, Muted));
+            reversalRows.Add(new("IMPORTE DE LA REVERSIÓN", 12, true, Ink,
+                RightText: $"C$ {Money(reversal.AmountMinorUnits)}", RightFontSize: 13, RightColor: Green));
+            reversalRows.Add(new(string.Empty, 8, false, Rule, IsSeparator: true));
+            reversalRows.Add(new("Documento interno de trazabilidad. No es factura ni comprobante fiscal.", 9, true, Muted, IsSection: true));
+            reversalRows.Add(new("El reembolso contado documenta lo declarado por el Administrador y no sustituye el registro de caja.", 9, false, Muted));
+            return reversalRows;
+        }
+
         var rows = new List<PdfRow>
         {
             new("INFORMACION DE LA VENTA", 11, true, Ink, IsSection: true),
@@ -150,12 +196,12 @@ public static class SaleReceiptPdfGenerator
         return pages;
     }
 
-    private static string BuildPageContent(SaleHistoryEntry sale, IReadOnlyList<PdfRow> rows, int pageNumber, int pageCount)
+    private static string BuildPageContent(SaleHistoryEntry sale, SaleReversalEntry? reversal, IReadOnlyList<PdfRow> rows, int pageNumber, int pageCount)
     {
         var content = new StringBuilder();
         AddText(content, "Miscelanea Ari", Left, 800, 19, true, Ink);
-        AddText(content, "COMPROBANTE INTERNO DE VENTA", Left, 779, 11, true, Green);
-        AddText(content, $"Folio: V-{sale.OperationId:N}".ToUpperInvariant(), Left, 758, 9, true, Muted);
+        AddText(content, reversal is null ? "COMPROBANTE INTERNO DE VENTA" : "CONSTANCIA INTERNA DE REVERSIÓN", Left, 779, 11, true, Green);
+        AddText(content, reversal is null ? $"Folio: V-{sale.OperationId:N}".ToUpperInvariant() : $"Folio: R-{reversal.OperationId:N}".ToUpperInvariant(), Left, 758, 9, true, Muted);
         AddText(content, $"Pagina {pageNumber} de {pageCount}", 455, 758, 8, false, Muted);
         AddRule(content, 742);
 

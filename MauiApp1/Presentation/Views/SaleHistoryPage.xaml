@@ -56,6 +56,7 @@
                                         </Grid>
                                         <VerticalStackLayout Spacing="4">
                                             <Label Text="{Binding ActorText}" FontSize="13" TextColor="#61738A" />
+                                            <Label Text="{Binding StatusText, StringFormat='Estado: {0}'}" FontSize="14" FontAttributes="Bold" TextColor="#007F60" />
                                             <Label Text="{Binding CustomerText}" FontSize="14" TextColor="#34445A" />
                                             <Label Text="{Binding DueText}" FontSize="13" TextColor="#61738A" />
                                             <Label Text="{Binding PaymentText}" FontSize="13" TextColor="#61738A"
@@ -66,8 +67,17 @@
                                             <Label Text="{Binding LinesText}" FontSize="13" TextColor="#34445A"
                                                    LineBreakMode="WordWrap" />
                                         </Border>
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                            <Button Grid.Column="1" Text="Ver ticket" Clicked="OnViewTicketClicked"
+                                        <Border IsVisible="{Binding HasReversals}" Padding="12" BackgroundColor="#FFF7ED" Stroke="#FED7AA"
+                                                StrokeShape="RoundRectangle 10">
+                                            <Label Text="{Binding ReversalDetailsText}" FontSize="13" TextColor="#7C2D12"
+                                                   LineBreakMode="WordWrap" />
+                                        </Border>
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <Button Grid.Column="1" Text="Anular / devolver" Clicked="OnReverseSaleClicked"
+                                                    IsVisible="{Binding CanCreateReversal}"
+                                                    BackgroundColor="#FFF0E8" TextColor="#9A3412"
+                                                    CornerRadius="10" Padding="14,10" />
+                                            <Button Grid.Column="2" Text="Ver ticket" Clicked="OnViewTicketClicked"
                                                     BackgroundColor="#E8EEF5" TextColor="#0D1B2A"
                                                     CornerRadius="10" Padding="18,10" />
                                             <Label Grid.Column="0" Text="{Binding TotalText}" FontSize="19"
