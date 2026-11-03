@@ -278,6 +278,15 @@ public sealed class CoordinatorBusinessOperationApplier
             payload.OccurredAtUtc.Kind != DateTimeKind.Utc || payload.Lines.Select(item => item.LineNumber).Distinct().Count() != payload.Lines.Count ||
             payload.Lines.Sum(item => item.LineTotalMinorUnits) != payload.TotalMinorUnits)
             throw new BusinessOperationConflictException("La venta está incompleta.");
+        if (payload.Payments is not null)
+        {
+            if (payload.Payments.Any(item => item is null))
+                throw new BusinessOperationConflictException("El detalle de pago contiene elementos vacíos.");
+            var paymentError = SalePaymentRules.Validate(payload.TotalMinorUnits, payload.IsCredit,
+                payload.Payments.Select(item => new SalePaymentDraft(item.PaymentId, (SalePaymentMethod)item.Method,
+                    item.AmountMinorUnits, item.CashReceivedMinorUnits, item.ChangeMinorUnits)).ToArray());
+            if (paymentError is not null) throw new BusinessOperationConflictException(paymentError);
+        }
         if (payload.IsCredit && (payload.CustomerId is null || payload.CreditDueAtUtc is null || payload.CreditDueAtUtc.Value.Kind != DateTimeKind.Utc))
             throw new BusinessOperationConflictException("La venta a crédito requiere cliente y vencimiento.");
         if (payload.CustomerId is Guid customerId && !await context.Customers.AnyAsync(item => item.CustomerId == customerId, ct))
@@ -303,6 +312,16 @@ public sealed class CoordinatorBusinessOperationApplier
                 ProductId = product.ProductId, ProductNameSnapshot = line.ProductNameSnapshot, UnitSnapshot = line.UnitSnapshot,
                 Type = (int)InventoryMovementType.SaleExit, QuantityMilliUnits = line.QuantityMilliUnits, OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor });
         }
+        if (payload.Payments is not null)
+            context.SalePayments.AddRange(payload.Payments.Select(payment => new SalePaymentEntity
+            {
+                PaymentId = payment.PaymentId,
+                OperationId = operationId,
+                Method = payment.Method,
+                AmountMinorUnits = payment.AmountMinorUnits,
+                CashReceivedMinorUnits = payment.CashReceivedMinorUnits,
+                ChangeMinorUnits = payment.ChangeMinorUnits
+            }));
         if (payload.IsCredit)
             context.Receivables.Add(new ReceivableEntity { OperationId = operationId, CustomerId = payload.CustomerId!.Value,
                 OriginalAmountMinorUnits = payload.TotalMinorUnits, OutstandingMinorUnits = payload.TotalMinorUnits, DueAtUtc = payload.CreditDueAtUtc!.Value });
@@ -506,6 +525,15 @@ public sealed class CoordinatorBusinessOperationApplier
                 item.SalePriceMinorUnits < 0 || item.LineTotalMinorUnits < 0) ||
             payload.Lines.Sum(item => item.LineTotalMinorUnits) != payload.TotalMinorUnits)
             throw new BusinessOperationConflictException("La venta importada está incompleta o contiene importes inválidos.");
+        if (payload.Payments is not null)
+        {
+            if (payload.Payments.Any(item => item is null))
+                throw new BusinessOperationConflictException("El detalle de pago importado contiene elementos vacíos.");
+            var paymentError = SalePaymentRules.Validate(payload.TotalMinorUnits, payload.IsCredit,
+                payload.Payments.Select(item => new SalePaymentDraft(item.PaymentId, (SalePaymentMethod)item.Method,
+                    item.AmountMinorUnits, item.CashReceivedMinorUnits, item.ChangeMinorUnits)).ToArray());
+            if (paymentError is not null) throw new BusinessOperationConflictException(paymentError);
+        }
         if (!await context.UserAccounts.AnyAsync(item => item.UserId == actor, ct))
             throw new BusinessOperationConflictException("No existe la cuenta central elegida como responsable de esta venta.");
         if (payload.CustomerId is Guid customerId && !await context.Customers.AnyAsync(item => item.CustomerId == customerId, ct))
@@ -514,9 +542,11 @@ public sealed class CoordinatorBusinessOperationApplier
         if (existing is not null)
         {
             var lines = await context.SaleLines.AsNoTracking().Where(item => item.OperationId == payload.OperationId).ToListAsync(ct);
+            var payments = await context.SalePayments.AsNoTracking().Where(item => item.OperationId == payload.OperationId).ToListAsync(ct);
             if (existing.OccurredAtUtc != payload.OccurredAtUtc || existing.ActorUserId != actor ||
                 existing.TotalMinorUnits != payload.TotalMinorUnits || existing.IsCredit != payload.IsCredit ||
                 existing.CustomerId != payload.CustomerId || lines.Count != payload.Lines.Count ||
+                !ImportedPaymentsMatch(payload.Payments, payments) ||
                 payload.Lines.Any(incoming => !lines.Any(saved => saved.LineNumber == incoming.LineNumber &&
                     saved.ProductId == incoming.ProductId && saved.ProductNameSnapshot == incoming.ProductNameSnapshot &&
                     saved.UnitSnapshot == incoming.UnitSnapshot && saved.QuantityMilliUnits == incoming.QuantityMilliUnits &&
@@ -537,6 +567,24 @@ public sealed class CoordinatorBusinessOperationApplier
             QuantityMilliUnits = line.QuantityMilliUnits, SalePriceMinorUnits = line.SalePriceMinorUnits,
             LineTotalMinorUnits = line.LineTotalMinorUnits
         }));
+        if (payload.Payments is not null)
+            context.SalePayments.AddRange(payload.Payments.Select(payment => new SalePaymentEntity
+            {
+                PaymentId = payment.PaymentId, OperationId = payload.OperationId, Method = payment.Method,
+                AmountMinorUnits = payment.AmountMinorUnits, CashReceivedMinorUnits = payment.CashReceivedMinorUnits,
+                ChangeMinorUnits = payment.ChangeMinorUnits
+            }));
+    }
+
+    private static bool ImportedPaymentsMatch(IReadOnlyList<InitialImportSalePayment>? incoming,
+        IReadOnlyList<SalePaymentEntity> saved)
+    {
+        if (incoming is null) return saved.Count == 0;
+        return incoming.Count == saved.Count && incoming.All(payment => saved.Any(item =>
+            item.PaymentId == payment.PaymentId && item.Method == payment.Method &&
+            item.AmountMinorUnits == payment.AmountMinorUnits &&
+            item.CashReceivedMinorUnits == payment.CashReceivedMinorUnits &&
+            item.ChangeMinorUnits == payment.ChangeMinorUnits));
     }
 
     private static async Task ApplyImportedReceivableAsync(LocalDbContext context, string json, CancellationToken ct)

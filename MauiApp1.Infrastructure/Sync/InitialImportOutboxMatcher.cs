@@ -67,6 +67,7 @@ public static class InitialImportOutboxMatcher
                     return payload?.Lines is not null && sale is not null && payload.OperationId == sale.OperationId &&
                         payload.OccurredAtUtc == sale.OccurredAtUtc && payload.TotalMinorUnits == sale.TotalMinorUnits &&
                         payload.IsCredit == sale.IsCredit && payload.CustomerId == sale.CustomerId && payload.Lines.Count == sale.Lines.Count &&
+                        PaymentsEqual(payload.Payments, sale.Payments) &&
                         payload.Lines.All(line => sale.Lines.Any(saved => saved.LineNumber == line.LineNumber &&
                             saved.ProductId == line.ProductId && saved.QuantityMilliUnits == line.QuantityMilliUnits &&
                             saved.ProductNameSnapshot == line.ProductNameSnapshot && saved.UnitSnapshot == line.UnitSnapshot &&
@@ -104,6 +105,16 @@ public static class InitialImportOutboxMatcher
 
     private static bool ImagesEqual(byte[]? left, byte[]? right) =>
         left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
+
+    private static bool PaymentsEqual(IReadOnlyList<SaleRecordedPaymentPayload>? payload,
+        IReadOnlyList<InitialImportSalePayment>? snapshot)
+    {
+        if (payload is null) return snapshot is null or { Count: 0 };
+        if (snapshot is null || payload.Count != snapshot.Count) return false;
+        return payload.All(item => snapshot.Any(saved => saved.PaymentId == item.PaymentId &&
+            saved.Method == item.Method && saved.AmountMinorUnits == item.AmountMinorUnits &&
+            saved.CashReceivedMinorUnits == item.CashReceivedMinorUnits && saved.ChangeMinorUnits == item.ChangeMinorUnits));
+    }
 
     private sealed record CustomerCreatedPayload(Guid CustomerId, string Name, string? Phone);
     private sealed record PaymentRecordedPayload(Guid PaymentId, Guid OperationId, Guid ActorUserId,

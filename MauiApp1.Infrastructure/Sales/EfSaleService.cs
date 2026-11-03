@@ -74,6 +74,10 @@ internal sealed class EfSaleService(
             return SaleResult.Failure("El total de la venta supera el valor permitido.");
         }
 
+        var paymentValidationError = SalePaymentRules.Validate(totalMinorUnits, sale.IsCredit, sale.Payments);
+        if (paymentValidationError is not null)
+            return SaleResult.Failure(paymentValidationError);
+
         var movementLines = lines.Select((line, index) => new InventoryMovementLineDraft(
             index,
             new ProductId(line.ProductId),
@@ -94,7 +98,9 @@ internal sealed class EfSaleService(
             totalMinorUnits,
             sale.IsCredit,
             sale.CustomerId,
-            sale.CreditDueAtUtc));
+            sale.CreditDueAtUtc,
+            sale.Payments?.Select(payment => new SaleRecordedPaymentPayload(payment.PaymentId, (int)payment.Method,
+                payment.AmountMinorUnits, payment.CashReceivedMinorUnits, payment.ChangeMinorUnits)).ToArray()));
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (sale.IsCredit)
@@ -138,9 +144,19 @@ internal sealed class EfSaleService(
                   persistedReceivable.OriginalAmountMinorUnits == totalMinorUnits &&
                   persistedReceivable.OutstandingMinorUnits == totalMinorUnits && persistedReceivable.DueAtUtc == sale.CreditDueAtUtc
                 : !await context.Receivables.AnyAsync(item => item.OperationId == sale.OperationId, cancellationToken);
+            var savedPayments = await context.SalePayments.AsNoTracking()
+                .Where(item => item.OperationId == sale.OperationId)
+                .OrderBy(item => item.Method)
+                .ToListAsync(cancellationToken);
+            var expectedPayments = (sale.Payments ?? []).OrderBy(item => item.Method).ToArray();
+            var paymentDetailsMatch = savedPayments.Count == expectedPayments.Length && expectedPayments.All(expected =>
+                savedPayments.Any(saved => saved.PaymentId == expected.PaymentId && saved.Method == (int)expected.Method &&
+                    saved.AmountMinorUnits == expected.AmountMinorUnits &&
+                    saved.CashReceivedMinorUnits == expected.CashReceivedMinorUnits &&
+                    saved.ChangeMinorUnits == expected.ChangeMinorUnits));
             return existingSale is not null && existingSale.TotalMinorUnits == totalMinorUnits &&
                    existingSale.IsCredit == sale.IsCredit && existingSale.CustomerId == sale.CustomerId &&
-                   persistedLineCount == lines.Count && creditMatches
+                   persistedLineCount == lines.Count && creditMatches && paymentDetailsMatch
                 ? SaleResult.Success(alreadyApplied: true)
                 : SaleResult.Failure("La operación ya existe, pero no se encontró la venta y deuda completas asociadas. No se modificó el inventario.");
         }
@@ -178,6 +194,18 @@ internal sealed class EfSaleService(
                 SalePriceMinorUnits = line.Price,
                 LineTotalMinorUnits = line.LineTotal
             });
+        }
+        if (sale.Payments is not null)
+        {
+            context.SalePayments.AddRange(sale.Payments.Select(payment => new SalePaymentEntity
+            {
+                PaymentId = payment.PaymentId,
+                OperationId = sale.OperationId,
+                Method = (int)payment.Method,
+                AmountMinorUnits = payment.AmountMinorUnits,
+                CashReceivedMinorUnits = payment.CashReceivedMinorUnits,
+                ChangeMinorUnits = payment.ChangeMinorUnits
+            }));
         }
 
         try
@@ -250,6 +278,16 @@ internal sealed class EfSaleService(
         var dueDates = await context.Receivables.AsNoTracking()
             .Where(item => operationIds.Contains(item.OperationId))
             .ToDictionaryAsync(item => item.OperationId, item => item.DueAtUtc, cancellationToken);
+        var payments = await context.SalePayments.AsNoTracking()
+            .Where(item => operationIds.Contains(item.OperationId))
+            .OrderBy(item => item.Method)
+            .Select(item => new { item.OperationId, item.Method, item.AmountMinorUnits,
+                item.CashReceivedMinorUnits, item.ChangeMinorUnits })
+            .ToListAsync(cancellationToken);
+        var paymentsBySale = payments.GroupBy(item => item.OperationId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<SaleHistoryPayment>)group.Select(item =>
+                new SaleHistoryPayment((SalePaymentMethod)item.Method, item.AmountMinorUnits,
+                    item.CashReceivedMinorUnits, item.ChangeMinorUnits)).ToArray());
 
         return sales.Select(sale => new SaleHistoryEntry(
             sale.OperationId,
@@ -259,6 +297,7 @@ internal sealed class EfSaleService(
             linesBySale.GetValueOrDefault(sale.OperationId, []),
             sale.IsCredit,
             sale.CustomerId.HasValue ? customerNames.GetValueOrDefault(sale.CustomerId.Value) : null,
-            dueDates.TryGetValue(sale.OperationId, out var dueAtUtc) ? dueAtUtc : null)).ToArray();
+            dueDates.TryGetValue(sale.OperationId, out var dueAtUtc) ? dueAtUtc : null,
+            paymentsBySale.GetValueOrDefault(sale.OperationId, []))).ToArray();
     }
 }

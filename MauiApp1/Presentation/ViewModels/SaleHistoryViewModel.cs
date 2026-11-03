@@ -72,6 +72,19 @@ public sealed record SaleHistoryCard(SaleHistoryEntry Sale)
 
     public string SaleTypeText => Sale.IsCredit ? "Venta a crédito" : "Venta de contado";
 
+    public string PaymentText => Sale.IsCredit
+        ? "Cuenta por cobrar; los abonos aparecen por separado."
+        : Sale.Payments is not { Count: > 0 }
+            ? "Sin detalle de pago registrado."
+            : string.Join(" · ", Sale.Payments.Select(payment =>
+                payment.Method switch
+                {
+                    SalePaymentMethod.Cash => $"Efectivo C$ {(payment.AmountMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)} (recibido C$ {(payment.CashReceivedMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}, cambio C$ {(payment.ChangeMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)})",
+                    SalePaymentMethod.Card => $"Tarjeta C$ {(payment.AmountMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}",
+                    SalePaymentMethod.Transfer => $"Transferencia C$ {(payment.AmountMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture)}",
+                    _ => "Método no disponible"
+                }));
+
     public string CustomerText => Sale.IsCredit ? $"Cliente: {Sale.CustomerName ?? "No disponible"}" : string.Empty;
 
     public string DueText => Sale.CreditDueAtUtc is { } due

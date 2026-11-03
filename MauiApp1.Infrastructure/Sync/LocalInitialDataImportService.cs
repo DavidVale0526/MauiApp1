@@ -58,12 +58,17 @@ public sealed class LocalInitialDataImportService(
 
             var saleHeaders = await context.Sales.AsNoTracking().ToListAsync(cancellationToken);
             var saleLines = await context.SaleLines.AsNoTracking().ToListAsync(cancellationToken);
+            var salePayments = await context.SalePayments.AsNoTracking().ToListAsync(cancellationToken);
             var sales = saleHeaders.Select(item => new InitialImportSale(item.OperationId, AsUtc(item.OccurredAtUtc),
                 item.ActorUserId, item.TotalMinorUnits, item.IsCredit, item.CustomerId,
                 saleLines.Where(line => line.OperationId == item.OperationId).OrderBy(line => line.LineNumber)
                     .Select(line => new InitialImportSaleLine(line.LineNumber, line.ProductId,
                         line.ProductNameSnapshot, line.UnitSnapshot, line.QuantityMilliUnits,
-                        line.SalePriceMinorUnits, line.LineTotalMinorUnits)).ToArray())).ToArray();
+                        line.SalePriceMinorUnits, line.LineTotalMinorUnits)).ToArray(),
+                salePayments.Where(payment => payment.OperationId == item.OperationId).OrderBy(payment => payment.Method)
+                    .Select(payment => new InitialImportSalePayment(payment.PaymentId, payment.Method,
+                        payment.AmountMinorUnits, payment.CashReceivedMinorUnits, payment.ChangeMinorUnits)).ToArray() is { Length: > 0 } paymentDetails
+                    ? paymentDetails : null)).ToArray();
 
             var receivables = await context.Receivables.AsNoTracking()
                 .Select(item => new InitialImportReceivable(item.OperationId, item.CustomerId,

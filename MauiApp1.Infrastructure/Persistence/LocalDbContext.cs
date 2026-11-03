@@ -31,6 +31,8 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
 
     internal DbSet<SaleLineEntity> SaleLines => Set<SaleLineEntity>();
 
+    internal DbSet<SalePaymentEntity> SalePayments => Set<SalePaymentEntity>();
+
     internal DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
 
     internal DbSet<ReceivableEntity> Receivables => Set<ReceivableEntity>();
@@ -269,6 +271,30 @@ public sealed class LocalDbContext(DbContextOptions<LocalDbContext> options) : D
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.ProductId);
+        });
+
+        modelBuilder.Entity<SalePaymentEntity>(entity =>
+        {
+            entity.ToTable("SalePayments", table =>
+            {
+                table.HasCheckConstraint("CK_SalePayments_Method_Valid", "\"Method\" BETWEEN 1 AND 3");
+                table.HasCheckConstraint("CK_SalePayments_Amount_Positive", "\"AmountMinorUnits\" > 0");
+                table.HasCheckConstraint("CK_SalePayments_Cash_NonNegative", "\"CashReceivedMinorUnits\" >= 0");
+                table.HasCheckConstraint("CK_SalePayments_Change_NonNegative", "\"ChangeMinorUnits\" >= 0");
+                table.HasCheckConstraint("CK_SalePayments_Method_Amounts", "(\"Method\" = 1 AND \"CashReceivedMinorUnits\" >= \"AmountMinorUnits\" AND \"ChangeMinorUnits\" = \"CashReceivedMinorUnits\" - \"AmountMinorUnits\") OR (\"Method\" <> 1 AND \"CashReceivedMinorUnits\" = 0 AND \"ChangeMinorUnits\" = 0)");
+            });
+            entity.HasKey(item => item.PaymentId);
+            entity.Property(item => item.PaymentId).ValueGeneratedNever();
+            entity.Property(item => item.OperationId).IsRequired();
+            entity.Property(item => item.Method).IsRequired();
+            entity.Property(item => item.AmountMinorUnits).IsRequired();
+            entity.Property(item => item.CashReceivedMinorUnits).IsRequired();
+            entity.Property(item => item.ChangeMinorUnits).IsRequired();
+            entity.HasOne<SaleEntity>()
+                .WithMany()
+                .HasForeignKey(item => item.OperationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.OperationId, item.Method }).IsUnique();
         });
 
         modelBuilder.Entity<CustomerEntity>(entity =>

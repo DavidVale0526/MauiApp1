@@ -45,12 +45,51 @@
             <Border BackgroundColor="#EBFAF3" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16">
               <Label x:Name="TermsText" FontSize="14" TextColor="#00694F" LineBreakMode="WordWrap" />
             </Border>
+            <Border IsVisible="{Binding IsCashSale}" BackgroundColor="#F7F9FB" Stroke="#DFE7F0"
+                    StrokeThickness="1" StrokeShape="RoundRectangle 12" Padding="14">
+              <VerticalStackLayout Spacing="10">
+                <Label Text="Pago de contado" FontSize="17" FontAttributes="Bold" TextColor="#0D172B" />
+                <Label Text="Distribuye el total entre los métodos usados. En efectivo, indica cuánto recibiste para calcular el cambio."
+                       FontSize="12" TextColor="#647792" LineBreakMode="WordWrap" />
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+                  <VerticalStackLayout Spacing="4">
+                    <Label Text="Efectivo aplicado (C$)" FontSize="12" TextColor="#45556B" />
+                    <Entry Text="{Binding CashAppliedInput}" Keyboard="Numeric" IsEnabled="{Binding CanEditPayment}"
+                           TextColor="#172438" PlaceholderColor="#94A3B8" BackgroundColor="White" />
+                  </VerticalStackLayout>
+                  <VerticalStackLayout Grid.Column="1" Spacing="4">
+                    <Label Text="Efectivo recibido (C$)" FontSize="12" TextColor="#45556B" />
+                    <Entry Text="{Binding CashReceivedInput}" Keyboard="Numeric" IsEnabled="{Binding CanEditPayment}"
+                           TextColor="#172438" PlaceholderColor="#94A3B8" BackgroundColor="White" />
+                  </VerticalStackLayout>
+                  <VerticalStackLayout Grid.Row="1" Spacing="4">
+                    <Label Text="Tarjeta (C$)" FontSize="12" TextColor="#45556B" />
+                    <Entry Text="{Binding CardAppliedInput}" Keyboard="Numeric" IsEnabled="{Binding CanEditPayment}"
+                           TextColor="#172438" PlaceholderColor="#94A3B8" BackgroundColor="White" />
+                  </VerticalStackLayout>
+                  <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="4">
+                    <Label Text="Transferencia (C$)" FontSize="12" TextColor="#45556B" />
+                    <Entry Text="{Binding TransferAppliedInput}" Keyboard="Numeric" IsEnabled="{Binding CanEditPayment}"
+                           TextColor="#172438" PlaceholderColor="#94A3B8" BackgroundColor="White" />
+                  </VerticalStackLayout>
+                  <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding ChangeText}" FontSize="15"
+                         FontAttributes="Bold" TextColor="#007F60" />
+                </Grid>
+                <Label Text="{Binding PaymentErrorMessage}" FontSize="12" TextColor="#B42318" LineBreakMode="WordWrap">
+                  <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding PaymentErrorMessage}" Value="">
+                      <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                  </Label.Triggers>
+                </Label>
+              </VerticalStackLayout>
+            </Border>
             <Label Text="La fecha y hora se registrarán automáticamente." FontSize="13" TextColor="#647792" />
           </VerticalStackLayout>
         </ScrollView>
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
           <Button x:Name="CancelButton" Text="Volver a revisar" Clicked="OnCancelClicked" BackgroundColor="#F0F3F7" TextColor="#34445A" FontSize="13" CornerRadius="10" Padding="12,14" />
-          <Button x:Name="ConfirmButton" Grid.Column="1" Text="Registrar venta" Clicked="OnConfirmClicked" BackgroundColor="#007F60" TextColor="White" FontSize="13" FontAttributes="Bold" CornerRadius="10" Padding="12,14" />
+          <Button x:Name="ConfirmButton" Grid.Column="1" Text="Registrar venta" Clicked="OnConfirmClicked" IsEnabled="{Binding CanRegisterPending}" BackgroundColor="#007F60" TextColor="White" FontSize="13" FontAttributes="Bold" CornerRadius="10" Padding="12,14" />
         </Grid>
       </Grid>
     </Border>

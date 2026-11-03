@@ -9,7 +9,8 @@ public sealed record SaleDraft(
     IReadOnlyList<SaleLineDraft> Lines,
     bool IsCredit = false,
     Guid? CustomerId = null,
-    DateTime? CreditDueAtUtc = null);
+    DateTime? CreditDueAtUtc = null,
+    IReadOnlyList<SalePaymentDraft>? Payments = null);
 
 public sealed record SaleLineDraft(
     ProductId ProductId,

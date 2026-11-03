@@ -31,6 +31,18 @@ public sealed class SaleTicketViewModel
         ? $"Venta a crédito · Cliente: {Sale.CustomerName ?? "No disponible"} · Vence: {Sale.CreditDueAtUtc?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "No disponible"}"
         : "Venta de contado";
 
+    public string PaymentDetailsText => Sale.IsCredit
+        ? "El saldo se registra como cuenta por cobrar; los abonos se consultan por separado."
+        : Sale.Payments is not { Count: > 0 }
+            ? "Sin detalle de pago registrado para esta venta."
+            : string.Join(Environment.NewLine, Sale.Payments.Select(payment => payment.Method switch
+            {
+                SalePaymentMethod.Cash => $"Efectivo aplicado: C$ {FormatMoney(payment.AmountMinorUnits)} · recibido: C$ {FormatMoney(payment.CashReceivedMinorUnits)} · cambio: C$ {FormatMoney(payment.ChangeMinorUnits)}",
+                SalePaymentMethod.Card => $"Tarjeta: C$ {FormatMoney(payment.AmountMinorUnits)}",
+                SalePaymentMethod.Transfer => $"Transferencia: C$ {FormatMoney(payment.AmountMinorUnits)}",
+                _ => "Método de pago no disponible"
+            }));
+
     public string TotalText => $"C$ {FormatMoney(Sale.TotalMinorUnits)}";
 
     internal static string FormatMoney(long minorUnits) =>

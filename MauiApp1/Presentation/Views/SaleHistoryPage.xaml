@@ -58,6 +58,8 @@
                                             <Label Text="{Binding ActorText}" FontSize="13" TextColor="#61738A" />
                                             <Label Text="{Binding CustomerText}" FontSize="14" TextColor="#34445A" />
                                             <Label Text="{Binding DueText}" FontSize="13" TextColor="#61738A" />
+                                            <Label Text="{Binding PaymentText}" FontSize="13" TextColor="#61738A"
+                                                   LineBreakMode="WordWrap" />
                                         </VerticalStackLayout>
                                         <Border Padding="12" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
                                                 StrokeShape="RoundRectangle 10">

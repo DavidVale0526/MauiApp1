@@ -18,7 +18,7 @@ public partial class SaleReviewPage : ContentPage
         CancelButton.Text = retry ? "Cancelar" : "Volver a revisar";
         TermsText.Text = sale.IsCredit
             ? $"Venta a crédito para: {viewModel.SelectedCustomer?.Name ?? "cliente"}\nVence: {sale.CreditDueAtUtc!.Value.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)}\nEl saldo inicial será {viewModel.TotalAmountText}."
-            : "Venta de contado.";
+            : "La venta se guardará cuando la suma de los pagos cubra el total.";
     }
 
     public Task<bool> Decision => _decision.Task;

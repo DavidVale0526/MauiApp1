@@ -60,7 +60,7 @@
             </VerticalStackLayout>
             <VerticalStackLayout Padding="18,16" Spacing="6" BackgroundColor="#F7F9FB">
               <Label Text="Documento interno de consulta. No es factura ni comprobante fiscal." FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
-              <Label Text="Este registro no contiene impuestos ni datos de cobro." FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
+              <Label Text="{Binding PaymentDetailsText}" FontSize="12" TextColor="#647792" HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
           </VerticalStackLayout>
         </Border>

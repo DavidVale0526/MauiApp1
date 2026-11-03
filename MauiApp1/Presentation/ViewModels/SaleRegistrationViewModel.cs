@@ -28,6 +28,10 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     private Guid? _lastCompletedSaleOperationId;
     private bool _isCredit;
     private CreditCustomerOption? _selectedCustomer;
+    private string _cashAppliedInput = "0.00";
+    private string _cashReceivedInput = "0.00";
+    private string _cardAppliedInput = "0.00";
+    private string _transferAppliedInput = "0.00";
 
     public SaleRegistrationViewModel(IProductService productService, ISaleService saleService, ICustomerService customerService)
     {
@@ -69,6 +73,9 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             if (SetProperty(ref _isCredit, value))
             {
                 OnPropertyChanged(nameof(CanConfirm));
+                OnPropertyChanged(nameof(IsCashSale));
+                OnPropertyChanged(nameof(CanRegisterPending));
+                OnPropertyChanged(nameof(PaymentErrorMessage));
                 ((Command)AddLineCommand).ChangeCanExecute();
             }
         }
@@ -113,6 +120,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
                 ((Command)AddLineCommand).ChangeCanExecute();
                 OnPropertyChanged(nameof(CanEditLines));
                 OnPropertyChanged(nameof(CanConfirm));
+                OnPropertyChanged(nameof(CanEditPayment));
+                OnPropertyChanged(nameof(CanRegisterPending));
             }
         }
     }
@@ -120,6 +129,30 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     public bool CanEditLines => !IsBusy && _pendingSale is null;
 
     public bool CanConfirm => !IsBusy && (_pendingSale is not null || (Lines.Count > 0 && (!IsCredit || SelectedCustomer is not null)));
+
+    public bool IsCashSale => !IsCredit;
+
+    public bool CanEditPayment => !IsBusy && !_pendingSaleAttempted;
+
+    public bool CanRegisterPending => !IsBusy && _pendingSale is not null &&
+        (IsCredit || IsPaymentValid(out _));
+
+    public string CashAppliedInput { get => _cashAppliedInput; set => SetPaymentInput(ref _cashAppliedInput, value); }
+
+    public string CashReceivedInput { get => _cashReceivedInput; set => SetPaymentInput(ref _cashReceivedInput, value); }
+
+    public string CardAppliedInput { get => _cardAppliedInput; set => SetPaymentInput(ref _cardAppliedInput, value); }
+
+    public string TransferAppliedInput { get => _transferAppliedInput; set => SetPaymentInput(ref _transferAppliedInput, value); }
+
+    public string PaymentErrorMessage
+    {
+        get => IsCashSale && !IsPaymentValid(out var error) ? error : string.Empty;
+    }
+
+    public string ChangeText => TryGetPaymentAmounts(out var cash, out var received, out _, out _, out _) && cash > 0
+        ? $"Cambio: C$ {((received - cash) / 100m).ToString("0.00", CultureInfo.CurrentCulture)}"
+        : "Cambio: C$ 0.00";
 
     public string ConfirmButtonText => _pendingSaleAttempted ? "Reintentar la misma venta" : "Revisar y confirmar venta";
 
@@ -232,6 +265,14 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         }
 
         var occurredAtUtc = DateTime.UtcNow;
+        var totalMinorUnits = Lines.Aggregate(0L, (sum, line) => checked(sum + line.LineTotalMinorUnits));
+        if (!IsCredit)
+        {
+            CashAppliedInput = (totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture);
+            CashReceivedInput = (totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture);
+            CardAppliedInput = "0.00";
+            TransferAppliedInput = "0.00";
+        }
         _pendingSale = new SaleDraft(
             Guid.NewGuid(),
             occurredAtUtc,
@@ -293,8 +334,19 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             return false;
         }
 
+        if (!IsCredit)
+        {
+            if (!IsPaymentValid(out var error) || !TryBuildPayments(out var payments, out error))
+            {
+                return false;
+            }
+            _pendingSale = _pendingSale with { Payments = payments };
+        }
+
         IsBusy = true;
         _pendingSaleAttempted = true;
+        OnPropertyChanged(nameof(CanEditPayment));
+        OnPropertyChanged(nameof(CanRegisterPending));
         OnPropertyChanged(nameof(ConfirmButtonText));
         ErrorMessage = string.Empty;
         StatusMessage = string.Empty;
@@ -313,6 +365,11 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             Lines.Clear();
             _pendingSale = null;
             _pendingSaleAttempted = false;
+            CashAppliedInput = "0.00";
+            CashReceivedInput = "0.00";
+            CardAppliedInput = "0.00";
+            TransferAppliedInput = "0.00";
+            OnPropertyChanged(nameof(CanEditPayment));
             StatusMessage = result.AlreadyApplied
                 ? "Esta venta ya se había guardado; no se descontó la existencia otra vez."
                 : completedSale.IsCredit
@@ -423,6 +480,102 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         if (normalized.Count(character => character == '.') > 1) return false;
 
         return decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
+    }
+
+    private void SetPaymentInput(ref string storage, string value)
+    {
+        if (SetProperty(ref storage, value ?? string.Empty))
+        {
+            OnPropertyChanged(nameof(CanRegisterPending));
+            OnPropertyChanged(nameof(ChangeText));
+            OnPropertyChanged(nameof(PaymentErrorMessage));
+        }
+    }
+
+    private bool IsPaymentValid(out string error)
+    {
+        error = string.Empty;
+        if (!TryGetPaymentAmounts(out var cash, out var received, out var card, out var transfer, out var total))
+        {
+            error = "Escribe importes válidos con máximo dos decimales.";
+            return false;
+        }
+        if (cash < 0 || received < 0 || card < 0 || transfer < 0)
+        {
+            error = "Los importes no pueden ser negativos.";
+            return false;
+        }
+        if (cash + card + transfer != total)
+        {
+            error = $"Distribuye el total exacto de C$ {(total / 100m).ToString("0.00", CultureInfo.CurrentCulture)} entre efectivo, tarjeta y transferencia.";
+            return false;
+        }
+        if (cash > 0 && received < cash)
+        {
+            error = "El efectivo recibido no cubre el importe asignado a efectivo.";
+            return false;
+        }
+        if (cash == 0 && received != 0)
+        {
+            error = "Indica efectivo recibido solo cuando parte de la venta se pague en efectivo.";
+            return false;
+        }
+        return true;
+    }
+
+    private bool TryBuildPayments(out IReadOnlyList<SalePaymentDraft> payments, out string error)
+    {
+        payments = [];
+        if (!TryGetPaymentAmounts(out var cash, out var received, out var card, out var transfer, out _))
+        {
+            error = "Escribe importes válidos con máximo dos decimales.";
+            return false;
+        }
+        var items = new List<SalePaymentDraft>(3);
+        if (cash > 0) items.Add(new SalePaymentDraft(Guid.NewGuid(), SalePaymentMethod.Cash, cash, received, received - cash));
+        if (card > 0) items.Add(new SalePaymentDraft(Guid.NewGuid(), SalePaymentMethod.Card, card));
+        if (transfer > 0) items.Add(new SalePaymentDraft(Guid.NewGuid(), SalePaymentMethod.Transfer, transfer));
+        payments = items;
+        error = string.Empty;
+        return true;
+    }
+
+    private bool TryGetPaymentAmounts(out long cash, out long received, out long card, out long transfer, out long total)
+    {
+        cash = received = card = transfer = total = 0;
+        if (!TryParseMoney(CashAppliedInput, out cash) || !TryParseMoney(CashReceivedInput, out received) ||
+            !TryParseMoney(CardAppliedInput, out card) || !TryParseMoney(TransferAppliedInput, out transfer))
+            return false;
+        try
+        {
+            total = Lines.Aggregate(0L, (sum, line) => checked(sum + line.LineTotalMinorUnits));
+            _ = checked(cash + card + transfer);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryParseMoney(string? input, out long minorUnits)
+    {
+        minorUnits = 0;
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var normalized = input.Trim().Replace(',', '.');
+        if (normalized.Count(character => character == '.') > 1 ||
+            !decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount) ||
+            amount < 0 || decimal.Round(amount, 2) != amount)
+            return false;
+        try
+        {
+            minorUnits = checked((long)(amount * 100m));
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
     }
 
     private void OnLinesChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)

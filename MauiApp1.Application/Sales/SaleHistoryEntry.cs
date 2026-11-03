@@ -8,7 +8,8 @@ public sealed record SaleHistoryEntry(
     IReadOnlyList<SaleHistoryLine> Lines,
     bool IsCredit = false,
     string? CustomerName = null,
-    DateTime? CreditDueAtUtc = null);
+    DateTime? CreditDueAtUtc = null,
+    IReadOnlyList<SaleHistoryPayment>? Payments = null);
 
 public sealed record SaleHistoryLine(
     string ProductName,
@@ -16,3 +17,9 @@ public sealed record SaleHistoryLine(
     long QuantityMilliUnits,
     long SalePriceMinorUnits,
     long LineTotalMinorUnits);
+
+public sealed record SaleHistoryPayment(
+    SalePaymentMethod Method,
+    long AmountMinorUnits,
+    long CashReceivedMinorUnits,
+    long ChangeMinorUnits);

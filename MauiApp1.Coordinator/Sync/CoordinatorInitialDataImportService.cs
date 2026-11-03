@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using MauiApp1.Application.Sync;
 using MauiApp1.Application.Products;
+using MauiApp1.Application.Sales;
 using MauiApp1.Coordinator.Persistence;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
@@ -244,6 +245,9 @@ internal sealed class CoordinatorInitialDataImportService(
         CheckUnique(snapshot.Customers.Select(item => item.CustomerId), "clientes", blockers);
         CheckUnique(snapshot.Purchases.Select(item => item.OperationId), "compras", blockers);
         CheckUnique(snapshot.Sales.Select(item => item.OperationId), "ventas", blockers);
+        CheckUnique(snapshot.Sales.Where(item => item.Payments is not null)
+            .SelectMany(item => item.Payments!).Where(item => item is not null)
+            .Select(item => item.PaymentId), "pagos de ventas", blockers);
         CheckUnique(snapshot.Receivables.Select(item => item.OperationId), "cuentas por cobrar", blockers);
         CheckUnique(snapshot.Movements.Select(item => item.MovementId), "movimientos", blockers);
         CheckUnique(snapshot.Payments.Select(item => item.PaymentId), "pagos", blockers);
@@ -270,6 +274,7 @@ internal sealed class CoordinatorInitialDataImportService(
         var centralPurchaseLines = await context.PurchaseLines.AsNoTracking().ToListAsync(cancellationToken);
         var centralSales = await context.Sales.AsNoTracking().ToListAsync(cancellationToken);
         var centralSaleLines = await context.SaleLines.AsNoTracking().ToListAsync(cancellationToken);
+        var centralSalePayments = await context.SalePayments.AsNoTracking().ToListAsync(cancellationToken);
         var centralReceivables = await context.Receivables.AsNoTracking().ToListAsync(cancellationToken);
         var centralMovements = await context.InventoryMovements.AsNoTracking().ToListAsync(cancellationToken);
         var centralPayments = await context.Payments.AsNoTracking().ToListAsync(cancellationToken);
@@ -362,11 +367,17 @@ internal sealed class CoordinatorInitialDataImportService(
 
         foreach (var sale in snapshot.Sales)
         {
+            var paymentError = sale.Payments is null ? null : sale.Payments.Any(item => item is null)
+                ? "El detalle de pago contiene elementos vacíos."
+                : SalePaymentRules.Validate(sale.TotalMinorUnits,
+                sale.IsCredit, sale.Payments.Select(item => new SalePaymentDraft(item.PaymentId,
+                    (SalePaymentMethod)item.Method, item.AmountMinorUnits, item.CashReceivedMinorUnits,
+                    item.ChangeMinorUnits)).ToArray());
             if (sale.OccurredAtUtc.Kind != DateTimeKind.Utc || sale.TotalMinorUnits < 0 || sale.Lines.Count == 0 ||
                 sale.Lines.Any(line => line.ProductId == Guid.Empty || line.QuantityMilliUnits <= 0 ||
                     string.IsNullOrWhiteSpace(line.ProductNameSnapshot) || string.IsNullOrWhiteSpace(line.UnitSnapshot) ||
                     !productIds.Contains(line.ProductId)) ||
-                sale.Lines.Sum(line => line.LineTotalMinorUnits) != sale.TotalMinorUnits ||
+                sale.Lines.Sum(line => line.LineTotalMinorUnits) != sale.TotalMinorUnits || paymentError is not null ||
                 sale.Lines.Select(item => item.LineNumber).Distinct().Count() != sale.Lines.Count || sale.Lines.Any(item => item.LineNumber < 0) ||
                 Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(sale, JsonOptions)) > 900_000 ||
                 (sale.CustomerId is Guid customerId && !customerIds.Contains(customerId)) ||
@@ -374,12 +385,17 @@ internal sealed class CoordinatorInitialDataImportService(
                     !snapshot.Receivables.Any(item => item.OperationId == sale.OperationId) &&
                     !centralReceivables.Any(item => item.OperationId == sale.OperationId))))
                 blockers.Add($"La venta {sale.OperationId} está incompleta o usa referencias faltantes.");
+            foreach (var payment in sale.Payments ?? [])
+                if (payment is not null && centralSalePayments.Any(item => item.PaymentId == payment.PaymentId && item.OperationId != sale.OperationId))
+                    blockers.Add($"El identificador del pago {payment.PaymentId} ya pertenece a otra venta central.");
             var current = centralSales.FirstOrDefault(item => item.OperationId == sale.OperationId);
             if (current is not null)
             {
                 var lines = centralSaleLines.Where(item => item.OperationId == sale.OperationId).ToList();
+                var savedPayments = centralSalePayments.Where(item => item.OperationId == sale.OperationId).ToList();
                 if (current.OccurredAtUtc != sale.OccurredAtUtc || current.TotalMinorUnits != sale.TotalMinorUnits ||
                     current.IsCredit != sale.IsCredit || current.CustomerId != sale.CustomerId || lines.Count != sale.Lines.Count ||
+                    !SalePaymentsMatch(sale.Payments, savedPayments) ||
                     sale.Lines.Any(line => line.LineNumber < 0 || !lines.Any(saved => saved.LineNumber == line.LineNumber && saved.ProductId == line.ProductId &&
                         saved.ProductNameSnapshot == line.ProductNameSnapshot && saved.UnitSnapshot == line.UnitSnapshot &&
                         saved.QuantityMilliUnits == line.QuantityMilliUnits && saved.SalePriceMinorUnits == line.SalePriceMinorUnits &&
@@ -585,7 +601,7 @@ internal sealed class CoordinatorInitialDataImportService(
                 item.OperationId, item.OccurredAtUtc, item.Lines), actorMap[item.ActorLocalUserId], item.OccurredAtUtc);
         foreach (var item in snapshot.Sales.OrderBy(item => item.OccurredAtUtc).ThenBy(item => item.OperationId))
             Add("sale", item.OperationId, "Import.Sale", new InitialImportSalePayload(item.OperationId,
-                item.OccurredAtUtc, item.TotalMinorUnits, item.IsCredit, item.CustomerId, item.Lines),
+                item.OccurredAtUtc, item.TotalMinorUnits, item.IsCredit, item.CustomerId, item.Lines, item.Payments),
                 actorMap[item.ActorLocalUserId], item.OccurredAtUtc);
         foreach (var item in snapshot.Receivables.OrderBy(item => item.DueAtUtc).ThenBy(item => item.OperationId))
             Add("receivable", item.OperationId, "Import.Receivable", item, administratorUserId, item.DueAtUtc);
@@ -725,6 +741,17 @@ internal sealed class CoordinatorInitialDataImportService(
     {
         if (ids.Any(id => id == Guid.Empty) || ids.Distinct().Count() != ids.Count())
             blockers.Add($"El paquete contiene identificadores vacíos o repetidos en {label}.");
+    }
+
+    private static bool SalePaymentsMatch(IReadOnlyList<InitialImportSalePayment>? incoming,
+        IReadOnlyList<SalePaymentEntity> saved)
+    {
+        if (incoming is null) return saved.Count == 0;
+        return incoming.Count == saved.Count && incoming.All(payment => saved.Any(item =>
+            item.PaymentId == payment.PaymentId && item.Method == payment.Method &&
+            item.AmountMinorUnits == payment.AmountMinorUnits &&
+            item.CashReceivedMinorUnits == payment.CashReceivedMinorUnits &&
+            item.ChangeMinorUnits == payment.ChangeMinorUnits));
     }
 
     private static bool SameName(string? first, string? second) => Normalize(first) == Normalize(second);

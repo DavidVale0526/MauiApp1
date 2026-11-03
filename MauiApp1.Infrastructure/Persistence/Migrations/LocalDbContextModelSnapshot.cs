@@ -296,7 +296,8 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.PaymentEntity", b =>
                 {
                     b.Property<Guid>("PaymentId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .ValueGeneratedNever();
 
                     b.Property<Guid>("ActorUserId")
                         .HasColumnType("TEXT");
@@ -524,6 +525,46 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SalePaymentEntity", b =>
+                {
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("TEXT")
+                        .ValueGeneratedNever();
+
+                    b.Property<long>("AmountMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CashReceivedMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ChangeMinorUnits")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PaymentId");
+
+                    b.HasIndex("OperationId", "Method")
+                        .IsUnique();
+
+                    b.ToTable("SalePayments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SalePayments_Method_Valid", "\"Method\" BETWEEN 1 AND 3");
+
+                            t.HasCheckConstraint("CK_SalePayments_Amount_Positive", "\"AmountMinorUnits\" > 0");
+
+                            t.HasCheckConstraint("CK_SalePayments_Cash_NonNegative", "\"CashReceivedMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_SalePayments_Change_NonNegative", "\"ChangeMinorUnits\" >= 0");
+
+                            t.HasCheckConstraint("CK_SalePayments_Method_Amounts", "(\"Method\" = 1 AND \"CashReceivedMinorUnits\" >= \"AmountMinorUnits\" AND \"ChangeMinorUnits\" = \"CashReceivedMinorUnits\" - \"AmountMinorUnits\") OR (\"Method\" <> 1 AND \"CashReceivedMinorUnits\" = 0 AND \"ChangeMinorUnits\" = 0)");
+                        });
+                });
+
             modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -699,6 +740,15 @@ namespace MauiApp1.Infrastructure.Persistence.Migrations
                     b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.ProductEntity", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MauiApp1.Infrastructure.Persistence.Entities.SalePaymentEntity", b =>
+                {
+                    b.HasOne("MauiApp1.Infrastructure.Persistence.Entities.SaleEntity", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

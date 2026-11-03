@@ -31,9 +31,12 @@ public sealed record InitialImportPurchase(Guid OperationId, DateTime OccurredAt
 public sealed record InitialImportPurchaseLine(int LineNumber, Guid ProductId, string ProductNameSnapshot,
     string UnitSnapshot, long QuantityMilliUnits);
 public sealed record InitialImportSale(Guid OperationId, DateTime OccurredAtUtc, Guid ActorLocalUserId,
-    long TotalMinorUnits, bool IsCredit, Guid? CustomerId, IReadOnlyList<InitialImportSaleLine> Lines);
+    long TotalMinorUnits, bool IsCredit, Guid? CustomerId, IReadOnlyList<InitialImportSaleLine> Lines,
+    IReadOnlyList<InitialImportSalePayment>? Payments = null);
 public sealed record InitialImportSaleLine(int LineNumber, Guid ProductId, string ProductNameSnapshot,
     string UnitSnapshot, long QuantityMilliUnits, long SalePriceMinorUnits, long LineTotalMinorUnits);
+public sealed record InitialImportSalePayment(Guid PaymentId, int Method, long AmountMinorUnits,
+    long CashReceivedMinorUnits, long ChangeMinorUnits);
 public sealed record InitialImportReceivable(Guid OperationId, Guid CustomerId, long OriginalAmountMinorUnits,
     long OutstandingMinorUnits, DateTime DueAtUtc);
 public sealed record InitialImportMovement(Guid MovementId, Guid OperationId, int LineNumber, Guid? ProductId,
@@ -47,7 +50,8 @@ public sealed record InitialImportDiscrepancy(Guid DiscrepancyId, Guid Operation
 public sealed record InitialImportPurchasePayload(Guid OperationId, DateTime OccurredAtUtc,
     IReadOnlyList<InitialImportPurchaseLine> Lines);
 public sealed record InitialImportSalePayload(Guid OperationId, DateTime OccurredAtUtc,
-    long TotalMinorUnits, bool IsCredit, Guid? CustomerId, IReadOnlyList<InitialImportSaleLine> Lines);
+    long TotalMinorUnits, bool IsCredit, Guid? CustomerId, IReadOnlyList<InitialImportSaleLine> Lines,
+    IReadOnlyList<InitialImportSalePayment>? Payments = null);
 public sealed record InitialImportMovementPayload(Guid MovementId, Guid OperationId, int LineNumber,
     Guid? ProductId, string ProductNameSnapshot, string UnitSnapshot, int Type, long QuantityMilliUnits,
     string? Reason, DateTime OccurredAtUtc);

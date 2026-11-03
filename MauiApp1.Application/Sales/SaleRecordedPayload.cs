@@ -7,7 +7,8 @@ public sealed record SaleRecordedPayload(
     long TotalMinorUnits,
     bool IsCredit = false,
     Guid? CustomerId = null,
-    DateTime? CreditDueAtUtc = null);
+    DateTime? CreditDueAtUtc = null,
+    IReadOnlyList<SaleRecordedPaymentPayload>? Payments = null);
 
 public sealed record SaleRecordedLinePayload(
     int LineNumber,
@@ -17,3 +18,10 @@ public sealed record SaleRecordedLinePayload(
     long QuantityMilliUnits,
     long SalePriceMinorUnits,
     long LineTotalMinorUnits);
+
+public sealed record SaleRecordedPaymentPayload(
+    Guid PaymentId,
+    int Method,
+    long AmountMinorUnits,
+    long CashReceivedMinorUnits,
+    long ChangeMinorUnits);
