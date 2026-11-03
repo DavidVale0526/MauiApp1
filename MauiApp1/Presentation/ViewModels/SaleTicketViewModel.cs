@@ -19,7 +19,9 @@ public sealed class SaleTicketViewModel
 
     public string DocumentType => "TICKET INTERNO · NO FISCAL";
 
-    public string ReferenceText => $"Folio interno: {Sale.OperationId.ToString("N")[..8].ToUpperInvariant()}";
+    public string ReferenceText => $"Folio interno: V-{Sale.OperationId:N}".ToUpperInvariant();
+
+    public string PdfFileName => $"Comprobante-{Sale.OperationId:N}.pdf";
 
     public string DateText => $"Fecha: {Sale.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}";
 
@@ -28,7 +30,7 @@ public sealed class SaleTicketViewModel
     public string CurrencyText => "Córdobas nicaragüenses (C$)";
 
     public string CreditDetailsText => Sale.IsCredit
-        ? $"Venta a crédito · Cliente: {Sale.CustomerName ?? "No disponible"} · Vence: {Sale.CreditDueAtUtc?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "No disponible"}"
+        ? $"Venta a crédito · Cliente: {Sale.CustomerName ?? "No disponible"} · Saldo pendiente: C$ {FormatMoney(Sale.OutstandingMinorUnits ?? Sale.TotalMinorUnits)} · Vence: {Sale.CreditDueAtUtc?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "No disponible"}"
         : "Venta de contado";
 
     public string PaymentDetailsText => Sale.IsCredit

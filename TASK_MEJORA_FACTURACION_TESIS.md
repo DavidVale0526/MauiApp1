@@ -1,6 +1,6 @@
 # TASK — Completar facturación para el alcance de la tesis
 
-**Estado general:** Etapa 1 implementada; comprobaciones manuales integrales pendientes de Etapa 4  
+**Estado general:** Etapas 1 y 2 implementadas; comprobaciones manuales integrales pendientes de Etapa 4
 **Fecha de creación:** 3 de noviembre de 2026  
 **Plataformas:** Windows y Android; sincronización LAN existente  
 **Alcance:** captura de pagos de contado y cambio, comprobante imprimible/compartible, anulaciones y devoluciones con trazabilidad
@@ -45,7 +45,7 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 - [x] Definir los métodos de pago internos incluidos: efectivo, tarjeta y transferencia; permitir uno o varios métodos en una venta solo si el total queda liquidado.
 - [x] Definir que una venta de contado debe quedar pagada por completo; el efectivo entregado puede ser mayor o igual al importe asignado a efectivo y el cambio se calcula sin tratarlo como ingreso.
 - [x] Definir que las ventas a crédito conservan su comportamiento actual y que los pagos iniciales parciales/créditos mixtos no se habilitan sin modelar correctamente el saldo inicial.
-- [ ] Definir el formato de un folio interno legible y estable sin presentarlo como numeración tributaria. Evitar depender de una secuencia central para registrar ventas offline.
+- [x] Definir el formato de un folio interno legible y estable: usar el identificador completo de operación (`V-` + GUID), sin presentarlo como numeración tributaria ni depender de una secuencia central para registrar ventas offline.
 - [ ] Definir política de anulaciones y devoluciones: ventana/permiso, ventas que pueden anularse, devolución parcial por renglón, cantidades máximas y relación con pagos o deudas ya registrados.
 - [ ] Definir el tratamiento monetario de una devolución cuando la venta fue pagada, quedó a crédito o ya recibió abonos; no crear saldo negativo ni un reembolso ficticio.
 - [ ] Definir cómo se resuelven devoluciones concurrentes de la misma venta desde dispositivos diferentes: el coordinador valida el acumulado y rechaza el exceso como conflicto visible.
@@ -89,21 +89,23 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 
 ### Contenido del documento
 
-- [ ] Mostrar identificador/folio interno, fecha y hora local, negocio, usuario que atendió, renglones, cantidad y unidad, precio unitario, total por renglón y total general.
-- [ ] Mostrar método(s) de pago, importe asignado por método, efectivo recibido y cambio cuando corresponda.
-- [ ] Para ventas a crédito, mostrar cliente, saldo pendiente y vencimiento, sin presentar el saldo como pago recibido.
-- [ ] Incluir de forma visible “Comprobante interno — no es factura ni comprobante fiscal”.
-- [ ] No incluir impuestos calculados ni campos fiscales ficticios.
-- [ ] Usar los datos históricos guardados en la venta; no tomar nombres, precios o unidades actuales del catálogo para rehacer comprobantes anteriores.
+- [x] Mostrar identificador/folio interno, fecha y hora local, negocio, usuario que atendió, renglones, cantidad y unidad, precio unitario, total por renglón y total general.
+- [x] Mostrar método(s) de pago, importe asignado por método, efectivo recibido y cambio cuando corresponda.
+- [x] Para ventas a crédito, mostrar cliente, saldo pendiente y vencimiento, sin presentar el saldo como pago recibido.
+- [x] Incluir de forma visible “Comprobante interno — no es factura ni comprobante fiscal”.
+- [x] No incluir impuestos calculados ni campos fiscales ficticios.
+- [x] Usar los datos históricos guardados en la venta; no tomar nombres, precios o unidades actuales del catálogo para rehacer comprobantes anteriores.
 
 ### Acciones
 
-- [ ] Generar PDF localmente sin requerir Internet ni servicios externos.
-- [ ] Permitir abrir/guardar/compartir el PDF mediante los mecanismos nativos disponibles en Windows y Android.
-- [ ] Añadir acción de imprimir si la plataforma dispone de un flujo soportado; si no, permitir imprimir desde el PDF abierto y comunicarlo claramente.
-- [ ] Permitir volver a generar/compartir el comprobante desde el historial, sin crear una nueva venta.
-- [ ] Gestionar almacenamiento temporal y errores de permisos/cancelación sin perder ni alterar la venta.
-- [ ] Asegurar que el identificador o folio que aparece en el comprobante permita localizar exactamente la venta original.
+- [x] Generar PDF localmente sin requerir Internet ni servicios externos.
+- [x] Permitir abrir/guardar/compartir el PDF mediante los mecanismos nativos disponibles en Windows y Android.
+- [x] Permitir imprimir desde el lector de PDF abierto y comunicarlo claramente; no se añadió un flujo de impresión directa específico de plataforma.
+- [x] Permitir volver a generar/compartir el comprobante desde el historial, sin crear una nueva venta.
+- [x] Gestionar almacenamiento temporal y errores de permisos/cancelación sin perder ni alterar la venta.
+- [x] Asegurar que el identificador o folio que aparece en el comprobante permita localizar exactamente la venta original.
+
+**Estado:** implementación terminada y Windows/Android compilan sin errores. La generación, visualización real del PDF, selectores nativos y el flujo de compartir/imprimir deben comprobarse manualmente en los dispositivos y se registrarán en Etapa 4.
 
 **Criterio de aceptación:** el usuario genera desde una venta confirmada un comprobante PDF legible, con datos de pago correctos, que puede abrirse/compartirse en ambas plataformas; el historial permite repetir la acción y el documento mantiene la advertencia de no fiscal.
 
@@ -166,7 +168,8 @@ En esta etapa se prioriza una facturación operativa interna: registrar el pago 
 ## Registro de avance
 
 - **3 de noviembre de 2026 — Etapa 1 implementada:** detalle de pagos de contado separado de los abonos de crédito; captura de efectivo/tarjeta/transferencia con cambio; persistencia local y central; importación inicial y reintentos idempotentes; historial identifica ventas antiguas sin detalle. Migración `20261103120000_SalePaymentDetails` agregada. Compilación de Windows, Android y Coordinador completada sin errores. Queda pendiente probar venta en efectivo, cambio, métodos mixtos, crédito y sincronización en dispositivos como parte de Etapa 4.
-- **Etapa 0 sigue parcialmente pendiente:** la política de folios internos y reglas financieras de anulación/devolución se resolverán antes de las etapas 2 y 3, respectivamente.
+- **Etapa 0 sigue parcialmente pendiente:** el formato del folio interno quedó definido en Etapa 2 como identificador completo de operación. Las reglas financieras de anulación/devolución siguen pendientes y se acordarán antes de Etapa 3.
+- **3 de noviembre de 2026 — Etapa 2 implementada:** comprobante PDF local con datos históricos, folio interno completo, detalle de pagos/cambio y saldo de crédito; acciones nativas para guardar, compartir y abrir/imprimir desde Windows y Android; acceso disponible al confirmar una venta y desde su historial. Ambas plataformas compilaron sin errores. Falta comprobar en dispositivos que el PDF se renderice correctamente y que funcionen los selectores y destinos nativos; esas verificaciones quedan en Etapa 4.
 
 ## Archivos principales a revisar
 

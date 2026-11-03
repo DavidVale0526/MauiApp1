@@ -1,16 +1,20 @@
 using MauiApp1.Presentation.ViewModels;
 using MauiApp1.Application.Sync;
+using MauiApp1.Presentation.Services;
 
 namespace MauiApp1.Presentation.Views;
 
 public partial class SaleHistoryPage : CoordinatorRefreshPage
 {
     private readonly SaleHistoryViewModel _viewModel;
+    private readonly IReceiptDocumentActions _documentActions;
 
-    public SaleHistoryPage(SaleHistoryViewModel viewModel, ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
+    public SaleHistoryPage(SaleHistoryViewModel viewModel, ILocalDataChangeNotifier changeNotifier,
+        IReceiptDocumentActions documentActions) : base(changeNotifier)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _documentActions = documentActions;
         BindingContext = viewModel;
     }
 
@@ -33,7 +37,7 @@ public partial class SaleHistoryPage : CoordinatorRefreshPage
             return;
         }
 
-        await Navigation.PushAsync(new SaleTicketPage(card.Sale));
+        await Navigation.PushAsync(new SaleTicketPage(card.Sale, _documentActions));
     }
 
     private void OnPageSizeChanged(object? sender, EventArgs eventArgs)

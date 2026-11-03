@@ -278,6 +278,9 @@ internal sealed class EfSaleService(
         var dueDates = await context.Receivables.AsNoTracking()
             .Where(item => operationIds.Contains(item.OperationId))
             .ToDictionaryAsync(item => item.OperationId, item => item.DueAtUtc, cancellationToken);
+        var outstandingBySale = await context.Receivables.AsNoTracking()
+            .Where(item => operationIds.Contains(item.OperationId))
+            .ToDictionaryAsync(item => item.OperationId, item => item.OutstandingMinorUnits, cancellationToken);
         var payments = await context.SalePayments.AsNoTracking()
             .Where(item => operationIds.Contains(item.OperationId))
             .OrderBy(item => item.Method)
@@ -298,6 +301,7 @@ internal sealed class EfSaleService(
             sale.IsCredit,
             sale.CustomerId.HasValue ? customerNames.GetValueOrDefault(sale.CustomerId.Value) : null,
             dueDates.TryGetValue(sale.OperationId, out var dueAtUtc) ? dueAtUtc : null,
-            paymentsBySale.GetValueOrDefault(sale.OperationId, []))).ToArray();
+            paymentsBySale.GetValueOrDefault(sale.OperationId, []),
+            outstandingBySale.TryGetValue(sale.OperationId, out var outstanding) ? outstanding : null)).ToArray();
     }
 }

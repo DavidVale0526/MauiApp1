@@ -31,6 +31,13 @@ namespace MauiApp1
 
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton(desktopMode);
+#if ANDROID
+            builder.Services.AddSingleton<MauiApp1.Presentation.Services.IReceiptDocumentActions,
+                MauiApp1.Platforms.Android.AndroidReceiptDocumentActions>();
+#elif WINDOWS
+            builder.Services.AddSingleton<MauiApp1.Presentation.Services.IReceiptDocumentActions,
+                MauiApp1.Platforms.Windows.WindowsReceiptDocumentActions>();
+#endif
 #if WINDOWS
             builder.Services.AddTransient<BackupManagementPage>();
             var backupKeyDirectory = desktopMode.IsHost && !string.IsNullOrWhiteSpace(desktopMode.CentralDataDirectory)

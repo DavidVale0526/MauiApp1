@@ -9,7 +9,8 @@ public sealed record SaleHistoryEntry(
     bool IsCredit = false,
     string? CustomerName = null,
     DateTime? CreditDueAtUtc = null,
-    IReadOnlyList<SaleHistoryPayment>? Payments = null);
+    IReadOnlyList<SaleHistoryPayment>? Payments = null,
+    long? OutstandingMinorUnits = null);
 
 public sealed record SaleHistoryLine(
     string ProductName,

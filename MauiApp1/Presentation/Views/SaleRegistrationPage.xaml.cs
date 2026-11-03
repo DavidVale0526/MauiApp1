@@ -1,6 +1,7 @@
 using MauiApp1.Presentation.ViewModels;
 using MauiApp1.Application.Sync;
 using MauiApp1.Application.Sales;
+using MauiApp1.Presentation.Services;
 
 namespace MauiApp1.Presentation.Views;
 
@@ -80,10 +81,11 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
 
     private readonly SaleRegistrationViewModel _viewModel;
     private readonly ISaleService _saleService;
+    private readonly IReceiptDocumentActions _documentActions;
     private bool _reviewInProgress;
 
     public SaleRegistrationPage(SaleRegistrationViewModel viewModel, ISaleService saleService,
-        ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
+        ILocalDataChangeNotifier changeNotifier, IReceiptDocumentActions documentActions) : base(changeNotifier)
     {
         InitializeComponent();
 #if WINDOWS
@@ -99,6 +101,7 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
 #endif
         _viewModel = viewModel;
         _saleService = saleService;
+        _documentActions = documentActions;
         BindingContext = viewModel;
     }
 
@@ -174,7 +177,7 @@ public partial class SaleRegistrationPage : CoordinatorRefreshPage
                 .SingleOrDefault(item => item.OperationId == operationId);
             if (sale is not null)
             {
-                await Navigation.PushAsync(new SaleTicketPage(sale));
+                await Navigation.PushAsync(new SaleTicketPage(sale, _documentActions));
                 return;
             }
         }

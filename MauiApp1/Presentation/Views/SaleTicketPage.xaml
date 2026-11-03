@@ -10,6 +10,15 @@
             <Label Text="{Binding ReferenceText}" FontSize="13" TextColor="#647792" />
           </VerticalStackLayout>
         </Grid>
+        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+          <Button x:Name="SavePdfButton" Text="Guardar PDF" Clicked="OnSavePdfClicked"
+                  BackgroundColor="#E8EEF5" TextColor="#0D1B2A" CornerRadius="10" Padding="12,13" />
+          <Button x:Name="SharePdfButton" Grid.Column="1" Text="Compartir PDF" Clicked="OnSharePdfClicked"
+                  BackgroundColor="#E8EEF5" TextColor="#0D1B2A" CornerRadius="10" Padding="12,13" />
+          <Button x:Name="OpenPdfButton" Grid.Row="1" Grid.ColumnSpan="2" Text="Abrir PDF / imprimir"
+                  Clicked="OnOpenPdfClicked" BackgroundColor="#007F60" TextColor="White"
+                  FontAttributes="Bold" CornerRadius="10" Padding="12,14" />
+        </Grid>
         <VerticalStackLayout Spacing="12" Padding="0,8">
           <Border BackgroundColor="#D1FAE8" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="16,7" HorizontalOptions="Center">
             <Label Text="✓  VENTA REGISTRADA" FontSize="12" FontAttributes="Bold" TextColor="#007F60" />
