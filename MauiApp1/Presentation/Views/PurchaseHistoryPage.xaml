@@ -6,71 +6,185 @@
              x:Class="MauiApp1.Presentation.Views.PurchaseHistoryPage"
              x:DataType="viewModels:PurchaseHistoryViewModel"
              Title="Historial de compras" BackgroundColor="#F7F9FB">
-    <Grid x:Name="PageLayout" Padding="16,20" RowDefinitions="Auto,*" RowSpacing="20"
-          SizeChanged="OnPageSizeChanged">
-        <Grid x:Name="ContentHost" Grid.RowSpan="2" MaximumWidthRequest="1160" HorizontalOptions="Fill"
-              RowDefinitions="Auto,*" RowSpacing="20">
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                <Button Text="← Volver" Clicked="OnBackClicked" BackgroundColor="#E8EEF5"
-                        TextColor="#0D1B2A" CornerRadius="12" Padding="18,12" VerticalOptions="Center" />
+    <Grid x:Name="PageLayout" Padding="16,20" SizeChanged="OnPageSizeChanged">
+        <Grid x:Name="ContentHost" MaximumWidthRequest="1160" HorizontalOptions="Center"
+              RowDefinitions="Auto,Auto,*" RowSpacing="18">
+
+            <!-- Encabezado -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Button Text="← Volver" Clicked="OnBackClicked"
+                        BackgroundColor="White" TextColor="#34445A"
+                        BorderColor="#E3EAF2" BorderWidth="1"
+                        CornerRadius="10" Padding="16,10" VerticalOptions="Center" />
                 <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3" VerticalOptions="Center">
-                        <Label Text="Historial de compras" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
-                        <Label Text="Compras registradas, de la más reciente a la más antigua."
+                        <Label Text="Historial de Compras" FontSize="28" FontAttributes="Bold"
+                               TextColor="#111D31" />
+                        <Label Text="Registro ordenado de abastecimiento e ingresos de stock"
                                FontSize="14" TextColor="#61738A" />
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked"
-                            BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="11"
-                            Padding="18,12" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="↻ Actualizar" Clicked="OnRefreshClicked"
+                            BackgroundColor="#0D1B2A" TextColor="White" CornerRadius="10"
+                            Padding="16,10" VerticalOptions="Center" />
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,*" RowSpacing="10">
-                <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
+            <!-- Resumen -->
+            <Grid x:Name="StatsGrid" Grid.Row="1" ColumnDefinitions="*,*,*"
+                  ColumnSpacing="14" RowSpacing="10">
+                <Border x:Name="StatPurchases" Padding="18,16" BackgroundColor="White"
+                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 14">
+                    <Border.Shadow>
+                        <Shadow Brush="#0D1B2A" Offset="0,3" Radius="10" Opacity="0.06" />
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Compras registradas" FontSize="13" TextColor="#61738A" />
+                        <Label Text="{Binding PurchaseCountText}" FontSize="24" FontAttributes="Bold"
+                               TextColor="#111D31" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="StatThisMonth" Grid.Column="1" Padding="18,16" BackgroundColor="White"
+                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 14">
+                    <Border.Shadow>
+                        <Shadow Brush="#0D1B2A" Offset="0,3" Radius="10" Opacity="0.06" />
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Compras este mes" FontSize="13" TextColor="#61738A" />
+                        <Label Text="{Binding MonthlyPurchaseCountText}" FontSize="24" FontAttributes="Bold"
+                               TextColor="#111D31" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border x:Name="StatUnits" Grid.Column="2" Padding="18,16" BackgroundColor="White"
+                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 14">
+                    <Border.Shadow>
+                        <Shadow Brush="#0D1B2A" Offset="0,3" Radius="10" Opacity="0.06" />
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Unidades recibidas" FontSize="13" TextColor="#61738A" />
+                        <Label Text="{Binding UnitsReceivedText}" FontSize="24" FontAttributes="Bold"
+                               TextColor="#111D31" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- Lista de compras -->
+            <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="10">
+                <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="13" />
                 <Grid Grid.Row="1">
                     <ScrollView>
-                        <VerticalStackLayout Spacing="0" HorizontalOptions="Fill">
-                            <Border Padding="24" BackgroundColor="White" Stroke="#E3EAF2"
-                                    StrokeShape="RoundRectangle 16" VerticalOptions="Start" IsVisible="{Binding HasNoPurchases}">
-                                <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                        <VerticalStackLayout Spacing="14" HorizontalOptions="Fill">
+                            <Border Padding="30" BackgroundColor="White" Stroke="#E3EAF2"
+                                    StrokeThickness="1" StrokeShape="RoundRectangle 16"
+                                    VerticalOptions="Start" IsVisible="{Binding HasNoPurchases}">
+                                <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#EAF1FB"
+                                            StrokeThickness="0" StrokeShape="RoundRectangle 14"
+                                            HorizontalOptions="Center">
+                                        <Label Text="📦" FontSize="24" HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
+                                    </Border>
                                     <Label Text="Aún no hay compras registradas." FontSize="17"
-                                           FontAttributes="Bold" TextColor="#111D31" HorizontalTextAlignment="Center" />
-                                    <Label Text="Las compras guardadas aparecerán aquí."
-                                           FontSize="14" TextColor="#61738A" HorizontalTextAlignment="Center" />
+                                           FontAttributes="Bold" TextColor="#111D31"
+                                           HorizontalTextAlignment="Center" />
+                                    <Label Text="Las compras guardadas aparecerán aquí." FontSize="14"
+                                           TextColor="#61738A" HorizontalTextAlignment="Center" />
                                 </VerticalStackLayout>
                             </Border>
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Purchases}" HorizontalOptions="Fill">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="viewModels:PurchaseHistoryCard">
-                                <Border Padding="18" Margin="0,0,0,12" BackgroundColor="White"
-                                        Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
-                                    <VerticalStackLayout Spacing="12">
-                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                            <Border Padding="10" BackgroundColor="#E8EEF5" StrokeThickness="0"
-                                                    StrokeShape="RoundRectangle 12" VerticalOptions="Start">
-                                                <Label Text="↓" FontSize="18" FontAttributes="Bold" TextColor="#0D1B2A" />
-                                            </Border>
-                                            <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
-                                                <Label Text="Compra registrada" FontSize="16" FontAttributes="Bold" TextColor="#111D31" />
-                                                <Label Text="{Binding DateText}" FontSize="13" TextColor="#61738A" />
+
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Purchases}"
+                                                 Spacing="14" HorizontalOptions="Fill">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="viewModels:PurchaseHistoryCard">
+                                        <Border BackgroundColor="White" Stroke="#E3EAF2"
+                                                StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                                            <VerticalStackLayout Spacing="0">
+                                                <Grid Padding="16,14" ColumnDefinitions="Auto,*,Auto"
+                                                      ColumnSpacing="12">
+                                                    <Border WidthRequest="44" HeightRequest="44"
+                                                            BackgroundColor="#EAF1FB" StrokeThickness="0"
+                                                            StrokeShape="RoundRectangle 12"
+                                                            VerticalOptions="Center">
+                                                        <Label Text="📦" FontSize="20"
+                                                               HorizontalOptions="Center"
+                                                               VerticalOptions="Center" />
+                                                    </Border>
+
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="3"
+                                                                         VerticalOptions="Center">
+                                                        <Label Text="Compra registrada" FontSize="15"
+                                                               FontAttributes="Bold" TextColor="#111D31" />
+                                                        <Label Text="{Binding SubtitleText}" FontSize="12"
+                                                               TextColor="#61738A"
+                                                               LineBreakMode="TailTruncation" />
+                                                    </VerticalStackLayout>
+
+                                                    <Border Grid.Column="2" Padding="10,6"
+                                                            BackgroundColor="#E7F8EF" StrokeThickness="0"
+                                                            StrokeShape="RoundRectangle 12"
+                                                            VerticalOptions="Center">
+                                                        <HorizontalStackLayout Spacing="6">
+                                                            <BoxView WidthRequest="8" HeightRequest="8"
+                                                                     CornerRadius="4" Color="#12B76A"
+                                                                     VerticalOptions="Center" />
+                                                            <Label Text="Recibido" FontSize="12"
+                                                                   FontAttributes="Bold" TextColor="#067647"
+                                                                   VerticalOptions="Center" />
+                                                        </HorizontalStackLayout>
+                                                    </Border>
+                                                </Grid>
+
+                                                <BoxView HeightRequest="1" Color="#EDF1F5" />
+
+                                                <Grid Padding="16,14" ColumnDefinitions="*,Auto"
+                                                      ColumnSpacing="16">
+                                                    <VerticalStackLayout Spacing="8">
+                                                        <Label Text="{Binding ItemsHeader}" FontSize="11"
+                                                               FontAttributes="Bold" TextColor="#8291A5"
+                                                               CharacterSpacing="1.1" />
+                                                        <FlexLayout Wrap="Wrap" Direction="Row"
+                                                                    AlignItems="Start"
+                                                                    BindableLayout.ItemsSource="{Binding Items}">
+                                                            <BindableLayout.ItemTemplate>
+                                                                <DataTemplate x:DataType="viewModels:PurchaseHistoryItem">
+                                                                    <Border Margin="0,0,8,8" Padding="12,8"
+                                                                            BackgroundColor="#F7F9FB"
+                                                                            Stroke="#E3EAF2"
+                                                                            StrokeThickness="1"
+                                                                            StrokeShape="RoundRectangle 8">
+                                                                        <Label Text="{Binding Text}"
+                                                                               FontSize="13"
+                                                                               TextColor="#34445A" />
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </BindableLayout.ItemTemplate>
+                                                        </FlexLayout>
+                                                    </VerticalStackLayout>
+
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="2"
+                                                                         VerticalOptions="Center"
+                                                                         HorizontalOptions="End">
+                                                        <Label Text="ARTÍCULOS" FontSize="10"
+                                                               FontAttributes="Bold" TextColor="#8291A5"
+                                                               CharacterSpacing="1.1"
+                                                               HorizontalTextAlignment="End" />
+                                                        <Label Text="{Binding ItemCountText}" FontSize="20"
+                                                               FontAttributes="Bold" TextColor="#111D31"
+                                                               HorizontalTextAlignment="End" />
+                                                    </VerticalStackLayout>
+                                                </Grid>
                                             </VerticalStackLayout>
-                                        </Grid>
-                                        <BoxView HeightRequest="1" Color="#E3EAF2" />
-                                        <Label Text="Productos recibidos" FontSize="14" FontAttributes="Bold" TextColor="#34445A" />
-                                        <Border Padding="12" BackgroundColor="#F7F9FB" Stroke="#E3EAF2"
-                                                StrokeShape="RoundRectangle 10">
-                                            <Label Text="{Binding ProductsText}" FontSize="14" TextColor="#34445A"
-                                                   LineBreakMode="WordWrap" />
                                         </Border>
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                     </ScrollView>
+
                     <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                                       HorizontalOptions="Center" VerticalOptions="Center" Color="#0D1B2A" />
+                                       HorizontalOptions="Center" VerticalOptions="Center"
+                                       Color="#0D1B2A" />
                 </Grid>
             </Grid>
         </Grid>

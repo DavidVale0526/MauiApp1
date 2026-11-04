@@ -30,6 +30,39 @@ public sealed class PurchaseHistoryViewModel(IPurchaseService purchaseService) :
     public bool HasPurchases => Purchases.Count > 0;
     public bool HasNoPurchases => !HasPurchases;
 
+    public string PurchaseCountText => FormatCount(Purchases.Count, "compra", "compras");
+
+    public string MonthlyPurchaseCountText
+    {
+        get
+        {
+            var today = DateTime.Now;
+            var count = Purchases.Count(card =>
+            {
+                var date = card.Purchase.OccurredAtUtc.ToLocalTime();
+                return date.Year == today.Year && date.Month == today.Month;
+            });
+            return FormatCount(count, "compra", "compras");
+        }
+    }
+
+    public string UnitsReceivedText
+    {
+        get
+        {
+            decimal units = 0;
+            foreach (var card in Purchases)
+            {
+                foreach (var line in card.Purchase.Lines)
+                {
+                    units += line.QuantityMilliUnits / 1000m;
+                }
+            }
+
+            return $"{units.ToString("0.###", CultureInfo.CurrentCulture)} {(units == 1m ? "unidad" : "unidades")}";
+        }
+    }
+
     public async Task LoadAsync()
     {
         if (IsBusy) return;
@@ -45,6 +78,9 @@ public sealed class PurchaseHistoryViewModel(IPurchaseService purchaseService) :
             }
             OnPropertyChanged(nameof(HasPurchases));
             OnPropertyChanged(nameof(HasNoPurchases));
+            OnPropertyChanged(nameof(PurchaseCountText));
+            OnPropertyChanged(nameof(MonthlyPurchaseCountText));
+            OnPropertyChanged(nameof(UnitsReceivedText));
         }
         catch
         {
@@ -64,6 +100,9 @@ public sealed class PurchaseHistoryViewModel(IPurchaseService purchaseService) :
         return true;
     }
 
+    private static string FormatCount(int count, string singular, string plural) =>
+        $"{count} {(count == 1 ? singular : plural)}";
+
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
@@ -72,8 +111,19 @@ public sealed record PurchaseHistoryCard(PurchaseHistoryEntry Purchase)
 {
     public string DateText => Purchase.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
 
-    public string ProductsText => string.Join(
-        Environment.NewLine,
-        Purchase.Lines.Select(line =>
-            $"• {line.ProductName}: {(line.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {line.Unit}"));
+    public string ReferenceText =>
+        $"#CMP-{Purchase.OccurredAtUtc.ToLocalTime():yyyy}-{Purchase.OperationId.ToString("N")[..4].ToUpperInvariant()}";
+
+    public string SubtitleText => $"{ReferenceText} • {DateText}";
+
+    public string ItemsHeader => $"ARTÍCULOS RECIBIDOS ({Purchase.Lines.Count})";
+
+    public string ItemCountText => Purchase.Lines.Count.ToString(CultureInfo.CurrentCulture);
+
+    public IReadOnlyList<PurchaseHistoryItem> Items => Purchase.Lines
+        .Select(line => new PurchaseHistoryItem(
+            $"{line.ProductName} • {(line.QuantityMilliUnits / 1000m).ToString("0.###", CultureInfo.CurrentCulture)} {line.Unit}"))
+        .ToArray();
 }
+
+public sealed record PurchaseHistoryItem(string Text);
