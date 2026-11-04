@@ -6,6 +6,11 @@ public interface ICoordinatorPairingClient
     Task<CoordinatorAvailability> CheckAvailabilityAsync();
     Task<PairingCodeResult> CreateCodeAsync(string address, string fingerprint, string userName, string password);
     Task<PairingActionResult> PairAsync(string address, string fingerprint, string code);
+    /// <summary>
+    /// Cambia la dirección guardada de un dispositivo ya vinculado, conservando la
+    /// huella y el token. Sirve cuando el coordinador cambió de IP y mDNS no lo encuentra.
+    /// </summary>
+    Task<PairingActionResult> UpdateAddressAsync(string address);
     Task<PairingActionResult> UnlinkAsync();
 }
 

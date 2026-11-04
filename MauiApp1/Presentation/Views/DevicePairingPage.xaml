@@ -42,6 +42,14 @@
                         <Label Text="Conecta ambos dispositivos al Wi-Fi del negocio. El coordinador debe estar instalado y encendido en Windows." FontSize="13" TextColor="#61738A" />
                         <Button Text="Desvincular este dispositivo" Clicked="OnUnlinkClicked" IsVisible="{Binding CanUnlink}" Style="{StaticResource SecondaryButton}" />
                         <Label Text="Al desvincular, se revoca el acceso al coordinador. Los datos locales se conservan." IsVisible="{Binding CanUnlink}" FontSize="13" TextColor="#61738A" />
+                        <VerticalStackLayout Spacing="7" IsVisible="{Binding CanRepairAddress}">
+                            <Label Text="Dirección actual del coordinador" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Entry Placeholder="https://192.168.1.10:5080" Text="{Binding RepairAddress}"
+                                   IsEnabled="{Binding CanRepairAddress}" Keyboard="Url" Style="{StaticResource Input}" />
+                            <Button Text="Actualizar dirección del coordinador" Command="{Binding RepairAddressCommand}"
+                                    Style="{StaticResource SecondaryButton}" />
+                            <Label Text="Úsalo si Windows cambió de IP (por ejemplo, al cambiar de red). Se conserva la huella del certificado y el vínculo." FontSize="12" TextColor="#61738A" />
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16" IsVisible="{Binding CanDiscover}">

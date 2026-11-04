@@ -427,6 +427,55 @@ public sealed class CoordinatorPairingClient(
         finally { _pairingLock.Release(); }
     }
 
+    public async Task<PairingActionResult> UpdateAddressAsync(string address)
+    {
+        await _pairingLock.WaitAsync();
+        try
+        {
+            CoordinatorDeviceLink? link;
+            try { link = await storage.ReadAsync(); }
+            catch { return new(false, "No se pudo leer la autorización segura. No se modificó la vinculación."); }
+            if (link is null) return new(false, "Este dispositivo no está vinculado.");
+            if (!link.IsConfirmed) return new(false, "La vinculación está pendiente; usa el código del coordinador para confirmarla.");
+            if (string.IsNullOrWhiteSpace(address))
+                return new(false, "Escribe la dirección del coordinador, por ejemplo https://192.168.1.10:5080.");
+            if (!TryValidateConnection(address, link.CertificateFingerprint, out var uri, out var fingerprint, out var validationError))
+                return new(false, validationError);
+
+            try
+            {
+                using var client = CreatePinnedClient(uri!, fingerprint);
+                client.Timeout = TimeSpan.FromSeconds(6);
+                using var response = await client.GetAsync("health");
+                if (!response.IsSuccessStatusCode)
+                    return new(false, "La dirección respondió, pero no corresponde al coordinador vinculado. Verifica la IP.");
+            }
+            catch (HttpRequestException)
+            {
+                return new(false, "No se pudo contactar al coordinador en esa dirección. Revisa la red local y la IP de Windows.");
+            }
+            catch (TaskCanceledException)
+            {
+                return new(false, "El coordinador no respondió a tiempo en esa dirección. Revisa la red local y la IP de Windows.");
+            }
+
+            var updated = new CoordinatorDeviceLink
+            {
+                DeviceId = link.DeviceId,
+                Address = uri!.AbsoluteUri,
+                CertificateFingerprint = link.CertificateFingerprint,
+                DeviceToken = link.DeviceToken,
+                IsConfirmed = link.IsConfirmed,
+                PendingCode = link.PendingCode
+            };
+            try { await storage.SaveAsync(updated); }
+            catch { return new(false, "La dirección es válida, pero no se pudo guardar de forma segura. Vuelve a intentarlo."); }
+
+            return new(true, "Dirección del coordinador actualizada. Ya puedes desvincular o sincronizar.");
+        }
+        finally { _pairingLock.Release(); }
+    }
+
     public async Task<PairingActionResult> UnlinkAsync()
     {
         await _pairingLock.WaitAsync();

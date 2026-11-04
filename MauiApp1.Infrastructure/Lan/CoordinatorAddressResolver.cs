@@ -122,8 +122,8 @@ public sealed class CoordinatorAddressResolver(
     private static bool TryGetCoordinatorId(string fingerprint, out string coordinatorId)
     {
         coordinatorId = string.Empty;
-        var normalized = new string((fingerprint ?? string.Empty).Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
-        if (normalized.Length != 64) return false;
+        var normalized = CoordinatorFingerprint.TryNormalize(fingerprint);
+        if (normalized is null) return false;
         coordinatorId = Convert.ToHexString(Convert.FromHexString(normalized).AsSpan(0, 16));
         return true;
     }

@@ -262,11 +262,10 @@ public sealed class CoordinatorBusinessOperationApplier
         context.Purchases.Add(purchase);
         foreach (var line in payload.Lines.OrderBy(item => item.LineNumber))
         {
-            var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == line.ProductId, ct)
-                ?? throw new BusinessOperationConflictException("Un producto de la compra no existe en el coordinador.");
             if (line.QuantityMilliUnits <= 0) throw new BusinessOperationConflictException("La cantidad de compra debe ser positiva.");
-            var name = string.IsNullOrWhiteSpace(line.ProductNameSnapshot) ? product.Name : line.ProductNameSnapshot;
-            var unit = string.IsNullOrWhiteSpace(line.UnitSnapshot) ? product.Unit : line.UnitSnapshot;
+            var product = await GetOrCreatePurchaseProductAsync(context, line, ct);
+            var name = string.IsNullOrWhiteSpace(line.ProductNameSnapshot) ? product.Name : line.ProductNameSnapshot.Trim();
+            var unit = string.IsNullOrWhiteSpace(line.UnitSnapshot) ? product.Unit : line.UnitSnapshot.Trim();
             context.PurchaseLines.Add(new PurchaseLineEntity { OperationId = operationId, LineNumber = line.LineNumber,
                 ProductId = product.ProductId, ProductNameSnapshot = name, UnitSnapshot = unit, QuantityMilliUnits = line.QuantityMilliUnits });
             product.StockMilliUnits = checked(product.StockMilliUnits + line.QuantityMilliUnits);
@@ -276,6 +275,56 @@ public sealed class CoordinatorBusinessOperationApplier
                 OccurredAtUtc = payload.OccurredAtUtc, ActorUserId = actor });
         }
     }
+
+    // Un producto pudo crearse en un dispositivo antes de vincularse y, por tanto,
+    // nunca llegar al coordinador. La compra sí trae su identidad, nombre y unidad:
+    // se crea un producto base para no perder la compra ni bloquear la sincronización.
+    // Si después llega la ficha completa, el Administrador puede resolver la diferencia.
+    private static async Task<ProductEntity> GetOrCreatePurchaseProductAsync(
+        LocalDbContext context, PurchaseRecordedLinePayload line, CancellationToken ct)
+    {
+        var product = await context.Products.SingleOrDefaultAsync(item => item.ProductId == line.ProductId, ct);
+        if (product is not null) return product;
+
+        const string fallbackCategoryName = "Sin categoría";
+        var normalizedCategory = fallbackCategoryName.ToUpperInvariant();
+        var categoryId = await context.Categories.AsNoTracking()
+            .Where(item => item.NormalizedName == normalizedCategory)
+            .Select(item => (Guid?)item.CategoryId)
+            .FirstOrDefaultAsync(ct);
+        if (categoryId is null)
+        {
+            categoryId = FallbackCategoryId;
+            if (!await context.Categories.AnyAsync(item => item.CategoryId == categoryId.Value, ct))
+            {
+                context.Categories.Add(new CategoryEntity
+                {
+                    CategoryId = categoryId.Value,
+                    Name = fallbackCategoryName,
+                    NormalizedName = normalizedCategory
+                });
+                // La categoría debe existir antes que sus productos (clave foránea).
+                await context.SaveChangesAsync(ct);
+            }
+        }
+
+        product = new ProductEntity
+        {
+            ProductId = line.ProductId,
+            Name = string.IsNullOrWhiteSpace(line.ProductNameSnapshot) ? "Producto sin nombre" : line.ProductNameSnapshot.Trim(),
+            Unit = string.IsNullOrWhiteSpace(line.UnitSnapshot) ? "unidad" : line.UnitSnapshot.Trim(),
+            CategoryId = categoryId.Value,
+            SalePriceMinorUnits = 0,
+            StockMilliUnits = 0,
+            MinimumStockMilliUnits = 0,
+            IsActive = true,
+            ImageData = null
+        };
+        context.Products.Add(product);
+        return product;
+    }
+
+    private static readonly Guid FallbackCategoryId = new("7E3B2C1A-9D4F-4A6B-8C2D-5F1E0A9B7C3D");
 
     private static async Task ApplySaleAsync(LocalDbContext context, Guid operationId, string json, Guid actor, CancellationToken ct)
     {

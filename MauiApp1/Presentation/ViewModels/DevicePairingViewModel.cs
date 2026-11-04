@@ -11,6 +11,7 @@ using MauiApp1.Application.Authentication;
 using MauiApp1.Application.Lan;
 using MauiApp1.Configuration;
 using MauiApp1.Domain.Users;
+using MauiApp1.Infrastructure.Lan;
 using Microsoft.Maui.Storage;
 
 namespace MauiApp1.Presentation.ViewModels;
@@ -25,6 +26,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     private readonly DesktopCoordinatorModeOptions _desktopMode;
     private string _address = string.Empty, _fingerprint = string.Empty, _userName = string.Empty;
     private string _password = string.Empty, _code = string.Empty, _message = string.Empty, _generatedCode = string.Empty, _generatedQrPayload = string.Empty;
+    private string _repairAddress = string.Empty;
     private bool _busy, _ready, _confirmed, _hasSavedLink, _hasPendingLink;
     private CoordinatorCandidate? _selectedCoordinator;
     private Guid? _discoveryRequestId;
@@ -57,6 +59,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         RefreshApprovalRequestsCommand = new Command(async () => await RefreshApprovalRequestsAsync(), () => CanManageDiscoveredPairings && !IsBusy);
         CancelDiscoveredPairingCommand = new Command(async () => await CancelDiscoveredPairingAsync(), () => CanCancelDiscoveredPairing && !IsBusy);
         UseCurrentAddressCommand = new Command(async () => await UseCurrentAddressAsync(), () => CanUseCurrentAddress);
+        RepairAddressCommand = new Command(async () => await RepairAddressAsync(), () => CanRepairAddress);
     }
 
     public string Address
@@ -74,6 +77,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         }
     }
     public string Fingerprint { get => _fingerprint; set => Set(ref _fingerprint, value); }
+    public string RepairAddress { get => _repairAddress; set => Set(ref _repairAddress, value); }
     public string UserName { get => _userName; set => Set(ref _userName, value); }
     public string Password { get => _password; set => Set(ref _password, value); }
     public string Code { get => _code; set => Set(ref _code, value); }
@@ -119,6 +123,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public bool CanCancelDiscoveredPairing => _discoveryRequestId.HasValue && !IsBusy;
     public bool CanManageDiscoveredPairings => OperatingSystem.IsWindows() && _desktopMode.IsHost && CanGenerateCode;
     public bool CanUseCurrentAddress => OperatingSystem.IsWindows() && _desktopMode.IsHost && _ready && !IsBusy;
+    public bool CanRepairAddress => _confirmed && !_desktopMode.IsHost && _ready && !IsBusy;
     public bool ShowPairForm => !_confirmed;
     public bool CanUnlink => _confirmed && !IsBusy;
     public bool CanEditConnection => _ready && !_hasSavedLink && !IsBusy;
@@ -135,6 +140,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public ICommand RefreshApprovalRequestsCommand { get; }
     public ICommand CancelDiscoveredPairingCommand { get; }
     public ICommand UseCurrentAddressCommand { get; }
+    public ICommand RepairAddressCommand { get; }
 
     public async Task LoadAsync()
     {
@@ -155,7 +161,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                 if (File.Exists(fingerprintPath))
                 {
                     var fingerprint = await File.ReadAllTextAsync(fingerprintPath);
-                    Fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
+                    Fingerprint = CoordinatorFingerprint.TryNormalize(fingerprint) ?? string.Empty;
                 }
             }
             else
@@ -169,6 +175,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                     Address = status.Address;
                     Fingerprint = status.CertificateFingerprint;
                     Code = status.PendingCode ?? string.Empty;
+                    RepairAddress = status.Address;
                 }
             }
             _ready = true;
@@ -201,8 +208,8 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
             if (File.Exists(fingerprintPath))
             {
                 var fingerprint = await File.ReadAllTextAsync(fingerprintPath);
-                var normalized = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
-                if (normalized.Length == 64) Fingerprint = normalized;
+                var normalized = CoordinatorFingerprint.TryNormalize(fingerprint);
+                if (normalized is not null) Fingerprint = normalized;
             }
 
             Message = $"Dirección actual: {currentAddress}. Ingresa la contraseña del Administrador y pulsa «Actualizar solicitudes».";
@@ -210,6 +217,31 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         catch
         {
             Message = "No se pudo leer la dirección o la huella del coordinador. Revisa la red e inténtalo de nuevo.";
+        }
+        finally
+        {
+            IsBusy = false;
+            RefreshState();
+        }
+    }
+
+    private async Task RepairAddressAsync()
+    {
+        if (!CanRepairAddress) return;
+        IsBusy = true;
+        Message = string.Empty;
+        try
+        {
+            var result = await _client.UpdateAddressAsync(RepairAddress);
+            Message = result.Message;
+            if (result.Succeeded)
+            {
+                await LoadAsync();
+            }
+        }
+        catch
+        {
+            Message = "No se pudo actualizar la dirección. La vinculación guardada no se modificó.";
         }
         finally
         {
@@ -268,14 +300,14 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                 fingerprint = await reader.ReadToEndAsync();
             }
 
-            fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray());
-            if (fingerprint.Length != 64)
+            var normalized = CoordinatorFingerprint.TryNormalize(fingerprint);
+            if (normalized is null)
             {
                 Message = "El archivo no contiene una huella SHA-256 válida de 64 caracteres hexadecimales.";
                 return;
             }
 
-            Fingerprint = fingerprint.ToUpperInvariant();
+            Fingerprint = normalized;
         }
         catch (OperationCanceledException)
         {
@@ -672,7 +704,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     }
     private void RefreshState()
     {
-        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus), nameof(CanDiscover), nameof(CanRequestDiscoveredPairing), nameof(ShowDiscoveryRequest), nameof(CanCancelDiscoveredPairing), nameof(CanManageDiscoveredPairings), nameof(CanUseCurrentAddress) })
+        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus), nameof(CanDiscover), nameof(CanRequestDiscoveredPairing), nameof(ShowDiscoveryRequest), nameof(CanCancelDiscoveredPairing), nameof(CanManageDiscoveredPairings), nameof(CanUseCurrentAddress), nameof(CanRepairAddress) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();
         ((Command)LoadFingerprintCommand).ChangeCanExecute();
@@ -681,6 +713,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         ((Command)RefreshApprovalRequestsCommand).ChangeCanExecute();
         ((Command)CancelDiscoveredPairingCommand).ChangeCanExecute();
         ((Command)UseCurrentAddressCommand).ChangeCanExecute();
+        ((Command)RepairAddressCommand).ChangeCanExecute();
     }
 
     private sealed record PairingQrData(string Type, int Version, string Address, string Fingerprint,

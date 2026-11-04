@@ -154,12 +154,7 @@ internal sealed class CoordinatorDiscoveryPairingRegistry
         }
     }
 
-    private static string? NormalizeFingerprint(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        var normalized = new string(value.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
-        return normalized.Length == 64 ? normalized : null;
-    }
+    private static string? NormalizeFingerprint(string? value) => CoordinatorFingerprint.TryNormalize(value);
 
     internal sealed class PendingDiscoveryPairing(
         Guid requestId,

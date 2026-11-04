@@ -459,12 +459,7 @@ public sealed class CoordinatorDiscoveryPairingClient(
             bytes[0] == 172 && bytes[1] is >= 16 and <= 31;
     }
 
-    private static string? NormalizeFingerprint(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        var normalized = new string(value.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
-        return normalized.Length == 64 ? normalized : null;
-    }
+    private static string? NormalizeFingerprint(string? value) => CoordinatorFingerprint.TryNormalize(value);
 
     private static bool CoordinatorIdMatchesFingerprint(string coordinatorId, string fingerprint) =>
         string.Equals(coordinatorId, Convert.ToHexString(Convert.FromHexString(fingerprint).AsSpan(0, 16)),
