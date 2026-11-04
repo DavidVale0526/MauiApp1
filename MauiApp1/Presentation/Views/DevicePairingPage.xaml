@@ -129,6 +129,10 @@
                         <VerticalStackLayout Spacing="7">
                             <Label Text="Dirección del coordinador" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                             <Entry Placeholder="https://192.168.1.10:5080" Text="{Binding Address}" IsEnabled="{Binding CanEditAddress}" Keyboard="Url" Style="{StaticResource Input}" />
+                            <Button Text="Usar dirección IP actual de esta PC" Command="{Binding UseCurrentAddressCommand}"
+                                    IsVisible="{Binding CanUseCurrentAddress}" Style="{StaticResource SecondaryButton}" />
+                            <Label Text="Detecta la IP LAN activa de este equipo coordinador y actualiza la huella del certificado."
+                                   IsVisible="{Binding CanUseCurrentAddress}" FontSize="12" TextColor="#61738A" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="7">
                             <Label Text="Código de seguridad (SHA-256)" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />

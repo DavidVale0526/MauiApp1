@@ -13,7 +13,8 @@ public sealed class CoordinatorOperationSender(
     ICoordinatorUserSessionStorage sessionStorage,
     IAuthenticationService authenticationService,
     ILocalDeviceIdentity deviceIdentity,
-    ICoordinatedSignInService coordinatedSignInService) : ICoordinatorOperationSender
+    ICoordinatedSignInService coordinatedSignInService,
+    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorOperationSender
 {
     public async Task<CoordinatorOperationSendResult> SendAsync(
         OutboxOperation operation,
@@ -28,6 +29,22 @@ public sealed class CoordinatorOperationSender(
         var link = await linkStorage.ReadAsync().ConfigureAwait(false);
         if (link is null || !link.IsConfirmed)
             return new(CoordinatorOperationSendStatus.NotLinked);
+        if (addressResolver is not null)
+        {
+            var currentAddress = await addressResolver.ResolveAsync(link, cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(currentAddress, link.Address, StringComparison.OrdinalIgnoreCase))
+            {
+                link = new CoordinatorDeviceLink
+                {
+                    DeviceId = link.DeviceId,
+                    Address = currentAddress,
+                    CertificateFingerprint = link.CertificateFingerprint,
+                    DeviceToken = link.DeviceToken,
+                    IsConfirmed = link.IsConfirmed,
+                    PendingCode = link.PendingCode
+                };
+            }
+        }
 
         var session = await sessionStorage.ReadAsync().ConfigureAwait(false);
         var currentUser = authenticationService.CurrentUser;

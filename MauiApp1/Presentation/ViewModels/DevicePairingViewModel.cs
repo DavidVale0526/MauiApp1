@@ -56,9 +56,23 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         DiscoverCommand = new Command(async () => await DiscoverCoordinatorAsync(), () => CanDiscover);
         RefreshApprovalRequestsCommand = new Command(async () => await RefreshApprovalRequestsAsync(), () => CanManageDiscoveredPairings && !IsBusy);
         CancelDiscoveredPairingCommand = new Command(async () => await CancelDiscoveredPairingAsync(), () => CanCancelDiscoveredPairing && !IsBusy);
+        UseCurrentAddressCommand = new Command(async () => await UseCurrentAddressAsync(), () => CanUseCurrentAddress);
     }
 
-    public string Address { get => _address; set => Set(ref _address, value); }
+    public string Address
+    {
+        get => _address;
+        set
+        {
+            if (Set(ref _address, value))
+            {
+                // Una sesión de aprobación pertenece a la dirección con la que se abrió.
+                _adminApprovalToken = null;
+                _adminApprovalExpiry = DateTime.MinValue;
+                PendingDiscoveredPairings.Clear();
+            }
+        }
+    }
     public string Fingerprint { get => _fingerprint; set => Set(ref _fingerprint, value); }
     public string UserName { get => _userName; set => Set(ref _userName, value); }
     public string Password { get => _password; set => Set(ref _password, value); }
@@ -104,6 +118,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public bool ShowDiscoveryRequest => _discoveryRequestId.HasValue;
     public bool CanCancelDiscoveredPairing => _discoveryRequestId.HasValue && !IsBusy;
     public bool CanManageDiscoveredPairings => OperatingSystem.IsWindows() && _desktopMode.IsHost && CanGenerateCode;
+    public bool CanUseCurrentAddress => OperatingSystem.IsWindows() && _desktopMode.IsHost && _ready && !IsBusy;
     public bool ShowPairForm => !_confirmed;
     public bool CanUnlink => _confirmed && !IsBusy;
     public bool CanEditConnection => _ready && !_hasSavedLink && !IsBusy;
@@ -119,24 +134,20 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     public ICommand DiscoverCommand { get; }
     public ICommand RefreshApprovalRequestsCommand { get; }
     public ICommand CancelDiscoveredPairingCommand { get; }
+    public ICommand UseCurrentAddressCommand { get; }
 
     public async Task LoadAsync()
     {
         IsBusy = true;
         try
         {
-            var status = await _client.GetStatusAsync();
-            _hasSavedLink = status is not null;
-            _confirmed = status?.IsConfirmed == true;
-            _hasPendingLink = status is { IsConfirmed: false };
-            if (status is not null)
+            if (_desktopMode.IsHost && OperatingSystem.IsWindows())
             {
-                Address = status.Address;
-                Fingerprint = status.CertificateFingerprint;
-                Code = status.PendingCode ?? string.Empty;
-            }
-            else if (_desktopMode.IsHost && OperatingSystem.IsWindows())
-            {
+                // El coordinador no se vincula consigo mismo. Un vínculo viejo (aunque
+                // esté pendiente) no debe reemplazar la dirección LAN actual del equipo.
+                _hasSavedLink = false;
+                _hasPendingLink = false;
+                _confirmed = false;
                 Address = GetDefaultCoordinatorAddress();
                 var fingerprintPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -147,6 +158,19 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
                     Fingerprint = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
                 }
             }
+            else
+            {
+                var status = await _client.GetStatusAsync();
+                _hasSavedLink = status is not null;
+                _confirmed = status?.IsConfirmed == true;
+                _hasPendingLink = status is { IsConfirmed: false };
+                if (status is not null)
+                {
+                    Address = status.Address;
+                    Fingerprint = status.CertificateFingerprint;
+                    Code = status.PendingCode ?? string.Empty;
+                }
+            }
             _ready = true;
         }
         catch
@@ -155,6 +179,43 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
             Message = "No se pudo leer la autorización segura del dispositivo. No se reemplazará automáticamente.";
         }
         finally { IsBusy = false; RefreshState(); }
+    }
+
+    private async Task UseCurrentAddressAsync()
+    {
+        if (!CanUseCurrentAddress) return;
+        var currentAddress = GetDefaultCoordinatorAddress();
+        if (string.IsNullOrWhiteSpace(currentAddress))
+        {
+            Message = "No se encontró una dirección IPv4 activa en esta PC. Conéctala a la red del negocio y vuelve a intentar.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            Address = currentAddress;
+            var fingerprintPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Miscelanea Ari", "Coordinator", "coordinator-certificate-fingerprint.txt");
+            if (File.Exists(fingerprintPath))
+            {
+                var fingerprint = await File.ReadAllTextAsync(fingerprintPath);
+                var normalized = new string(fingerprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
+                if (normalized.Length == 64) Fingerprint = normalized;
+            }
+
+            Message = $"Dirección actual: {currentAddress}. Ingresa la contraseña del Administrador y pulsa «Actualizar solicitudes».";
+        }
+        catch
+        {
+            Message = "No se pudo leer la dirección o la huella del coordinador. Revisa la red e inténtalo de nuevo.";
+        }
+        finally
+        {
+            IsBusy = false;
+            RefreshState();
+        }
     }
 
     private async Task GenerateCodeAsync()
@@ -611,7 +672,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
     }
     private void RefreshState()
     {
-        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus), nameof(CanDiscover), nameof(CanRequestDiscoveredPairing), nameof(ShowDiscoveryRequest), nameof(CanCancelDiscoveredPairing), nameof(CanManageDiscoveredPairings) })
+        foreach (var name in new[] { nameof(ShowPairForm), nameof(CanUnlink), nameof(CanEditConnection), nameof(CanEditAddress), nameof(CanEditForm), nameof(CanScanQr), nameof(CanLoadFingerprintFromFile), nameof(CanShowGeneratedQr), nameof(LinkStatus), nameof(CanDiscover), nameof(CanRequestDiscoveredPairing), nameof(ShowDiscoveryRequest), nameof(CanCancelDiscoveredPairing), nameof(CanManageDiscoveredPairings), nameof(CanUseCurrentAddress) })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         ((Command)GenerateCodeCommand).ChangeCanExecute();
         ((Command)LoadFingerprintCommand).ChangeCanExecute();
@@ -619,6 +680,7 @@ public sealed class DevicePairingViewModel : INotifyPropertyChanged
         ((Command)DiscoverCommand).ChangeCanExecute();
         ((Command)RefreshApprovalRequestsCommand).ChangeCanExecute();
         ((Command)CancelDiscoveredPairingCommand).ChangeCanExecute();
+        ((Command)UseCurrentAddressCommand).ChangeCanExecute();
     }
 
     private sealed record PairingQrData(string Type, int Version, string Address, string Fingerprint,

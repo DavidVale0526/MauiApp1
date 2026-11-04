@@ -17,7 +17,8 @@ public sealed class CoordinatorPairingClient(
     ICoordinatorLinkStorage storage,
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,
-    ILogger<CoordinatorPairingClient>? logger = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
+    ILogger<CoordinatorPairingClient>? logger = null,
+    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public string? LastChangeError { get; private set; }
@@ -590,6 +591,22 @@ public sealed class CoordinatorPairingClient(
     private async Task<CoordinatorDeviceLink?> ReadLinkAsync()
     {
         var link = await storage.ReadAsync();
+        if (link is not null && addressResolver is not null)
+        {
+            var currentAddress = await addressResolver.ResolveAsync(link);
+            if (!string.Equals(currentAddress, link.Address, StringComparison.OrdinalIgnoreCase))
+            {
+                link = new CoordinatorDeviceLink
+                {
+                    DeviceId = link.DeviceId,
+                    Address = currentAddress,
+                    CertificateFingerprint = link.CertificateFingerprint,
+                    DeviceToken = link.DeviceToken,
+                    IsConfirmed = link.IsConfirmed,
+                    PendingCode = link.PendingCode
+                };
+            }
+        }
         if (link is not null && (!TryValidateConnection(link.Address, link.CertificateFingerprint, out _, out _, out _) ||
             link.DeviceToken.Length != 43 || !link.DeviceToken.All(character =>
                 char.IsAsciiLetterOrDigit(character) || character is '-' or '_')))

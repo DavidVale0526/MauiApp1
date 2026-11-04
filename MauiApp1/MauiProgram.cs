@@ -72,6 +72,7 @@ namespace MauiApp1
             #elif WINDOWS
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDiscovery, MauiApp1.Infrastructure.Lan.WindowsCoordinatorDiscovery>();
             #endif
+            builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorAddressResolver>();
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserSessionStorage, MauiApp1.Services.SecureCoordinatorUserSessionStorage>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient>(services =>

@@ -14,7 +14,8 @@ public sealed class CoordinatorRealtimeClient(
     ICoordinatorUserSessionStorage sessionStorage,
     IAuthenticationService authenticationService,
     ILocalOperationSyncService operationSyncService,
-    ILogger<CoordinatorRealtimeClient> logger) : ICoordinatorRealtimeClient, IAsyncDisposable
+    ILogger<CoordinatorRealtimeClient> logger,
+    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorRealtimeClient, IAsyncDisposable
 {
     private readonly object _lifecycleLock = new();
     private readonly SemaphoreSlim _syncGate = new(1, 1);
@@ -147,6 +148,22 @@ public sealed class CoordinatorRealtimeClient(
     {
         var currentUser = authenticationService.CurrentUser;
         var link = await linkStorage.ReadAsync();
+        if (link is not null && addressResolver is not null)
+        {
+            var currentAddress = await addressResolver.ResolveAsync(link, cancellationToken);
+            if (!string.Equals(currentAddress, link.Address, StringComparison.OrdinalIgnoreCase))
+            {
+                link = new CoordinatorDeviceLink
+                {
+                    DeviceId = link.DeviceId,
+                    Address = currentAddress,
+                    CertificateFingerprint = link.CertificateFingerprint,
+                    DeviceToken = link.DeviceToken,
+                    IsConfirmed = link.IsConfirmed,
+                    PendingCode = link.PendingCode
+                };
+            }
+        }
         var session = await sessionStorage.ReadAsync();
         if (currentUser is null || link is null || !link.IsConfirmed || session is null ||
             session.ExpiresAtUtc <= DateTime.UtcNow || session.LocalUserId != currentUser.Id.Value ||
