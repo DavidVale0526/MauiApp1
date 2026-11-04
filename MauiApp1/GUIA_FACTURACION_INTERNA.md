@@ -6,7 +6,7 @@ Esta guía describe las funciones implementadas para registrar ventas y conserva
 
 1. Abre **Punto de venta** y agrega los productos y cantidades.
 2. Revisa el carrito y continúa a la confirmación.
-3. Selecciona efectivo, tarjeta o transferencia. Si combinas métodos, distribuye el total completo entre ellos.
+3. Selecciona efectivo, tarjeta o transferencia con los botones rápidos para aplicar todo el total a ese método, o escribe el importe en tarjeta/transferencia: el efectivo aplicado se calcula como el resto del total. La suma aplicada debe coincidir con el total.
 4. Para efectivo, escribe cuánto recibió la caja. La pantalla calcula el cambio; confirma solo cuando la venta esté cubierta.
 5. Confirma la venta. El detalle de pago queda asociado a esa venta.
 

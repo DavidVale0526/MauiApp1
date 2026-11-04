@@ -40,6 +40,7 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         _customerService = customerService;
         Lines.CollectionChanged += OnLinesChanged;
         AddLineCommand = new Command(AddLine, () => CanEditLines && SelectedProduct is not null);
+        SelectPaymentMethodCommand = new Command<string>(ApplyPaymentMethod);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -51,6 +52,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     public ObservableCollection<CreditCustomerOption> Customers { get; } = [];
 
     public ICommand AddLineCommand { get; }
+
+    public ICommand SelectPaymentMethodCommand { get; }
 
     public SaleProductOption? SelectedProduct
     {
@@ -141,18 +144,50 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
 
     public string CashReceivedInput { get => _cashReceivedInput; set => SetPaymentInput(ref _cashReceivedInput, value); }
 
-    public string CardAppliedInput { get => _cardAppliedInput; set => SetPaymentInput(ref _cardAppliedInput, value); }
+    public string CardAppliedInput
+    {
+        get => _cardAppliedInput;
+        set
+        {
+            if (SetPaymentInput(ref _cardAppliedInput, value))
+            {
+                RebalanceCashApplied();
+            }
+        }
+    }
 
-    public string TransferAppliedInput { get => _transferAppliedInput; set => SetPaymentInput(ref _transferAppliedInput, value); }
+    public string TransferAppliedInput
+    {
+        get => _transferAppliedInput;
+        set
+        {
+            if (SetPaymentInput(ref _transferAppliedInput, value))
+            {
+                RebalanceCashApplied();
+            }
+        }
+    }
 
     public string PaymentErrorMessage
     {
         get => IsCashSale && !IsPaymentValid(out var error) ? error : string.Empty;
     }
 
-    public string ChangeText => TryGetPaymentAmounts(out var cash, out var received, out _, out _, out _) && cash > 0
-        ? $"Cambio: C$ {((received - cash) / 100m).ToString("0.00", CultureInfo.CurrentCulture)}"
-        : "Cambio: C$ 0.00";
+    public string ChangeText
+    {
+        get
+        {
+            if (!TryGetPaymentAmounts(out var cash, out var received, out _, out _, out _) || cash <= 0)
+            {
+                return "Cambio: C$ 0.00";
+            }
+
+            var change = received - cash;
+            return change > 0
+                ? $"Cambio: C$ {(change / 100m).ToString("0.00", CultureInfo.CurrentCulture)}"
+                : "Cambio: C$ 0.00";
+        }
+    }
 
     public string ConfirmButtonText => _pendingSaleAttempted ? "Reintentar la misma venta" : "Revisar y confirmar venta";
 
@@ -245,6 +280,27 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         }
     }
 
+    public void ApplyPaymentMethod(string? method)
+    {
+        if (IsCredit || !CanEditPayment || !TryGetTotalMinorUnits(out var total))
+        {
+            return;
+        }
+
+        switch (method)
+        {
+            case "Cash":
+                SetPaymentInputs(FormatMoney(total), FormatMoney(total), string.Empty, string.Empty);
+                break;
+            case "Card":
+                SetPaymentInputs("0.00", "0.00", FormatMoney(total), string.Empty);
+                break;
+            case "Transfer":
+                SetPaymentInputs("0.00", "0.00", string.Empty, FormatMoney(total));
+                break;
+        }
+    }
+
     public SaleDraft? PrepareSale()
     {
         if (_pendingSale is not null)
@@ -270,8 +326,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         {
             CashAppliedInput = (totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture);
             CashReceivedInput = (totalMinorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture);
-            CardAppliedInput = "0.00";
-            TransferAppliedInput = "0.00";
+            CardAppliedInput = string.Empty;
+            TransferAppliedInput = string.Empty;
         }
         _pendingSale = new SaleDraft(
             Guid.NewGuid(),
@@ -367,8 +423,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             _pendingSaleAttempted = false;
             CashAppliedInput = "0.00";
             CashReceivedInput = "0.00";
-            CardAppliedInput = "0.00";
-            TransferAppliedInput = "0.00";
+            CardAppliedInput = string.Empty;
+            TransferAppliedInput = string.Empty;
             OnPropertyChanged(nameof(CanEditPayment));
             StatusMessage = result.AlreadyApplied
                 ? "Esta venta ya se había guardado; no se descontó la existencia otra vez."
@@ -482,13 +538,90 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         return decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
     }
 
-    private void SetPaymentInput(ref string storage, string value)
+    private bool SetPaymentInput(ref string storage, string value)
     {
-        if (SetProperty(ref storage, value ?? string.Empty))
+        if (!SetProperty(ref storage, value ?? string.Empty))
         {
-            OnPropertyChanged(nameof(CanRegisterPending));
-            OnPropertyChanged(nameof(ChangeText));
-            OnPropertyChanged(nameof(PaymentErrorMessage));
+            return false;
+        }
+
+        OnPropertyChanged(nameof(CanRegisterPending));
+        OnPropertyChanged(nameof(ChangeText));
+        OnPropertyChanged(nameof(PaymentErrorMessage));
+        return true;
+    }
+
+    private void RebalanceCashApplied()
+    {
+        if (!TryGetTotalMinorUnits(out var total) ||
+            !TryParseMoneyOrZero(CardAppliedInput, out var card) ||
+            !TryParseMoneyOrZero(TransferAppliedInput, out var transfer))
+        {
+            return;
+        }
+
+        var newCash = card >= total || transfer >= total ? 0 : total - card - transfer;
+        if (!TryParseMoneyOrZero(CashAppliedInput, out var previousCash))
+        {
+            previousCash = 0;
+        }
+
+        if (!TryParseMoneyOrZero(CashReceivedInput, out var received))
+        {
+            received = 0;
+        }
+
+        var newCashText = FormatMoney(newCash);
+        if (CashAppliedInput != newCashText)
+        {
+            _cashAppliedInput = newCashText;
+            OnPropertyChanged(nameof(CashAppliedInput));
+        }
+
+        // El efectivo recibido acompaña al importe asignado a efectivo mientras no se haya
+        // capturado un monto distinto; si no queda efectivo aplicado, no puede haber recibido.
+        var newReceived = newCash == 0 ? 0 : received == previousCash ? newCash : received;
+        var newReceivedText = FormatMoney(newReceived);
+        if (CashReceivedInput != newReceivedText)
+        {
+            _cashReceivedInput = newReceivedText;
+            OnPropertyChanged(nameof(CashReceivedInput));
+        }
+
+        OnPropertyChanged(nameof(CanRegisterPending));
+        OnPropertyChanged(nameof(ChangeText));
+        OnPropertyChanged(nameof(PaymentErrorMessage));
+    }
+
+    private void SetPaymentInputs(string cash, string received, string card, string transfer)
+    {
+        _cashAppliedInput = cash;
+        _cashReceivedInput = received;
+        _cardAppliedInput = card;
+        _transferAppliedInput = transfer;
+        OnPropertyChanged(nameof(CashAppliedInput));
+        OnPropertyChanged(nameof(CashReceivedInput));
+        OnPropertyChanged(nameof(CardAppliedInput));
+        OnPropertyChanged(nameof(TransferAppliedInput));
+        OnPropertyChanged(nameof(CanRegisterPending));
+        OnPropertyChanged(nameof(ChangeText));
+        OnPropertyChanged(nameof(PaymentErrorMessage));
+    }
+
+    private static string FormatMoney(long minorUnits) =>
+        (minorUnits / 100m).ToString("0.00", CultureInfo.CurrentCulture);
+
+    private bool TryGetTotalMinorUnits(out long total)
+    {
+        try
+        {
+            total = Lines.Aggregate(0L, (sum, line) => checked(sum + line.LineTotalMinorUnits));
+            return true;
+        }
+        catch (OverflowException)
+        {
+            total = 0;
+            return false;
         }
     }
 
@@ -505,9 +638,24 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
             error = "Los importes no pueden ser negativos.";
             return false;
         }
-        if (cash + card + transfer != total)
+        var applied = cash + card + transfer;
+        if (card > total)
         {
-            error = $"Distribuye el total exacto de C$ {(total / 100m).ToString("0.00", CultureInfo.CurrentCulture)} entre efectivo, tarjeta y transferencia.";
+            error = $"El importe de tarjeta (C$ {(card / 100m).ToString("0.00", CultureInfo.CurrentCulture)}) supera el total de la venta (C$ {(total / 100m).ToString("0.00", CultureInfo.CurrentCulture)}).";
+            return false;
+        }
+        if (transfer > total)
+        {
+            error = $"El importe de transferencia (C$ {(transfer / 100m).ToString("0.00", CultureInfo.CurrentCulture)}) supera el total de la venta (C$ {(total / 100m).ToString("0.00", CultureInfo.CurrentCulture)}).";
+            return false;
+        }
+        if (applied != total)
+        {
+            var appliedText = (applied / 100m).ToString("0.00", CultureInfo.CurrentCulture);
+            var totalText = (total / 100m).ToString("0.00", CultureInfo.CurrentCulture);
+            error = applied > total
+                ? $"Entre tarjeta y transferencia aplicaste C$ {((card + transfer) / 100m).ToString("0.00", CultureInfo.CurrentCulture)} y el total es C$ {totalText}. Reduce C$ {((applied - total) / 100m).ToString("0.00", CultureInfo.CurrentCulture)}."
+                : $"La suma aplicada (C$ {appliedText}) no cubre el total (C$ {totalText}). Faltan C$ {((total - applied) / 100m).ToString("0.00", CultureInfo.CurrentCulture)}.";
             return false;
         }
         if (cash > 0 && received < cash)
@@ -543,8 +691,8 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
     private bool TryGetPaymentAmounts(out long cash, out long received, out long card, out long transfer, out long total)
     {
         cash = received = card = transfer = total = 0;
-        if (!TryParseMoney(CashAppliedInput, out cash) || !TryParseMoney(CashReceivedInput, out received) ||
-            !TryParseMoney(CardAppliedInput, out card) || !TryParseMoney(TransferAppliedInput, out transfer))
+        if (!TryParseMoneyOrZero(CashAppliedInput, out cash) || !TryParseMoneyOrZero(CashReceivedInput, out received) ||
+            !TryParseMoneyOrZero(CardAppliedInput, out card) || !TryParseMoneyOrZero(TransferAppliedInput, out transfer))
             return false;
         try
         {
@@ -556,6 +704,17 @@ public sealed class SaleRegistrationViewModel : INotifyPropertyChanged
         {
             return false;
         }
+    }
+
+    private static bool TryParseMoneyOrZero(string? input, out long minorUnits)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            minorUnits = 0;
+            return true;
+        }
+
+        return TryParseMoney(input, out minorUnits);
     }
 
     private static bool TryParseMoney(string? input, out long minorUnits)
