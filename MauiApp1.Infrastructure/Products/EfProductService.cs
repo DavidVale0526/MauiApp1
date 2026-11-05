@@ -111,6 +111,14 @@ internal sealed class EfProductService(
             return ProductOperationResult.Failure("Selecciona una categoría que siga disponible.");
         }
 
+        var existing = await FindDuplicateAsync(context, null, name, cancellationToken);
+        if (existing is not null)
+        {
+            return ProductOperationResult.Failure(existing.IsActive
+                ? "Ya existe un producto con ese nombre."
+                : "Ya existe un producto con ese nombre (desactivado). Puedes reactivarlo desde la lista.");
+        }
+
         var product = new ProductEntity
         {
             ProductId = ProductId.New().Value,
@@ -172,6 +180,14 @@ internal sealed class EfProductService(
         if (!await context.Categories.AnyAsync(category => category.CategoryId == draft.CategoryId.Value, cancellationToken))
         {
             return ProductOperationResult.Failure("Selecciona una categoría que siga disponible.");
+        }
+
+        var duplicate = await FindDuplicateAsync(context, productId, name, cancellationToken);
+        if (duplicate is not null)
+        {
+            return ProductOperationResult.Failure(duplicate.IsActive
+                ? "Ya existe otro producto con ese nombre."
+                : "Ya existe otro producto con ese nombre (desactivado).");
         }
 
         var imageData = draft.ReplaceImage ? draft.ImageData : product.ImageData;
@@ -336,5 +352,44 @@ internal sealed class EfProductService(
 
         errorMessage = string.Empty;
         return true;
+    }
+
+    private static async Task<ProductEntity?> FindDuplicateAsync(
+        LocalDbContext context,
+        Guid? currentProductId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var query = context.Products.AsNoTracking();
+        if (currentProductId.HasValue)
+        {
+            query = query.Where(item => item.ProductId != currentProductId.Value);
+        }
+
+        var match = await query
+            .FirstOrDefaultAsync(
+                item => item.Name == name || EF.Functions.Collate(item.Name, "NOCASE") == name,
+                cancellationToken);
+
+        if (match is not null)
+        {
+            return match;
+        }
+
+        var candidates = await query
+            .Select(item => new { item.ProductId, item.Name, item.IsActive })
+            .ToListAsync(cancellationToken);
+
+        var fallbackMatch = candidates.FirstOrDefault(
+            item => string.Equals(item.Name.Trim(), name, StringComparison.OrdinalIgnoreCase));
+
+        return fallbackMatch is null
+            ? null
+            : new ProductEntity
+            {
+                ProductId = fallbackMatch.ProductId,
+                Name = fallbackMatch.Name,
+                IsActive = fallbackMatch.IsActive
+            };
     }
 }

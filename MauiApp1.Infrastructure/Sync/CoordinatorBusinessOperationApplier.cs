@@ -182,9 +182,14 @@ public sealed class CoordinatorBusinessOperationApplier
         {
             if (!await context.Categories.AnyAsync(item => item.CategoryId == payload.CategoryId, ct))
                 throw new BusinessOperationConflictException("La categoría del producto aún no existe en el coordinador.");
+
+            var cleanName = payload.Name?.Trim() ?? string.Empty;
+            if (operationType != "Product.Resolved" && await HasDuplicateProductNameAsync(context, payload.ProductId, cleanName, ct))
+                throw new BusinessOperationConflictException("Ya existe un producto con ese nombre.");
+
             product = new ProductEntity { ProductId = payload.ProductId, StockMilliUnits = operationType == "Product.Resolved" ? payload.StockMilliUnits : 0 };
             context.Products.Add(product);
-            product.Name = payload.Name;
+            product.Name = cleanName;
             product.SalePriceMinorUnits = payload.SalePriceMinorUnits;
             product.Unit = payload.Unit;
             product.CategoryId = payload.CategoryId;
@@ -204,7 +209,12 @@ public sealed class CoordinatorBusinessOperationApplier
             throw new BusinessOperationConflictException("El producto cambió en otro dispositivo. Se conserva esta edición para que el Administrador resuelva el conflicto.");
         if (!await context.Categories.AnyAsync(item => item.CategoryId == payload.CategoryId, ct))
             throw new BusinessOperationConflictException("La categoría del producto no existe en el coordinador.");
-        product.Name = payload.Name;
+
+        var updatedName = payload.Name?.Trim() ?? string.Empty;
+        if (operationType != "Product.Resolved" && await HasDuplicateProductNameAsync(context, payload.ProductId, updatedName, ct))
+            throw new BusinessOperationConflictException("Ya existe otro producto con ese nombre.");
+
+        product.Name = updatedName;
         product.SalePriceMinorUnits = payload.SalePriceMinorUnits;
         // Stock is changed only by durable purchase, sale, and inventory operations.
         product.Unit = payload.Unit;
@@ -229,6 +239,29 @@ public sealed class CoordinatorBusinessOperationApplier
 
     private static bool ImagesEqual(byte[]? left, byte[]? right) =>
         left is null ? right is null : right is not null && left.AsSpan().SequenceEqual(right);
+
+    private static async Task<bool> HasDuplicateProductNameAsync(
+        LocalDbContext context,
+        Guid currentProductId,
+        string name,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var clean = name.Trim();
+        if (await context.Products.AnyAsync(
+            item => item.ProductId != currentProductId &&
+                    (item.Name == clean || EF.Functions.Collate(item.Name, "NOCASE") == clean), ct))
+        {
+            return true;
+        }
+
+        var candidates = await context.Products.AsNoTracking()
+            .Where(item => item.ProductId != currentProductId)
+            .Select(item => item.Name)
+            .ToListAsync(ct);
+
+        return candidates.Any(candidate => string.Equals(candidate?.Trim(), clean, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static async Task ApplyCustomerAsync(LocalDbContext context, string json, DateTime createdAtUtc, CancellationToken ct)
     {
