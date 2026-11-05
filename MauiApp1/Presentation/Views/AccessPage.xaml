@@ -59,12 +59,62 @@
                         <BoxView Grid.Row="1" Color="#EDF1F5" HeightRequest="1" />
 
                         <VerticalStackLayout Grid.Row="2" Padding="24" Spacing="16">
+                            <VerticalStackLayout IsVisible="{Binding IsLinkFirstForm}" Spacing="12">
+                                <Label Text="Este teléfono trabajará con el coordinador instalado en Windows. Primero vincúlalo y después entra con un usuario creado en Windows: así todo se sincroniza desde el inicio."
+                                       FontSize="13"
+                                       TextColor="#52657D"
+                                       LineBreakMode="WordWrap" />
+                                <Border Padding="14"
+                                        BackgroundColor="#F2F8FF"
+                                        Stroke="#D6E6F7"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 12">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Label Text="1. En Windows, abre Sincronización y genera el código o el QR."
+                                               FontSize="12"
+                                               TextColor="#3C5673"
+                                               LineBreakMode="WordWrap" />
+                                        <Label Text="2. En este teléfono, toca «Vincular este dispositivo»."
+                                               FontSize="12"
+                                               TextColor="#3C5673"
+                                               LineBreakMode="WordWrap" />
+                                        <Label Text="3. Entra con tu usuario y contraseña del coordinador."
+                                               FontSize="12"
+                                               TextColor="#3C5673"
+                                               LineBreakMode="WordWrap" />
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Button Text="Vincular este dispositivo   →"
+                                        Clicked="OnLinkDeviceClicked"
+                                        BackgroundColor="#0D1B2A"
+                                        TextColor="White"
+                                        FontSize="15"
+                                        FontAttributes="Bold"
+                                        CornerRadius="8"
+                                        HeightRequest="48"
+                                        Padding="16,10" />
+                                <Button Text="Ya me vinculé. Continuar"
+                                        Clicked="OnRefreshLinkClicked"
+                                        BackgroundColor="#E8EEF5"
+                                        TextColor="#111D31"
+                                        FontSize="14"
+                                        CornerRadius="8"
+                                        HeightRequest="44" />
+                                <Button Text="Usar este equipo sin coordinador"
+                                        Clicked="OnUseWithoutCoordinatorClicked"
+                                        BackgroundColor="Transparent"
+                                        TextColor="#8A5A00"
+                                        FontSize="13"
+                                        HeightRequest="42" />
+                            </VerticalStackLayout>
+
                             <VerticalStackLayout IsVisible="{Binding IsInitialSetupForm}" Spacing="8">
-                                <Label Text="Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión."
+                                <Label Text="{Binding LocalSetupExplanation}"
                                        FontSize="13"
                                        TextColor="#52657D"
                                        LineBreakMode="WordWrap" />
                                 <Label Text="Si el dispositivo está vinculado, las credenciales se validan con el coordinador cuando está disponible."
+                                       IsVisible="{Binding ShowLocalSetupSyncNote}"
                                        FontSize="12"
                                        TextColor="#718198"
                                        LineBreakMode="WordWrap" />
@@ -96,6 +146,13 @@
                                                SemanticProperties.Description="Nombre de usuario" />
                                     </Grid>
                                 </Border>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout IsVisible="{Binding IsLoginForm}" Spacing="0">
+                                <Label Text="{Binding LoginHint}"
+                                       FontSize="12"
+                                       TextColor="#718198"
+                                       LineBreakMode="WordWrap" />
                             </VerticalStackLayout>
 
                             <VerticalStackLayout IsVisible="{Binding IsCredentialFormVisible}" Spacing="6">

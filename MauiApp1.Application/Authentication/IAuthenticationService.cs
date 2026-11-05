@@ -10,6 +10,12 @@ public interface IAuthenticationService
 
     Task<bool> HasAdministratorAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Indica si el dispositivo ya tiene alguna cuenta local (Administrador o cajero).
+    /// Se usa para no forzar el alta inicial cuando ya existen credenciales válidas.
+    /// </summary>
+    Task<bool> HasAnyAccountAsync(CancellationToken cancellationToken = default);
+
     Task<AccountProvisioningResult> CreateInitialAdministratorAsync(
         string userName,
         string password,

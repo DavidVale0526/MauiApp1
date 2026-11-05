@@ -30,6 +30,12 @@ internal sealed class LocalAuthenticationService(
             account => account.Role == (int)UserRole.Administrator, cancellationToken);
     }
 
+    public async Task<bool> HasAnyAccountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.UserAccounts.AsNoTracking().AnyAsync(cancellationToken);
+    }
+
     public async Task<AccountProvisioningResult> CreateInitialAdministratorAsync(
         string userName,
         string password,

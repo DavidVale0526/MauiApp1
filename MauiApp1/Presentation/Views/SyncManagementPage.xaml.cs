@@ -18,6 +18,8 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
     private readonly ICoordinatorRealtimeClient _realtimeClient;
     private readonly DesktopCoordinatorModeOptions _desktopMode;
     private readonly IInventoryDiscrepancyService _discrepancyService;
+    private readonly IAuthenticationService _authenticationService;
+    private readonly ICoordinatorLinkStorage _linkStorage;
     private readonly bool _isAdministrator;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
@@ -29,6 +31,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         ICoordinatorRealtimeClient realtimeClient,
         DesktopCoordinatorModeOptions desktopMode,
         IInventoryDiscrepancyService discrepancyService,
+        ICoordinatorLinkStorage linkStorage,
         IAuthenticationService authenticationService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
@@ -40,6 +43,8 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         _realtimeClient = realtimeClient;
         _desktopMode = desktopMode;
         _discrepancyService = discrepancyService;
+        _linkStorage = linkStorage;
+        _authenticationService = authenticationService;
         _isAdministrator = authenticationService.CurrentUser?.Role == UserRole.Administrator;
         ReviewConflictsButton.IsVisible = _isAdministrator;
         ReviewShortagesButton.IsVisible = _isAdministrator;
@@ -140,6 +145,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
             RefreshNetworkStatus();
             RealtimeStatusLabel.Text = GetRealtimeStatusMessage(_realtimeClient.State);
             await RefreshSyncStatusAsync(syncError);
+            await RefreshLocalAccountStatusAsync();
             await RefreshShortageStatusAsync();
         }
         finally
@@ -219,6 +225,30 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
             SyncStatusLabel.Text = syncError is null
                 ? "No se pudo consultar la cola. Los cambios locales se conservan."
                 : $"{syncError}\nNo se pudo consultar el estado de la cola.";
+        }
+    }
+
+    private async Task RefreshLocalAccountStatusAsync()
+    {
+        LocalAccountAlert.IsVisible = false;
+        var user = _authenticationService.CurrentUser;
+        if (user is null) return;
+
+        try
+        {
+            var link = await _linkStorage.ReadAsync();
+            if (link?.IsConfirmed != true) return;
+            if (await _authenticationService.GetCoordinatorUserIdAsync(user.Id.Value) is not null) return;
+
+            LocalAccountStatusLabel.Text =
+                $"La cuenta «{user.UserName}» solo existe en este dispositivo y no está registrada en el coordinador. " +
+                "Los cambios que haga esta cuenta no se envían ni se reciben. " +
+                "Cierra sesión y entra con un usuario creado en Windows (Sincronización → Cuentas de cajero).";
+            LocalAccountAlert.IsVisible = true;
+        }
+        catch
+        {
+            // Si no se puede leer el vínculo, no se muestra una falsa alarma.
         }
     }
 

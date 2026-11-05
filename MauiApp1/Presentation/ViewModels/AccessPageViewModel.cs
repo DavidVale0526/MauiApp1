@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using MauiApp1.Application.Authentication;
+using MauiApp1.Application.Lan;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     private readonly IAuthenticationService _authenticationService;
     private readonly ICoordinatedSignInService _coordinatedSignInService;
     private readonly IRecoveryCodeGenerator _recoveryCodeGenerator;
+    private readonly ICoordinatorLinkStorage _coordinatorLinkStorage;
     private readonly ILogger<AccessPageViewModel> _logger;
     private string _userName = string.Empty;
     private string _password = string.Empty;
@@ -24,6 +26,8 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     private string _newPassword = string.Empty;
     private string _newPasswordConfirmation = string.Empty;
     private bool _isSetupMode;
+    private bool _requiresCoordinatorLink;
+    private bool _useLocalSetup;
     private bool _isInitialRecoveryCodeStage;
     private bool _isRecoveryMode;
     private bool _isRecoveryCodeResultStage;
@@ -33,11 +37,13 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
         IAuthenticationService authenticationService,
         ICoordinatedSignInService coordinatedSignInService,
         IRecoveryCodeGenerator recoveryCodeGenerator,
+        ICoordinatorLinkStorage coordinatorLinkStorage,
         ILogger<AccessPageViewModel> logger)
     {
         _authenticationService = authenticationService;
         _coordinatedSignInService = coordinatedSignInService;
         _recoveryCodeGenerator = recoveryCodeGenerator;
+        _coordinatorLinkStorage = coordinatorLinkStorage;
         _logger = logger;
         CreateAdministratorCommand = new Command(PrepareAdministratorCreation, () => !IsBusy);
         ConfirmAdministratorSetupCommand = new Command(async () => await ConfirmAdministratorCreationAsync(), () => !IsBusy);
@@ -122,7 +128,42 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsLoginMode => !IsSetupMode;
+    public bool IsLoginMode => !IsSetupMode && !RequiresCoordinatorLink;
+
+    /// <summary>
+    /// Un equipo cliente nuevo (Android) debe vincularse al coordinador antes de
+    /// ofrecer la creación de cuentas locales: esas cuentas no se sincronizan.
+    /// </summary>
+    public bool RequiresCoordinatorLink
+    {
+        get => _requiresCoordinatorLink;
+        private set
+        {
+            if (SetProperty(ref _requiresCoordinatorLink, value))
+            {
+                OnPropertyChanged(nameof(IsLinkFirstForm));
+                OnPropertyChanged(nameof(IsLoginMode));
+                OnPropertyChanged(nameof(IsLoginForm));
+                OnPropertyChanged(nameof(IsCredentialFormVisible));
+                OnPropertyChanged(nameof(IsInitialSetupForm));
+                OnPropertyChanged(nameof(Title));
+            }
+        }
+    }
+
+    public bool IsLinkFirstForm => RequiresCoordinatorLink;
+
+    public string LoginHint => OperatingSystem.IsAndroid()
+        ? "Usa un usuario creado en Windows (Administrador o Cuentas de cajero). Las cuentas creadas solo en este teléfono no se sincronizan."
+        : string.Empty;
+
+    public bool HasLoginHint => !string.IsNullOrWhiteSpace(LoginHint);
+
+    public string LocalSetupExplanation => OperatingSystem.IsAndroid()
+        ? "Crea la cuenta que administrará este equipo sin coordinador. Esta cuenta quedará solo en este teléfono: sus ventas y cambios no se sincronizarán."
+        : "Crea la cuenta que administrará este dispositivo. La configuración se realiza sin conexión.";
+
+    public bool ShowLocalSetupSyncNote => !OperatingSystem.IsAndroid();
 
     public bool IsInitialRecoveryCodeStage
     {
@@ -176,7 +217,9 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
             ? "Guarda tu nuevo código"
             : IsRecoveryMode
                 ? "Recuperar contraseña"
-                : IsSetupMode ? "Configurar cuenta de Administrador" : "Iniciar sesión";
+                : RequiresCoordinatorLink
+                    ? "Vincular este dispositivo"
+                    : IsSetupMode ? "Configurar cuenta de Administrador" : "Iniciar sesión";
 
     public string RecoveryCode
     {
@@ -213,7 +256,21 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     {
         try
         {
-            IsSetupMode = !await _authenticationService.HasAdministratorAsync();
+            var hasAdministrator = await _authenticationService.HasAdministratorAsync();
+            var hasAnyAccount = hasAdministrator || await _authenticationService.HasAnyAccountAsync();
+            var isLinked = false;
+            if (OperatingSystem.IsAndroid())
+            {
+                try { isLinked = (await _coordinatorLinkStorage.ReadAsync())?.IsConfirmed == true; }
+                catch { isLinked = false; }
+            }
+
+            // En Android el primer arranque de un equipo cliente no crea un
+            // Administrador local: primero se vincula y se entra con una cuenta
+            // del coordinador. La creación local queda como opción secundaria
+            // para trabajar sin sincronización.
+            RequiresCoordinatorLink = OperatingSystem.IsAndroid() && !hasAnyAccount && !isLinked && !_useLocalSetup;
+            IsSetupMode = !hasAnyAccount && !RequiresCoordinatorLink;
             ErrorMessage = string.Empty;
             NoticeMessage = string.Empty;
         }
@@ -222,6 +279,19 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
             _logger.LogError(exception, "No se pudo preparar la pantalla de acceso.");
             ErrorMessage = "No fue posible preparar el acceso. Cierra y vuelve a abrir la aplicación.";
         }
+    }
+
+    /// <summary>
+    /// Habilita el alta local de Administrador cuando el usuario eligió
+    /// explícitamente trabajar sin coordinador en un dispositivo Android.
+    /// </summary>
+    public void EnableLocalAdministratorSetup()
+    {
+        _useLocalSetup = true;
+        RequiresCoordinatorLink = false;
+        IsSetupMode = true;
+        ErrorMessage = string.Empty;
+        NoticeMessage = string.Empty;
     }
 
     private void PrepareAdministratorCreation()

@@ -1,4 +1,5 @@
 using MauiApp1.Presentation.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 #if ANDROID
 using Android.Views;
 #endif
@@ -37,6 +38,36 @@ public partial class AccessPage : ContentPage
         PasswordVisibilityButton.ImageSource = PrimaryPasswordEntry.IsPassword
             ? "eye_off.svg"
             : "eye.svg";
+    }
+
+    private async void OnLinkDeviceClicked(object? sender, EventArgs eventArgs)
+    {
+        if (Handler?.MauiContext?.Services.GetRequiredService<DevicePairingPage>() is not { } page)
+        {
+            await DisplayAlertAsync("Vinculación",
+                "No se pudo abrir la pantalla de vinculación. Cierra y vuelve a abrir la aplicación.", "Aceptar");
+            return;
+        }
+
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async void OnRefreshLinkClicked(object? sender, EventArgs eventArgs)
+    {
+        await _viewModel.InitializeAsync();
+        if (!_viewModel.RequiresCoordinatorLink) return;
+        await DisplayAlertAsync("Vinculación pendiente",
+            "Todavía no se detecta un vínculo confirmado con el coordinador. Completa la vinculación desde " +
+            "«Vincular este dispositivo» y vuelve a intentar.", "Aceptar");
+    }
+
+    private async void OnUseWithoutCoordinatorClicked(object? sender, EventArgs eventArgs)
+    {
+        var confirmed = await DisplayAlertAsync("Usar sin coordinador",
+            "Esta cuenta quedará solo en este teléfono y sus ventas no se sincronizarán con el coordinador. " +
+            "Úsala solo si este equipo trabajará de forma independiente. ¿Deseas continuar?",
+            "Sí, continuar", "Cancelar");
+        if (confirmed) _viewModel.EnableLocalAdministratorSetup();
     }
 
     private void ApplyResponsiveCardWidth()

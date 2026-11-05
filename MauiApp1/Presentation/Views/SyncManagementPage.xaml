@@ -46,6 +46,12 @@
                         </Border>
                     </VerticalStackLayout>
                 </Border>
+                <Border x:Name="LocalAccountAlert" IsVisible="False" Padding="16" BackgroundColor="#FEF3F2" Stroke="#F97066" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Esta cuenta no se sincroniza" FontSize="17" FontAttributes="Bold" TextColor="#B42318" />
+                        <Label x:Name="LocalAccountStatusLabel" FontSize="13" TextColor="#B42318" />
+                    </VerticalStackLayout>
+                </Border>
                 <Border x:Name="ShortageAlert" IsVisible="False" Padding="16" BackgroundColor="#FFF6E5" Stroke="#F0B429" StrokeThickness="1" StrokeShape="RoundRectangle 16">
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Faltantes de existencia" FontSize="17" FontAttributes="Bold" TextColor="#8A5A00" />
