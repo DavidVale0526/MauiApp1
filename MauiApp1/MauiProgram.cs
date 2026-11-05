@@ -96,6 +96,7 @@ namespace MauiApp1
             builder.Services.AddTransient<SyncManagementPage>();
             builder.Services.AddTransient<InitialDataImportPage>();
             builder.Services.AddTransient<MauiApp1.Presentation.Views.ConflictReviewPage>();
+            builder.Services.AddTransient<MauiApp1.Presentation.Views.InventoryDiscrepancyPage>();
             builder.Services.AddTransient<AccessPage>();
             builder.Services.AddTransient<AccessPageViewModel>();
             builder.Services.AddTransient<MainPage>();

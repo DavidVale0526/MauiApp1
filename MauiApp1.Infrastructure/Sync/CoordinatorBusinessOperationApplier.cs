@@ -7,6 +7,7 @@ using MauiApp1.Application.Purchases;
 using MauiApp1.Application.Sales;
 using MauiApp1.Application.Sync;
 using MauiApp1.Domain.Inventory;
+using MauiApp1.Domain.Users;
 using MauiApp1.Infrastructure.Persistence;
 using MauiApp1.Infrastructure.Persistence.Entities;
 using Microsoft.Data.Sqlite;
@@ -72,6 +73,9 @@ public sealed class CoordinatorBusinessOperationApplier
                     break;
                 case "Inventory.MixedWasteRecorded":
                     await ApplyMixedWasteAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
+                    break;
+                case "Inventory.ShortageResolved":
+                    await ApplyShortageResolutionAsync(context, operationId, payloadJson, actorUserId, cancellationToken);
                     break;
                 case "Credit.PaymentRecorded":
                     await ApplyPaymentAsync(context, payloadJson, actorUserId, cancellationToken);
@@ -357,7 +361,11 @@ public sealed class CoordinatorBusinessOperationApplier
             var qty = Math.Min(product.StockMilliUnits, line.QuantityMilliUnits);
             product.StockMilliUnits -= qty;
             var shortage = line.QuantityMilliUnits - qty;
-            if (shortage > 0)
+            // Una venta puede contener el mismo producto en más de un renglón. El
+            // faltante se registra una sola vez por venta y producto para que la
+            // resolución del Administrador se pueda sincronizar entre dispositivos.
+            if (shortage > 0 && !await context.InventoryDiscrepancies.AnyAsync(item =>
+                    item.OperationId == operationId && item.ProductId == product.ProductId, ct))
                 context.InventoryDiscrepancies.Add(new InventoryDiscrepancyEntity { DiscrepancyId = Guid.NewGuid(), OperationId = operationId,
                     ProductId = product.ProductId, ActorUserId = actor, ShortageMilliUnits = shortage, CreatedAtUtc = payload.OccurredAtUtc, IsResolved = false });
             context.SaleLines.Add(new SaleLineEntity { OperationId = operationId, LineNumber = line.LineNumber, ProductId = product.ProductId,
@@ -922,6 +930,25 @@ public sealed class CoordinatorBusinessOperationApplier
             ActorUserId = actor, AmountMinorUnits = payload.AmountMinorUnits, OccurredAtUtc = payload.OccurredAtUtc });
     }
 
+    private static async Task ApplyShortageResolutionAsync(LocalDbContext context, Guid operationId, string json, Guid actor, CancellationToken ct)
+    {
+        var payload = Read<InventoryShortageResolvedPayload>(json);
+        if (payload.OperationId != operationId || payload.SaleOperationId == Guid.Empty || payload.ProductId == Guid.Empty)
+            throw new BusinessOperationConflictException("La resolución del faltante contiene datos inválidos.");
+        var administrator = await context.UserAccounts.AsNoTracking()
+            .AnyAsync(user => user.UserId == actor && user.Role == (int)UserRole.Administrator, ct);
+        if (!administrator)
+            throw new BusinessOperationConflictException("Solo un Administrador activo puede marcar un faltante como resuelto.");
+
+        var discrepancies = await context.InventoryDiscrepancies
+            .Where(item => item.OperationId == payload.SaleOperationId && item.ProductId == payload.ProductId && !item.IsResolved)
+            .ToListAsync(ct);
+        // Cada dispositivo calcula sus faltantes con la existencia local que tenía.
+        // Si aquí no existe ese faltante, la decisión no tiene nada que conciliar en
+        // este equipo; se acepta para que el resto de los dispositivos la reciba.
+        foreach (var discrepancy in discrepancies) discrepancy.IsResolved = true;
+    }
+
     private static async Task ApplyImportedDiscrepancyAsync(LocalDbContext context, string json, Guid actor, CancellationToken ct)
     {
         var payload = Read<InitialImportDiscrepancyPayload>(json);
@@ -953,6 +980,7 @@ public sealed class CoordinatorBusinessOperationApplier
 
     private sealed record CustomerCreatedPayload(Guid CustomerId, string Name, string? Phone);
     private sealed record PaymentRecordedPayload(Guid PaymentId, Guid OperationId, Guid ActorUserId, long AmountMinorUnits, DateTime OccurredAtUtc);
+    private sealed record InventoryShortageResolvedPayload(Guid OperationId, Guid SaleOperationId, Guid ProductId);
 }
 
 public sealed class BusinessOperationConflictException(string message) : Exception(message);

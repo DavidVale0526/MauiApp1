@@ -46,6 +46,13 @@
                         </Border>
                     </VerticalStackLayout>
                 </Border>
+                <Border x:Name="ShortageAlert" IsVisible="False" Padding="16" BackgroundColor="#FFF6E5" Stroke="#F0B429" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Faltantes de existencia" FontSize="17" FontAttributes="Bold" TextColor="#8A5A00" />
+                        <Label x:Name="ShortageStatusLabel" FontSize="13" TextColor="#8A5A00" />
+                        <Button x:Name="ReviewShortagesButton" Text="Revisar faltantes" Clicked="OnReviewShortagesClicked" Style="{StaticResource SecondaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Acciones" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />

@@ -1,4 +1,5 @@
 using MauiApp1.Application.Authentication;
+using MauiApp1.Application.Inventory;
 using MauiApp1.Application.Lan;
 using MauiApp1.Application.Sync;
 using MauiApp1.Configuration;
@@ -16,6 +17,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
     private readonly ICoordinatedSignInService _coordinatedSignInService;
     private readonly ICoordinatorRealtimeClient _realtimeClient;
     private readonly DesktopCoordinatorModeOptions _desktopMode;
+    private readonly IInventoryDiscrepancyService _discrepancyService;
     private readonly bool _isAdministrator;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
@@ -26,6 +28,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         ICoordinatedSignInService coordinatedSignInService,
         ICoordinatorRealtimeClient realtimeClient,
         DesktopCoordinatorModeOptions desktopMode,
+        IInventoryDiscrepancyService discrepancyService,
         IAuthenticationService authenticationService,
         ILocalDataChangeNotifier changeNotifier) : base(changeNotifier)
     {
@@ -36,8 +39,10 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         _coordinatedSignInService = coordinatedSignInService;
         _realtimeClient = realtimeClient;
         _desktopMode = desktopMode;
+        _discrepancyService = discrepancyService;
         _isAdministrator = authenticationService.CurrentUser?.Role == UserRole.Administrator;
         ReviewConflictsButton.IsVisible = _isAdministrator;
+        ReviewShortagesButton.IsVisible = _isAdministrator;
 #if WINDOWS
         InitialImportButton.IsVisible = _isAdministrator && !_desktopMode.IsHost;
 #else
@@ -96,6 +101,13 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
         await Navigation.PushModalAsync(new NavigationPage(page));
     }
 
+    private async void OnReviewShortagesClicked(object? sender, EventArgs args)
+    {
+        if (!_isAdministrator) return;
+        if (Handler?.MauiContext?.Services.GetRequiredService<InventoryDiscrepancyPage>() is not { } page) return;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
     private async void OnDevicePairingClicked(object? sender, EventArgs args)
     {
         if (Handler?.MauiContext?.Services.GetRequiredService<DevicePairingPage>() is not { } page) return;
@@ -128,6 +140,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
             RefreshNetworkStatus();
             RealtimeStatusLabel.Text = GetRealtimeStatusMessage(_realtimeClient.State);
             await RefreshSyncStatusAsync(syncError);
+            await RefreshShortageStatusAsync();
         }
         finally
         {
@@ -206,6 +219,37 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
             SyncStatusLabel.Text = syncError is null
                 ? "No se pudo consultar la cola. Los cambios locales se conservan."
                 : $"{syncError}\nNo se pudo consultar el estado de la cola.";
+        }
+    }
+
+    private async Task RefreshShortageStatusAsync()
+    {
+        if (!_isAdministrator)
+        {
+            ShortageAlert.IsVisible = false;
+            return;
+        }
+
+        try
+        {
+            var summary = await _discrepancyService.GetSummaryAsync();
+            if (summary.OpenCount == 0)
+            {
+                ShortageAlert.IsVisible = false;
+                return;
+            }
+
+            var units = (summary.TotalShortageMilliUnits / 1000m)
+                .ToString("0.###", System.Globalization.CultureInfo.CurrentCulture);
+            ShortageStatusLabel.Text = summary.OpenCount == 1
+                ? $"Hay 1 venta con existencia insuficiente ({units} unidades en total). Revísala para conciliar el inventario."
+                : $"Hay {summary.OpenCount} ventas con existencia insuficiente ({units} unidades en total). Revísalas para conciliar el inventario.";
+            ShortageAlert.IsVisible = true;
+        }
+        catch
+        {
+            ShortageStatusLabel.Text = "No se pudieron consultar los faltantes de existencia.";
+            ShortageAlert.IsVisible = true;
         }
     }
 

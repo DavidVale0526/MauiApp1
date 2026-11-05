@@ -64,6 +64,7 @@ public static class LocalPersistenceServiceCollectionExtensions
         services.AddSingleton(provider => new InventoryMovementWriter(
             provider.GetRequiredService<ILocalDeviceIdentity>()));
         services.AddTransient<IPurchaseService, EfPurchaseService>();
+        services.AddTransient<IInventoryDiscrepancyService, EfInventoryDiscrepancyService>();
         services.AddTransient<ISaleService, EfSaleService>();
         services.AddTransient<ICustomerService, EfCustomerService>();
         services.AddTransient<IPaymentService, EfPaymentService>();
