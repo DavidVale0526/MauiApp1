@@ -28,6 +28,16 @@ public interface IAuthenticationService
         string recoveryCode,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Crea una cuenta local con el rol indicado. Solo un Administrador puede hacerlo.
+    /// </summary>
+    Task<AccountProvisioningResult> CreateAccountAsync(
+        string userName,
+        string password,
+        string recoveryCode,
+        UserRole role,
+        CancellationToken cancellationToken = default);
+
     Task<PasswordRecoveryResult> ResetPasswordAsync(
         string userName,
         string recoveryCode,
@@ -38,7 +48,16 @@ public interface IAuthenticationService
         string currentPassword,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(
+    Task<IReadOnlyList<UserAccountSummary>> GetAccountsAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cambia el rol de una cuenta local. No permite degradar al último
+    /// Administrador activo ni cambiar el rol de la propia cuenta.
+    /// </summary>
+    Task<AccountRoleChangeResult> ChangeRoleAsync(
+        Guid userId,
+        UserRole role,
         CancellationToken cancellationToken = default);
 
     Task<AuthenticationResult> SignInAsync(

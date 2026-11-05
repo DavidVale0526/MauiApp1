@@ -756,42 +756,12 @@ internal static class Program
                 : Results.Conflict(new ApiMessageResponse(result.ErrorMessage ?? "No se pudo confirmar la importación."));
         });
 
-        app.MapPost("/api/users/cashiers", async (
-            CreateCashierRequest request,
-            HttpContext httpContext,
-            IDbContextFactory<LocalDbContext> contextFactory,
-            MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher passwordHasher,
-            CancellationToken cancellationToken) =>
-        {
-            if (!httpContext.Request.IsHttps) return Results.Problem("La creación de cuentas requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
-            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
-            if (deviceId is null) return Results.Unauthorized();
-            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
-            if (userId is null) return Results.Unauthorized();
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var admin = await context.UserAccounts.SingleOrDefaultAsync(item => item.UserId == userId.Value && item.IsEnabled, cancellationToken);
-            if (admin?.Role != (int)UserRole.Administrator) return Results.Json(new ApiMessageResponse("Solo el Administrador puede crear cuentas de Cajero."), statusCode: StatusCodes.Status403Forbidden);
-            var userName = request.UserName?.Trim();
-            if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 || string.IsNullOrEmpty(request.Password) || request.Password.Length is < 5 or > 1024 ||
-                !MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(request.RecoveryCode, out var normalizedRecoveryCode))
-                return Results.BadRequest(new ApiMessageResponse("El usuario, contraseña o código de recuperación no son válidos."));
-            var normalized = userName.ToUpperInvariant();
-            if (await context.UserAccounts.AnyAsync(item => item.NormalizedUserName == normalized, cancellationToken))
-                return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado."));
-            var (salt, hash) = await Task.Run(() => passwordHasher.Hash(request.Password), cancellationToken);
-            var (recoverySalt, recoveryHash) = await Task.Run(() => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
-            context.UserAccounts.Add(new MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity
-            {
-                UserId = Guid.NewGuid(), UserName = userName, NormalizedUserName = normalized, PasswordSalt = salt,
-                PasswordHash = hash, PasswordIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
-                RecoveryCodeSalt = recoverySalt, RecoveryCodeHash = recoveryHash,
-                RecoveryCodeIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
-                Role = (int)UserRole.Cashier, IsEnabled = true, CreatedAtUtc = DateTime.UtcNow
-            });
-            try { await context.SaveChangesAsync(cancellationToken); }
-            catch (DbUpdateException) { return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado.")); }
-            return Results.Ok(new ApiMessageResponse("Cuenta de Cajero creada en el coordinador."));
-        });
+        // Creación de cuentas con rol. La ruta antigua se conserva para los
+        // dispositivos que todavía no se han actualizado; sin rol, crea Cajero.
+        app.MapPost("/api/users", CreateUserAccountAsync);
+        app.MapPost("/api/users/cashiers", CreateUserAccountAsync);
+        app.MapGet("/api/users", GetUserAccountsAsync);
+        app.MapPost("/api/users/role", ChangeUserRoleAsync);
 
         app.MapGet("/api/users/cashiers", async (
             HttpContext httpContext,
@@ -816,12 +786,14 @@ internal static class Program
                 .AsNoTracking()
                 .Where(account => account.Role == (int)UserRole.Cashier)
                 .OrderBy(account => account.NormalizedUserName)
-                .Select(account => new CashierAccountSummary(
-                    account.UserName,
-                    account.IsEnabled,
-                    account.CreatedAtUtc))
                 .ToListAsync(cancellationToken);
-            return Results.Ok(accounts);
+            // Ruta antigua: mantiene la forma que esperan las versiones previas.
+            return Results.Ok(accounts.Select(account => new UserAccountResponse(
+                account.UserId,
+                account.UserName,
+                ((UserRole)account.Role).ToString(),
+                account.IsEnabled,
+                account.CreatedAtUtc)).ToArray());
         });
 
         app.MapGet("/api/sync/changes", async (
@@ -911,6 +883,184 @@ internal static class Program
         return IsValidDiscoveredDeviceToken(token) ? token : null;
     }
 
+    private static async Task<IResult> CreateUserAccountAsync(
+        CreateUserRequest request,
+        HttpContext httpContext,
+        CoordinatorPairingStore pairingStore,
+        IDbContextFactory<LocalDbContext> contextFactory,
+        MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher passwordHasher,
+        CancellationToken cancellationToken)
+    {
+        if (!httpContext.Request.IsHttps)
+            return Results.Problem("La creación de cuentas requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+        var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+        if (deviceId is null) return Results.Unauthorized();
+        var actorId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+        if (actorId is null) return Results.Unauthorized();
+
+        // Sin rol explícito se conserva el comportamiento anterior (Cajero).
+        var role = UserRole.Cashier;
+        if (!string.IsNullOrWhiteSpace(request.Role) &&
+            (!Enum.TryParse<UserRole>(request.Role, true, out role) ||
+             role is not (UserRole.Administrator or UserRole.Cashier)))
+        {
+            return Results.BadRequest(new ApiMessageResponse("El rol solicitado no es válido."));
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var actor = await context.UserAccounts.SingleOrDefaultAsync(
+            item => item.UserId == actorId.Value && item.IsEnabled, cancellationToken);
+        if (actor?.Role != (int)UserRole.Administrator)
+            return Results.Json(new ApiMessageResponse("Solo el Administrador puede crear cuentas."),
+                statusCode: StatusCodes.Status403Forbidden);
+
+        var userName = request.UserName?.Trim();
+        if (string.IsNullOrWhiteSpace(userName) || userName.Length > 80 ||
+            string.IsNullOrEmpty(request.Password) || request.Password.Length is < 5 or > 1024 ||
+            !MauiApp1.Infrastructure.Authentication.RecoveryCodeGenerator.TryNormalize(
+                request.RecoveryCode, out var normalizedRecoveryCode))
+            return Results.BadRequest(new ApiMessageResponse("El usuario, contraseña o código de recuperación no son válidos."));
+
+        var normalized = userName.ToUpperInvariant();
+        if (await context.UserAccounts.AnyAsync(item => item.NormalizedUserName == normalized, cancellationToken))
+            return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado."));
+
+        var (salt, hash) = await Task.Run(() => passwordHasher.Hash(request.Password), cancellationToken);
+        var (recoverySalt, recoveryHash) = await Task.Run(
+            () => passwordHasher.Hash(normalizedRecoveryCode), cancellationToken);
+        context.UserAccounts.Add(new MauiApp1.Infrastructure.Persistence.Entities.UserAccountEntity
+        {
+            UserId = Guid.NewGuid(),
+            UserName = userName,
+            NormalizedUserName = normalized,
+            PasswordSalt = salt,
+            PasswordHash = hash,
+            PasswordIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
+            RecoveryCodeSalt = recoverySalt,
+            RecoveryCodeHash = recoveryHash,
+            RecoveryCodeIterations = MauiApp1.Infrastructure.Authentication.Pbkdf2PasswordHasher.Iterations,
+            Role = (int)role,
+            IsEnabled = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException) { return Results.Conflict(new ApiMessageResponse("Ese nombre de usuario ya está registrado.")); }
+
+        return Results.Ok(new ApiMessageResponse(role == UserRole.Administrator
+            ? "Cuenta de Administrador creada en el coordinador."
+            : "Cuenta de Cajero creada en el coordinador."));
+    }
+
+    private static async Task<IResult> GetUserAccountsAsync(
+        HttpContext httpContext,
+        CoordinatorPairingStore pairingStore,
+        IDbContextFactory<LocalDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!httpContext.Request.IsHttps)
+            return Results.Problem("La consulta de cuentas requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+        var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+        if (deviceId is null) return Results.Unauthorized();
+        var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+        if (userId is null) return Results.Unauthorized();
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var isAdministrator = await context.UserAccounts.AnyAsync(
+            account => account.UserId == userId.Value && account.IsEnabled &&
+                       account.Role == (int)UserRole.Administrator,
+            cancellationToken);
+        if (!isAdministrator) return Results.Forbid();
+
+        var accounts = await context.UserAccounts
+            .AsNoTracking()
+            .OrderByDescending(account => account.Role)
+            .ThenBy(account => account.NormalizedUserName)
+            .ToListAsync(cancellationToken);
+        return Results.Ok(accounts.Select(account => new UserAccountResponse(
+            account.UserId,
+            account.UserName,
+            ((UserRole)account.Role).ToString(),
+            account.IsEnabled,
+            account.CreatedAtUtc)).ToArray());
+    }
+
+    private static async Task<IResult> ChangeUserRoleAsync(
+        ChangeUserRoleRequest request,
+        HttpContext httpContext,
+        CoordinatorPairingStore pairingStore,
+        IDbContextFactory<LocalDbContext> contextFactory,
+        IHubContext<CoordinatorChangesHub> changesHub,
+        CoordinatorConnectionRegistry connectionRegistry,
+        CancellationToken cancellationToken)
+    {
+        if (!httpContext.Request.IsHttps)
+            return Results.Problem("El cambio de rol requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+        var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+        if (deviceId is null) return Results.Unauthorized();
+        var actorId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+        if (actorId is null) return Results.Unauthorized();
+
+        if (request.UserId == Guid.Empty ||
+            !Enum.TryParse<UserRole>(request.Role, true, out var role) ||
+            role is not (UserRole.Administrator or UserRole.Cashier))
+            return Results.BadRequest(new ApiMessageResponse("El rol solicitado no es válido."));
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var actor = await context.UserAccounts.SingleOrDefaultAsync(
+            item => item.UserId == actorId.Value && item.IsEnabled, cancellationToken);
+        if (actor?.Role != (int)UserRole.Administrator)
+            return Results.Json(new ApiMessageResponse("Solo el Administrador puede cambiar roles."),
+                statusCode: StatusCodes.Status403Forbidden);
+
+        var account = await context.UserAccounts.SingleOrDefaultAsync(
+            item => item.UserId == request.UserId, cancellationToken);
+        if (account is null)
+            return Results.NotFound(new ApiMessageResponse("La cuenta ya no existe. Actualiza la lista."));
+        if (account.UserId == actorId.Value)
+            return Results.Conflict(new ApiMessageResponse(
+                "No puedes cambiar tu propio rol. Pídelo a otro Administrador."));
+        if (account.Role == (int)role)
+            return Results.Ok(new ApiMessageResponse("La cuenta ya tenía ese rol."));
+
+        if (account.IsEnabled && account.Role == (int)UserRole.Administrator && role == UserRole.Cashier)
+        {
+            var otherActiveAdministrators = await context.UserAccounts.AnyAsync(
+                item => item.UserId != account.UserId &&
+                        item.IsEnabled &&
+                        item.Role == (int)UserRole.Administrator,
+                cancellationToken);
+            if (!otherActiveAdministrators)
+                return Results.Conflict(new ApiMessageResponse(
+                    "No puedes quitar el rol al último Administrador activo del sistema."));
+        }
+
+        account.Role = (int)role;
+        await context.SaveChangesAsync(cancellationToken);
+
+        // El rol se resuelve al iniciar sesión y en cada operación central.
+        // Se cierran las sesiones de la cuenta para que el cambio se aplique
+        // de inmediato y no quede un panel con privilegios antiguos.
+        await pairingStore.RevokeUserSessionsAsync(account.UserId, cancellationToken);
+        foreach (var connection in connectionRegistry.Snapshot()
+                     .Where(item => item.UserId == account.UserId))
+        {
+            try
+            {
+                await changesHub.Clients.Client(connection.ConnectionId)
+                    .SendAsync("AuthorizationRevoked", cancellationToken: cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // La sesión ya quedó revocada en la base; la notificación es solo un aviso.
+            }
+            finally { connectionRegistry.Remove(connection.ConnectionId); }
+        }
+
+        return Results.Ok(new ApiMessageResponse(role == UserRole.Administrator
+            ? "La cuenta ahora es Administrador. Vuelve a iniciar sesión en sus dispositivos."
+            : "La cuenta ahora es Cajero. Vuelve a iniciar sesión en sus dispositivos."));
+    }
+
     private static async Task<Guid?> GetAuthorizedDeviceIdAsync(
         HttpContext context, CoordinatorPairingStore pairingStore, CancellationToken cancellationToken)
     {
@@ -977,7 +1127,9 @@ internal sealed record UnlinkDeviceRequest(Guid DeviceId);
 internal sealed record PairDeviceResponse(bool Success, string Message);
 internal sealed record SyncOperationResponse(bool Accepted, bool AlreadyAccepted, long? Sequence, string Message);
 internal sealed record SyncChangesResponse(IReadOnlyList<ConfirmedOperation> Changes, long NextSequence);
-internal sealed record CreateCashierRequest(string? UserName, string? Password, string? RecoveryCode);
+internal sealed record CreateUserRequest(string? UserName, string? Password, string? RecoveryCode, string? Role);
+internal sealed record ChangeUserRoleRequest(Guid UserId, string? Role);
+internal sealed record UserAccountResponse(Guid UserId, string UserName, string Role, bool IsEnabled, DateTime CreatedAtUtc);
 internal sealed record PasswordRecoveryRequest(string? UserName, string? RecoveryCode, string? NewPassword);
 internal sealed record ConfigureRecoveryCodeRequest(string? CurrentPassword);
 internal sealed record RecoveryCodeResponse(string RecoveryCode);

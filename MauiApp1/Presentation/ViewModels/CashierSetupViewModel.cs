@@ -13,28 +13,32 @@ namespace MauiApp1.Presentation.ViewModels;
 public sealed class CashierSetupViewModel : INotifyPropertyChanged
 {
     private readonly IAuthenticationService _authenticationService;
-    private readonly ICoordinatorCashierAccountClient _coordinatorCashierClient;
+    private readonly ICoordinatorUserAccountClient _coordinatorUserClient;
     private readonly ICoordinatorUserSessionStorage _coordinatorSessionStorage;
     private readonly DesktopCoordinatorModeOptions _desktopMode;
     private readonly IRecoveryCodeGenerator _recoveryCodeGenerator;
     private string _userName = string.Empty;
     private string _password = string.Empty;
     private string _passwordConfirmation = string.Empty;
+    private string _selectedRole = CashierRoleLabel;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
     private string _recoveryCode = string.Empty;
     private string _listErrorMessage = string.Empty;
     private bool _isBusy;
 
+    private const string CashierRoleLabel = "Cajero";
+    private const string AdministratorRoleLabel = "Administrador";
+
     public CashierSetupViewModel(
         IAuthenticationService authenticationService,
-        ICoordinatorCashierAccountClient coordinatorCashierClient,
+        ICoordinatorUserAccountClient coordinatorUserClient,
         ICoordinatorUserSessionStorage coordinatorSessionStorage,
         DesktopCoordinatorModeOptions desktopMode,
         IRecoveryCodeGenerator recoveryCodeGenerator)
     {
         _authenticationService = authenticationService;
-        _coordinatorCashierClient = coordinatorCashierClient;
+        _coordinatorUserClient = coordinatorUserClient;
         _coordinatorSessionStorage = coordinatorSessionStorage;
         _desktopMode = desktopMode;
         _recoveryCodeGenerator = recoveryCodeGenerator;
@@ -51,6 +55,14 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
     public ICommand CopyRecoveryCodeCommand { get; }
     public ICommand DismissRecoveryCodeCommand { get; }
     public ObservableCollection<CashierAccountRow> Cashiers { get; } = new();
+
+    public IReadOnlyList<string> RoleOptions { get; } = [CashierRoleLabel, AdministratorRoleLabel];
+
+    public string SelectedRole
+    {
+        get => _selectedRole;
+        set => SetProperty(ref _selectedRole, value);
+    }
 
     public string UserName
     {
@@ -123,7 +135,7 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
     public bool HasCashiers => Cashiers.Count > 0;
     public bool HasListError => !string.IsNullOrWhiteSpace(ListErrorMessage);
     public bool ShowEmptyMessage => !IsBusy && !HasCashiers && string.IsNullOrWhiteSpace(ListErrorMessage);
-    public string CashierCountText => Cashiers.Count == 1 ? "1 cajero registrado" : $"{Cashiers.Count} cajeros registrados";
+    public string CashierCountText => Cashiers.Count == 1 ? "1 cuenta registrada" : $"{Cashiers.Count} cuentas registradas";
 
     public async Task LoadCashiersAsync()
     {
@@ -133,15 +145,63 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         IsBusy = true;
         try
         {
-            await RefreshCashiersCoreAsync();
+            await RefreshAccountsCoreAsync();
         }
         catch (UnauthorizedAccessException)
         {
-            ListErrorMessage = "Solo el Administrador puede consultar las cuentas de cajero.";
+            ListErrorMessage = "Solo el Administrador puede consultar las cuentas.";
         }
         catch
         {
-            ListErrorMessage = "No se pudo cargar la lista de cajeros. Inténtalo de nuevo.";
+            ListErrorMessage = "No se pudo cargar la lista de cuentas. Inténtalo de nuevo.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Cambia el rol de una cuenta existente. La decisión se guarda en el
+    /// coordinador (o en la base activa si este equipo es el host).
+    /// </summary>
+    public async Task<(bool Succeeded, string Message)> ChangeRoleAsync(CashierAccountRow row)
+    {
+        if (IsBusy)
+            return (false, "Espera a que termine la operación actual.");
+
+        var newRole = row.Role == UserRole.Administrator ? UserRole.Cashier : UserRole.Administrator;
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+        try
+        {
+            var useCoordinator = await ShouldUseCoordinatorAccountStoreAsync();
+            var result = useCoordinator
+                ? await _coordinatorUserClient.ChangeRoleAsync(row.UserId, newRole)
+                : await _authenticationService.ChangeRoleAsync(row.UserId, newRole);
+
+            if (!result.Succeeded)
+            {
+                var error = result.ErrorMessage ?? "No se pudo cambiar el rol.";
+                ErrorMessage = error;
+                return (false, error);
+            }
+
+            var message = newRole == UserRole.Administrator
+                ? $"La cuenta «{row.UserName}» ahora es Administrador."
+                : $"La cuenta «{row.UserName}» ahora es Cajero.";
+            if (result.SessionRevoked)
+                message += " Se cerraron sus sesiones; deberá volver a iniciar sesión.";
+            SuccessMessage = message;
+            await RefreshAccountsCoreAsync();
+            return (true, message);
+        }
+        catch
+        {
+            const string error = "No se pudo cambiar el rol. Comprueba la conexión e inténtalo de nuevo.";
+            ErrorMessage = error;
+            return (false, error);
         }
         finally
         {
@@ -166,11 +226,12 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         IsBusy = true;
         try
         {
+            var role = SelectedRole == AdministratorRoleLabel ? UserRole.Administrator : UserRole.Cashier;
             var useCoordinator = await ShouldUseCoordinatorAccountStoreAsync();
             var recoveryCode = _recoveryCodeGenerator.Generate();
             var result = useCoordinator
-                ? await _coordinatorCashierClient.CreateCashierAsync(UserName, Password, recoveryCode)
-                : await _authenticationService.CreateCashierAccountAsync(UserName, Password, recoveryCode);
+                ? await _coordinatorUserClient.CreateAccountAsync(UserName, Password, recoveryCode, role)
+                : await _authenticationService.CreateAccountAsync(UserName, Password, recoveryCode, role);
 
             if (!result.Succeeded)
             {
@@ -181,7 +242,7 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
                     SuccessMessage = "No se recibió confirmación. Conserva el código y verifica si la cuenta aparece en la lista.";
                     Password = string.Empty;
                     PasswordConfirmation = string.Empty;
-                    await RefreshCashiersCoreAsync();
+                    await RefreshAccountsCoreAsync();
                 }
                 return;
             }
@@ -189,9 +250,12 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
             UserName = string.Empty;
             Password = string.Empty;
             PasswordConfirmation = string.Empty;
+            SelectedRole = CashierRoleLabel;
             RecoveryCode = result.RecoveryCode ?? recoveryCode;
-            SuccessMessage = "Cuenta creada. Entrega este código al cajero y guárdalo en un lugar seguro.";
-            await RefreshCashiersCoreAsync();
+            SuccessMessage = role == UserRole.Administrator
+                ? "Cuenta de Administrador creada. Entrega este código y guárdalo en un lugar seguro."
+                : "Cuenta creada. Entrega este código a la persona que usará la cuenta y guárdalo en un lugar seguro.";
+            await RefreshAccountsCoreAsync();
         }
         catch
         {
@@ -203,19 +267,19 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task RefreshCashiersCoreAsync()
+    private async Task RefreshAccountsCoreAsync()
     {
         ListErrorMessage = string.Empty;
-        IReadOnlyList<CashierAccountSummary> accounts;
+        IReadOnlyList<UserAccountSummary> accounts;
         try
         {
             var useCoordinator = await ShouldUseCoordinatorAccountStoreAsync();
             if (useCoordinator)
             {
-                var result = await _coordinatorCashierClient.GetCashiersAsync();
+                var result = await _coordinatorUserClient.GetAccountsAsync();
                 if (!result.Succeeded)
                 {
-                    ListErrorMessage = result.ErrorMessage ?? "No se pudo consultar la lista central de cajeros.";
+                    ListErrorMessage = result.ErrorMessage ?? "No se pudo consultar la lista central de cuentas.";
                     return;
                 }
 
@@ -223,29 +287,34 @@ public sealed class CashierSetupViewModel : INotifyPropertyChanged
             }
             else
             {
-                accounts = await _authenticationService.GetCashierAccountsAsync();
+                accounts = await _authenticationService.GetAccountsAsync();
             }
         }
         catch (UnauthorizedAccessException)
         {
-            ListErrorMessage = "Solo el Administrador puede consultar las cuentas de cajero.";
+            ListErrorMessage = "Solo el Administrador puede consultar las cuentas.";
             return;
         }
         catch
         {
-            ListErrorMessage = "No se pudo cargar la lista de cajeros. Inténtalo de nuevo.";
+            ListErrorMessage = "No se pudo cargar la lista de cuentas. Inténtalo de nuevo.";
             return;
         }
 
+        var currentUserId = _authenticationService.CurrentUser?.Id.Value;
         Cashiers.Clear();
         foreach (var account in accounts
                      .Where(account => !string.IsNullOrWhiteSpace(account.UserName) && account.UserName.Length <= 80)
-                     .OrderBy(account => account.UserName, StringComparer.CurrentCultureIgnoreCase))
+                     .OrderByDescending(account => account.Role)
+                     .ThenBy(account => account.UserName, StringComparer.CurrentCultureIgnoreCase))
         {
             Cashiers.Add(new CashierAccountRow(
+                account.UserId,
                 account.UserName,
+                account.Role,
                 account.IsEnabled,
-                account.CreatedAtUtc));
+                account.CreatedAtUtc,
+                isCurrentUser: account.UserId == currentUserId));
         }
 
         OnPropertyChanged(nameof(HasCashiers));
@@ -290,19 +359,38 @@ public sealed class CashierAccountRow
 {
     private static readonly CultureInfo SpanishCulture = CultureInfo.GetCultureInfo("es-MX");
 
-    public CashierAccountRow(string userName, bool isEnabled, DateTime createdAtUtc)
+    public CashierAccountRow(
+        Guid userId,
+        string userName,
+        UserRole role,
+        bool isEnabled,
+        DateTime createdAtUtc,
+        bool isCurrentUser)
     {
+        UserId = userId;
         UserName = userName;
+        Role = role;
         IsEnabled = isEnabled;
+        IsCurrentUser = isCurrentUser;
         CreatedAtText = createdAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", SpanishCulture);
     }
 
+    public Guid UserId { get; }
     public string UserName { get; }
+    public UserRole Role { get; }
     public bool IsEnabled { get; }
+    public bool IsCurrentUser { get; }
+    public bool IsAdministrator => Role == UserRole.Administrator;
+    public string RoleText => IsAdministrator ? "Administrador" : "Cajero";
+    public Microsoft.Maui.Graphics.Color RoleColor => IsAdministrator
+        ? Microsoft.Maui.Graphics.Color.FromArgb("#0D5C4A")
+        : Microsoft.Maui.Graphics.Color.FromArgb("#52657D");
     public string StatusText => IsEnabled ? "Activo" : "Deshabilitado";
     public Microsoft.Maui.Graphics.Color StatusTextColor => IsEnabled
         ? Microsoft.Maui.Graphics.Color.FromArgb("#008060")
         : Microsoft.Maui.Graphics.Color.FromArgb("#B42318");
     public string CreatedAtText { get; }
-    public string CreatedAtDescription => $"Agregado el {CreatedAtText}";
+    public string DetailsText => $"{StatusText} · Agregado el {CreatedAtText}";
+    public bool CanChangeRole => !IsCurrentUser;
+    public string ToggleRoleText => IsAdministrator ? "Hacer cajero" : "Hacer administrador";
 }

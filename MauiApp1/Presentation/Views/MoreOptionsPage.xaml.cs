@@ -60,7 +60,7 @@ public partial class MoreOptionsPage : CoordinatorRefreshPage
         };
         if (_authenticationService.CurrentUser?.Role == UserRole.Administrator)
         {
-            administration.Add(new("♙", "Cuentas de cajero", "Administrar cuentas de cajero", typeof(CashierSetupPage)));
+            administration.Add(new("♙", "Cuentas y roles", "Crear cuentas y cambiar roles", typeof(CashierSetupPage)));
 #if WINDOWS
             if (_desktopMode.IsHost)
                 administration.Add(new("▤", "Respaldos", "Guardar y consultar copias en una memoria USB", typeof(BackupManagementPage)));

@@ -154,7 +154,7 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
     public bool IsLinkFirstForm => RequiresCoordinatorLink;
 
     public string LoginHint => OperatingSystem.IsAndroid()
-        ? "Usa un usuario creado en Windows (Administrador o Cuentas de cajero). Las cuentas creadas solo en este teléfono no se sincronizan."
+        ? "Usa un usuario creado en Windows (Administrador o Cajero desde Cuentas y roles). Las cuentas creadas solo en este teléfono no se sincronizan."
         : string.Empty;
 
     public bool HasLoginHint => !string.IsNullOrWhiteSpace(LoginHint);
@@ -267,10 +267,12 @@ public sealed class AccessPageViewModel : INotifyPropertyChanged
 
             // En Android el primer arranque de un equipo cliente no crea un
             // Administrador local: primero se vincula y se entra con una cuenta
-            // del coordinador. La creación local queda como opción secundaria
-            // para trabajar sin sincronización.
-            RequiresCoordinatorLink = OperatingSystem.IsAndroid() && !hasAnyAccount && !isLinked && !_useLocalSetup;
-            IsSetupMode = !hasAnyAccount && !RequiresCoordinatorLink;
+            // del coordinador. La creación local solo aparece si el usuario
+            // eligió explícitamente trabajar sin coordinador.
+            RequiresCoordinatorLink = OperatingSystem.IsAndroid() && !_useLocalSetup && !hasAnyAccount && !isLinked;
+            IsSetupMode = OperatingSystem.IsAndroid()
+                ? _useLocalSetup && !hasAnyAccount
+                : !hasAnyAccount;
             ErrorMessage = string.Empty;
             NoticeMessage = string.Empty;
         }

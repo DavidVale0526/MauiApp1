@@ -106,15 +106,27 @@ internal sealed class LocalAuthenticationService(
         return AccountProvisioningResult.Success(recoveryCode);
     }
 
-    public async Task<AccountProvisioningResult> CreateCashierAccountAsync(
+    public Task<AccountProvisioningResult> CreateCashierAccountAsync(
         string userName,
         string password,
         string recoveryCode,
+        CancellationToken cancellationToken = default) =>
+        CreateAccountAsync(userName, password, recoveryCode, UserRole.Cashier, cancellationToken);
+
+    public async Task<AccountProvisioningResult> CreateAccountAsync(
+        string userName,
+        string password,
+        string recoveryCode,
+        UserRole role,
         CancellationToken cancellationToken = default)
     {
         if (_currentUser?.Role != UserRole.Administrator)
         {
             return AccountProvisioningResult.Failure("Solo una sesión de Administrador puede crear cuentas.");
+        }
+        if (role is not (UserRole.Administrator or UserRole.Cashier))
+        {
+            return AccountProvisioningResult.Failure("El rol seleccionado no es válido.");
         }
 
         var validationError = ValidateCredentials(userName, password);
@@ -154,7 +166,7 @@ internal sealed class LocalAuthenticationService(
             RecoveryCodeSalt = recoverySalt,
             RecoveryCodeHash = recoveryHash,
             RecoveryCodeIterations = Pbkdf2PasswordHasher.Iterations,
-            Role = (int)UserRole.Cashier,
+            Role = (int)role,
             IsEnabled = true,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -240,24 +252,78 @@ internal sealed class LocalAuthenticationService(
         return PasswordRecoveryResult.Success(recoveryCode);
     }
 
-    public async Task<IReadOnlyList<CashierAccountSummary>> GetCashierAccountsAsync(
+    public async Task<IReadOnlyList<UserAccountSummary>> GetAccountsAsync(
         CancellationToken cancellationToken = default)
     {
         if (_currentUser?.Role != UserRole.Administrator)
         {
-            throw new UnauthorizedAccessException("Solo una sesión de Administrador puede consultar las cuentas de cajero.");
+            throw new UnauthorizedAccessException("Solo una sesión de Administrador puede consultar las cuentas.");
         }
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        return await context.UserAccounts
+        var accounts = await context.UserAccounts
             .AsNoTracking()
-            .Where(account => account.Role == (int)UserRole.Cashier)
-            .OrderBy(account => account.NormalizedUserName)
-            .Select(account => new CashierAccountSummary(
+            .OrderByDescending(account => account.Role)
+            .ThenBy(account => account.NormalizedUserName)
+            .ToListAsync(cancellationToken);
+
+        return accounts
+            .Select(account => new UserAccountSummary(
+                account.UserId,
                 account.UserName,
+                (UserRole)account.Role,
                 account.IsEnabled,
                 account.CreatedAtUtc))
-            .ToListAsync(cancellationToken);
+            .ToArray();
+    }
+
+    public async Task<AccountRoleChangeResult> ChangeRoleAsync(
+        Guid userId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser?.Role != UserRole.Administrator)
+        {
+            return AccountRoleChangeResult.Failure("Solo una sesión de Administrador puede cambiar roles.");
+        }
+        if (role is not (UserRole.Administrator or UserRole.Cashier))
+        {
+            return AccountRoleChangeResult.Failure("El rol seleccionado no es válido.");
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var account = await context.UserAccounts
+            .SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+        if (account is null)
+        {
+            return AccountRoleChangeResult.Failure("La cuenta ya no existe. Actualiza la lista.");
+        }
+        if (account.UserId == _currentUser.Id.Value)
+        {
+            return AccountRoleChangeResult.Failure(
+                "No puedes cambiar tu propio rol. Pídelo a otro Administrador.");
+        }
+        if (account.Role == (int)role)
+        {
+            return AccountRoleChangeResult.Success();
+        }
+        if (account.IsEnabled && account.Role == (int)UserRole.Administrator && role == UserRole.Cashier)
+        {
+            var otherActiveAdministrators = await context.UserAccounts.AnyAsync(
+                item => item.UserId != account.UserId &&
+                        item.IsEnabled &&
+                        item.Role == (int)UserRole.Administrator,
+                cancellationToken);
+            if (!otherActiveAdministrators)
+            {
+                return AccountRoleChangeResult.Failure(
+                    "No puedes quitar el rol al último Administrador activo del sistema.");
+            }
+        }
+
+        account.Role = (int)role;
+        await context.SaveChangesAsync(cancellationToken);
+        return AccountRoleChangeResult.Success();
     }
 
     public async Task<AuthenticationResult> SignInAsync(

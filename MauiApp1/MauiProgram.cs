@@ -79,7 +79,7 @@ namespace MauiApp1
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorAuthenticationClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
-            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorCashierAccountClient>(services =>
+            builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserAccountClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorPasswordRecoveryClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());

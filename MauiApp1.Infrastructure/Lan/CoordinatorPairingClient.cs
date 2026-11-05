@@ -18,7 +18,7 @@ public sealed class CoordinatorPairingClient(
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,
     ILogger<CoordinatorPairingClient>? logger = null,
-    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorCashierAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
+    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorUserAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public string? LastChangeError { get; private set; }
@@ -199,9 +199,11 @@ public sealed class CoordinatorPairingClient(
         return client;
     }
 
-    public async Task<AccountProvisioningResult> CreateCashierAsync(
-        string userName, string password, string recoveryCode, CancellationToken cancellationToken = default)
+    public async Task<AccountProvisioningResult> CreateAccountAsync(
+        string userName, string password, string recoveryCode, UserRole role, CancellationToken cancellationToken = default)
     {
+        if (role is not (UserRole.Administrator or UserRole.Cashier))
+            return AccountProvisioningResult.Failure("El rol seleccionado no es válido.");
         var link = await ReadLinkAsync();
         var session = await sessionStorage.ReadAsync();
         if (link is null || !link.IsConfirmed || session is null || session.ExpiresAtUtc <= DateTime.UtcNow ||
@@ -218,14 +220,14 @@ public sealed class CoordinatorPairingClient(
             client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
             client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
             using var response = await client.PostAsJsonAsync(
-                "api/users/cashiers", new { userName, password, recoveryCode }, cancellationToken);
+                "api/users", new { userName, password, recoveryCode, role = role.ToString() }, cancellationToken);
             if (response.IsSuccessStatusCode) return AccountProvisioningResult.Success(recoveryCode);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
                 return AccountProvisioningResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
             var errorResult = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
             return AccountProvisioningResult.Failure(errorResult?.Message ?? "El coordinador no pudo crear la cuenta.");
         }
-        catch (HttpRequestException) { return AccountProvisioningResult.Unknown(recoveryCode, "No se recibió confirmación del coordinador. Conserva el código y actualiza la lista de cajeros antes de volver a crear la cuenta."); }
+        catch (HttpRequestException) { return AccountProvisioningResult.Unknown(recoveryCode, "No se recibió confirmación del coordinador. Conserva el código y actualiza la lista de cuentas antes de volver a crear la cuenta."); }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         { return AccountProvisioningResult.Unknown(recoveryCode, "El coordinador no confirmó el resultado. Conserva el código y actualiza la lista antes de volver a crear la cuenta."); }
         catch (System.Text.Json.JsonException) { return AccountProvisioningResult.Unknown(recoveryCode, "La respuesta del coordinador no es válida. Conserva el código y actualiza la lista antes de volver a crear la cuenta."); }
@@ -327,47 +329,92 @@ public sealed class CoordinatorPairingClient(
         catch (System.Text.Json.JsonException) { return null; }
     }
 
-    public async Task<CashierAccountListResult> GetCashiersAsync(CancellationToken cancellationToken = default)
+    public async Task<UserAccountListResult> GetAccountsAsync(CancellationToken cancellationToken = default)
     {
         var client = await CreateSessionClientAsync();
         if (client is null)
-            return CashierAccountListResult.Failure(
-                "Vincula este dispositivo e inicia sesión central como Administrador para consultar los cajeros.");
+            return UserAccountListResult.Failure(
+                "Vincula este dispositivo e inicia sesión central como Administrador para consultar las cuentas.");
 
         using (client)
         {
             try
             {
-                using var response = await client.GetAsync("api/users/cashiers", cancellationToken);
+                using var response = await client.GetAsync("api/users", cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
-                    var accounts = await response.Content.ReadFromJsonAsync<IReadOnlyList<CashierAccountSummary>>(cancellationToken);
+                    var accounts = await response.Content.ReadFromJsonAsync<IReadOnlyList<UserAccountSummary>>(cancellationToken);
                     return accounts is null
-                        ? CashierAccountListResult.Failure("El coordinador devolvió una lista vacía no válida.")
-                        : CashierAccountListResult.Success(accounts);
+                        ? UserAccountListResult.Failure("El coordinador devolvió una lista vacía no válida.")
+                        : UserAccountListResult.Success(accounts);
                 }
 
                 if (response.StatusCode == HttpStatusCode.Unauthorized)
-                    return CashierAccountListResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
+                    return UserAccountListResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
                 if (response.StatusCode == HttpStatusCode.Forbidden)
-                    return CashierAccountListResult.Failure("Solo el Administrador puede consultar las cuentas de cajero.");
+                    return UserAccountListResult.Failure("Solo el Administrador puede consultar las cuentas.");
 
                 var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
-                return CashierAccountListResult.Failure(
-                    error?.Message ?? "El coordinador no pudo consultar las cuentas de cajero.");
+                return UserAccountListResult.Failure(
+                    error?.Message ?? "El coordinador no pudo consultar las cuentas.");
             }
             catch (HttpRequestException)
             {
-                return CashierAccountListResult.Failure(
+                return UserAccountListResult.Failure(
                     "No se pudo contactar al coordinador por la red local. Comprueba la conexión e inténtalo de nuevo.");
             }
             catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                return CashierAccountListResult.Failure("El coordinador no respondió a tiempo. Inténtalo de nuevo.");
+                return UserAccountListResult.Failure("El coordinador no respondió a tiempo. Inténtalo de nuevo.");
             }
             catch (System.Text.Json.JsonException)
             {
-                return CashierAccountListResult.Failure("La respuesta del coordinador no tiene un formato válido.");
+                return UserAccountListResult.Failure("La respuesta del coordinador no tiene un formato válido.");
+            }
+        }
+    }
+
+    public async Task<AccountRoleChangeResult> ChangeRoleAsync(
+        Guid userId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        if (role is not (UserRole.Administrator or UserRole.Cashier))
+            return AccountRoleChangeResult.Failure("El rol seleccionado no es válido.");
+
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return AccountRoleChangeResult.Failure(
+                "Vincula este dispositivo e inicia sesión central como Administrador para cambiar roles.");
+
+        using (client)
+        {
+            try
+            {
+                using var response = await client.PostAsJsonAsync(
+                    "api/users/role", new { userId, role = role.ToString() }, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                    return AccountRoleChangeResult.Success(sessionRevoked: true);
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                    return AccountRoleChangeResult.Failure("La sesión del Administrador venció. Inicia sesión de nuevo.");
+                if (response.StatusCode == HttpStatusCode.Forbidden)
+                    return AccountRoleChangeResult.Failure("Solo el Administrador puede cambiar roles.");
+
+                var error = await response.Content.ReadFromJsonAsync<ApiMessageResponse>(cancellationToken);
+                return AccountRoleChangeResult.Failure(
+                    error?.Message ?? "El coordinador no pudo cambiar el rol.");
+            }
+            catch (HttpRequestException)
+            {
+                return AccountRoleChangeResult.Failure(
+                    "No se pudo contactar al coordinador por la red local. Comprueba la conexión e inténtalo de nuevo.");
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return AccountRoleChangeResult.Failure("El coordinador no respondió a tiempo. Inténtalo de nuevo.");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return AccountRoleChangeResult.Failure("La respuesta del coordinador no tiene un formato válido.");
             }
         }
     }

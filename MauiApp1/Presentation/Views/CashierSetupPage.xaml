@@ -4,7 +4,7 @@
              xmlns:viewModels="clr-namespace:MauiApp1.Presentation.ViewModels"
              x:Class="MauiApp1.Presentation.Views.CashierSetupPage"
              x:DataType="viewModels:CashierSetupViewModel"
-             Title="Cajeros" BackgroundColor="#F7F9FB">
+             Title="Cuentas y roles" BackgroundColor="#F7F9FB">
     <ContentPage.Resources>
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="BackgroundColor" Value="#0D1B2A" />
@@ -31,8 +31,8 @@
             <VerticalStackLayout Spacing="18" MaximumWidthRequest="680" HorizontalOptions="Center">
                 <Button Text="← Volver" Clicked="OnBackClicked" HorizontalOptions="Start" Style="{StaticResource BackButton}" />
                 <VerticalStackLayout Spacing="4">
-                    <Label Text="Cuentas de cajero" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
-                    <Label Text="Crea accesos y consulta quiénes pueden operar el punto de venta." FontSize="14" TextColor="#61738A" />
+                    <Label Text="Cuentas y roles" FontSize="28" FontAttributes="Bold" TextColor="#111D31" />
+                    <Label Text="Crea accesos, asigna roles y consulta quién puede operar el sistema." FontSize="14" TextColor="#61738A" />
                 </VerticalStackLayout>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
                     <VerticalStackLayout Spacing="16">
@@ -52,15 +52,28 @@
                             <Label Text="Confirmar contraseña" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
                             <Entry Placeholder="Repite la contraseña" Text="{Binding PasswordConfirmation}" IsPassword="True" ReturnType="Go" Style="{StaticResource Input}" />
                         </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="7">
+                            <Label Text="Rol de la cuenta" FontSize="13" FontAttributes="Bold" TextColor="#52657D" />
+                            <Border BackgroundColor="White" Stroke="#DCE5EF" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12,0" HeightRequest="52">
+                                <Picker ItemsSource="{Binding RoleOptions}"
+                                        SelectedItem="{Binding SelectedRole}"
+                                        Title="Selecciona el rol"
+                                        TextColor="#111D31"
+                                        TitleColor="#8291A5"
+                                        FontSize="14" />
+                            </Border>
+                            <Label Text="El Administrador puede gestionar cuentas, reportes y configuración. El Cajero solo opera el punto de venta."
+                                   FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
                         <Label Text="{Binding ErrorMessage}" TextColor="#B42318" FontSize="14" />
                         <Label Text="{Binding SuccessMessage}" TextColor="#008060" FontSize="14" FontAttributes="Bold" />
                         <Border IsVisible="{Binding HasRecoveryCode}" Padding="14" BackgroundColor="#E8FBF2"
                                 Stroke="#A7EACD" StrokeThickness="1" StrokeShape="RoundRectangle 12">
                             <VerticalStackLayout Spacing="10">
-                                <Label Text="Código de recuperación del cajero" FontSize="15" FontAttributes="Bold" TextColor="#006B50" />
+                                <Label Text="Código de recuperación de la cuenta" FontSize="15" FontAttributes="Bold" TextColor="#006B50" />
                                 <Label Text="{Binding RecoveryCode}" FontSize="20" FontAttributes="Bold" TextColor="#111D31"
                                        FontFamily="monospace" CharacterSpacing="1" />
-                                <Label Text="Se muestra una sola vez. Entrégaselo al cajero; podrá usarlo si olvida su contraseña."
+                                <Label Text="Se muestra una sola vez. Entrégalo a la persona que usará la cuenta; podrá usarlo si olvida su contraseña."
                                        FontSize="13" TextColor="#52657D" />
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                                     <Button Text="Copiar código" Command="{Binding CopyRecoveryCodeCommand}"
@@ -77,27 +90,42 @@
                     <VerticalStackLayout Spacing="14">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="3">
-                                <Label Text="Cajeros registrados" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="Cuentas registradas" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
                                 <Label Text="{Binding CashierCountText}" FontSize="13" TextColor="#61738A" />
                             </VerticalStackLayout>
                             <Button Grid.Column="1" Text="Actualizar" Command="{Binding RefreshCashiersCommand}"
                                     Style="{StaticResource BackButton}" Padding="12,9" />
                         </Grid>
+                        <Label Text="El rol se guarda donde viven las cuentas: en este equipo si es el host, o en el coordinador si está vinculado. El cambio se aplica de inmediato y, si la cuenta está abierta en otro equipo, deberá iniciar sesión de nuevo."
+                               FontSize="12" TextColor="#718198" LineBreakMode="WordWrap" />
                         <Label Text="{Binding ListErrorMessage}" IsVisible="{Binding HasListError}"
                                TextColor="#B42318" FontSize="14" />
-                        <Label Text="Todavía no hay cuentas de cajero registradas." IsVisible="{Binding ShowEmptyMessage}"
+                        <Label Text="Todavía no hay cuentas registradas." IsVisible="{Binding ShowEmptyMessage}"
                                TextColor="#61738A" FontSize="14" Padding="4,8" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding Cashiers}" Spacing="8">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:CashierAccountRow">
                                     <Border Padding="14" BackgroundColor="#F7F9FB" Stroke="#E3EAF2" StrokeThickness="1"
                                             StrokeShape="RoundRectangle 12">
-                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="5">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
                                             <Label Text="{Binding UserName}" FontSize="16" FontAttributes="Bold" TextColor="#111D31"
                                                    LineBreakMode="TailTruncation" />
-                                            <Label Grid.Column="1" Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}"
+                                            <Label Grid.Column="1" Text="{Binding RoleText}" TextColor="{Binding RoleColor}"
                                                    FontSize="13" FontAttributes="Bold" VerticalOptions="Center" />
-                                            <Label Grid.Row="1" Text="{Binding CreatedAtDescription}" FontSize="13" TextColor="#61738A" />
+                                            <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding DetailsText}"
+                                                   FontSize="13" TextColor="#61738A" />
+                                            <Button Grid.Row="2" Grid.ColumnSpan="2"
+                                                    Text="{Binding ToggleRoleText}"
+                                                    IsVisible="{Binding CanChangeRole}"
+                                                    Clicked="OnChangeRoleClicked"
+                                                    CommandParameter="{Binding .}"
+                                                    BackgroundColor="#E8EEF5"
+                                                    TextColor="#0D1B2A"
+                                                    FontSize="13"
+                                                    CornerRadius="8"
+                                                    HeightRequest="38"
+                                                    HorizontalOptions="Start"
+                                                    Padding="14,0" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

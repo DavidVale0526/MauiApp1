@@ -243,7 +243,7 @@ public partial class SyncManagementPage : CoordinatorRefreshPage
             LocalAccountStatusLabel.Text =
                 $"La cuenta «{user.UserName}» solo existe en este dispositivo y no está registrada en el coordinador. " +
                 "Los cambios que haga esta cuenta no se envían ni se reciben. " +
-                "Cierra sesión y entra con un usuario creado en Windows (Sincronización → Cuentas de cajero).";
+                "Cierra sesión y entra con un usuario creado en Windows (Sincronización → Cuentas y roles).";
             LocalAccountAlert.IsVisible = true;
         }
         catch
