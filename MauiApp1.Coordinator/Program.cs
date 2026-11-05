@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using MauiApp1.Application.Backups;
 using MauiApp1.Application.Authentication;
+using MauiApp1.Application.Lan;
 using MauiApp1.Application.Storage;
 using MauiApp1.Application.Sync;
 using MauiApp1.Coordinator.Persistence;
@@ -196,6 +197,7 @@ internal static class Program
         builder.Services.AddSingleton<CoordinatorConnectionRegistry>();
         builder.Services.AddSingleton(_ => new CoordinatorPairingStore(centralDatabasePath));
         builder.Services.AddSingleton(_ => new CoordinatorOperationStore(centralDatabasePath));
+        builder.Services.AddSingleton(_ => new MauiApp1.Infrastructure.Lan.CoordinatorDevicePresenceStore(centralDatabasePath));
         builder.Services.AddSingleton(serviceProvider => new CoordinatorInitialDataImportService(
             centralDatabasePath,
             serviceProvider.GetRequiredService<IDbContextFactory<LocalDbContext>>(),
@@ -238,8 +240,10 @@ internal static class Program
         var pairingStore = app.Services.GetRequiredService<CoordinatorPairingStore>();
         await pairingStore.InitializeAsync();
         var operationStore = app.Services.GetRequiredService<CoordinatorOperationStore>();
+        var presenceStore = app.Services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorDevicePresenceStore>();
         var businessOperationApplier = app.Services.GetRequiredService<CoordinatorBusinessOperationApplier>();
         await operationStore.InitializeAsync();
+        await presenceStore.InitializeAsync();
         var initialDataImportService = app.Services.GetRequiredService<CoordinatorInitialDataImportService>();
         await initialDataImportService.InitializeAsync();
 
@@ -816,6 +820,49 @@ internal static class Program
                 ? changes[^1].Sequence : cursor));
         });
 
+        app.MapPost("/api/sync/progress", async (
+            SyncProgressRequest request,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("El registro del avance requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+            if (request.ProcessedSequence < 0) return Results.BadRequest();
+
+            var latestSequence = await operationStore.GetLatestSequenceAsync(cancellationToken);
+            if (request.ProcessedSequence > latestSequence)
+                return Results.BadRequest(new { message = "El avance informado supera los cambios disponibles." });
+
+            await presenceStore.RecordSyncProgressAsync(deviceId.Value, userId.Value,
+                httpContext.Request.Headers["X-Device-Name"].FirstOrDefault(), request.ProcessedSequence, cancellationToken);
+            return Results.Ok();
+        });
+
+        app.MapGet("/api/devices/summary", async (
+            HttpContext httpContext,
+            IDbContextFactory<LocalDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!httpContext.Request.IsHttps)
+                return Results.Problem("La consulta de dispositivos requiere HTTPS.", statusCode: StatusCodes.Status400BadRequest);
+            var deviceId = await GetAuthorizedDeviceIdAsync(httpContext, pairingStore, cancellationToken);
+            if (deviceId is null) return Results.Unauthorized();
+            var userId = await GetAuthenticatedUserIdAsync(httpContext, pairingStore, deviceId.Value, cancellationToken);
+            if (userId is null) return Results.Unauthorized();
+
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var isAdministrator = await context.UserAccounts.AnyAsync(item => item.UserId == userId.Value &&
+                item.IsEnabled && item.Role == (int)UserRole.Administrator, cancellationToken);
+            if (!isAdministrator) return Results.Forbid();
+
+            var devices = await presenceStore.GetDevicesAsync(cancellationToken);
+            return Results.Ok(CoordinatorDeviceListResult.Success(devices));
+        });
+
         app.MapGet("/api/sync/conflicts", async (
             HttpContext httpContext,
             IDbContextFactory<LocalDbContext> contextFactory,
@@ -1118,6 +1165,7 @@ internal static class Program
 }
 
 internal sealed record HealthResponse(string Status);
+internal sealed record SyncProgressRequest(long ProcessedSequence);
 internal sealed record CreatePairingCodeRequest(string UserName, string Password);
 internal sealed record CreatePairingCodeResponse(string Code, DateTime ExpiresAtUtc);
 internal sealed record CreateUserSessionRequest(string UserName, string Password);

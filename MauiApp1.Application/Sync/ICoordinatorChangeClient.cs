@@ -13,6 +13,7 @@ public interface ICoordinatorChangeClient
 {
     string? LastChangeError => null;
     Task<CoordinatorChangesPage?> GetChangesAsync(long afterSequence, int limit = 100, CancellationToken cancellationToken = default);
+    Task AcknowledgeChangesAsync(long processedSequence, CancellationToken cancellationToken = default) => Task.CompletedTask;
     Task<IReadOnlyList<CoordinatorConflictItem>?> GetConflictsAsync(CancellationToken cancellationToken = default);
     Task<string?> ResolveConflictAsync(Guid operationId, bool applyIncoming, CancellationToken cancellationToken = default);
 }

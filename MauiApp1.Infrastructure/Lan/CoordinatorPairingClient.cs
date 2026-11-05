@@ -18,7 +18,7 @@ public sealed class CoordinatorPairingClient(
     ICoordinatorUserSessionStorage sessionStorage,
     ILocalDeviceIdentity deviceIdentity,
     ILogger<CoordinatorPairingClient>? logger = null,
-    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorUserAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient
+    CoordinatorAddressResolver? addressResolver = null) : ICoordinatorPairingClient, ICoordinatorAuthenticationClient, ICoordinatorUserAccountClient, ICoordinatorPasswordRecoveryClient, ICoordinatorChangeClient, IInitialDataImportClient, ICoordinatorDeviceClient
 {
     private readonly SemaphoreSlim _pairingLock = new(1, 1);
     public string? LastChangeError { get; private set; }
@@ -44,6 +44,7 @@ public sealed class CoordinatorPairingClient(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
             client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
             client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
+            client.DefaultRequestHeaders.Add("X-Device-Name", GetDeviceName());
             using var response = await client.GetAsync($"api/sync/changes?afterSequence={afterSequence}&limit={Math.Clamp(limit, 1, 500)}", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
@@ -72,6 +73,28 @@ public sealed class CoordinatorPairingClient(
         }
     }
 
+    public async Task AcknowledgeChangesAsync(long processedSequence, CancellationToken cancellationToken = default)
+    {
+        if (processedSequence < 0) return;
+        var client = await CreateSessionClientAsync();
+        if (client is null) return;
+        using (client)
+        {
+            try
+            {
+                using var response = await client.PostAsJsonAsync("api/sync/progress",
+                    new { processedSequence }, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                    logger?.LogDebug("El coordinador no aceptó el avance de sincronización ({StatusCode}).", response.StatusCode);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                logger?.LogDebug(exception, "No se pudo informar al coordinador del avance aplicado.");
+            }
+        }
+    }
+
     public async Task<IReadOnlyList<CoordinatorConflictItem>?> GetConflictsAsync(CancellationToken cancellationToken = default)
     {
         var auth = await CreateSessionClientAsync();
@@ -81,6 +104,41 @@ public sealed class CoordinatorPairingClient(
         {
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadFromJsonAsync<IReadOnlyList<CoordinatorConflictItem>>(cancellationToken);
+        }
+    }
+
+    public async Task<CoordinatorDeviceListResult> GetDevicesAsync(CancellationToken cancellationToken = default)
+    {
+        var client = await CreateSessionClientAsync();
+        if (client is null)
+            return CoordinatorDeviceListResult.Failure("Vincula este dispositivo e inicia sesión central como Administrador para consultar los dispositivos.");
+
+        using (client)
+        {
+            try
+            {
+                using var response = await client.GetAsync("api/devices/summary", cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<CoordinatorDeviceListResult>(cancellationToken);
+                    return result ?? CoordinatorDeviceListResult.Failure("El coordinador devolvió una lista vacía.");
+                }
+
+                var message = response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized => "La sesión central venció. Inicia sesión de nuevo.",
+                    HttpStatusCode.Forbidden => "Solo el Administrador puede consultar los dispositivos vinculados.",
+                    HttpStatusCode.NotFound => "El coordinador aún no incluye el resumen de dispositivos. Actualiza el servicio de Windows.",
+                    _ => $"No se pudo consultar los dispositivos (respuesta {(int)response.StatusCode})."
+                };
+                return CoordinatorDeviceListResult.Failure(message);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+            {
+                logger?.LogWarning(exception, "No se pudo consultar la lista de dispositivos vinculados.");
+                return CoordinatorDeviceListResult.Failure("No se pudo contactar al coordinador para consultar los dispositivos.");
+            }
         }
     }
 
@@ -196,8 +254,11 @@ public sealed class CoordinatorPairingClient(
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", link.DeviceToken);
         client.DefaultRequestHeaders.Add("X-Device-Id", link.DeviceId.ToString("D"));
         client.DefaultRequestHeaders.Add("X-User-Session", session.SessionToken);
+        client.DefaultRequestHeaders.Add("X-Device-Name", GetDeviceName());
         return client;
     }
+
+    private static string GetDeviceName() => OperatingSystem.IsAndroid() ? "Android" : Environment.MachineName;
 
     public async Task<AccountProvisioningResult> CreateAccountAsync(
         string userName, string password, string recoveryCode, UserRole role, CancellationToken cancellationToken = default)

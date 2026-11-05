@@ -29,10 +29,6 @@ public sealed class CoordinatorRealtimeClient(
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
-#if WINDOWS
-        SetState(CoordinatorRealtimeState.NotConfigured);
-        return Task.CompletedTask;
-#else
         if (authenticationService.CurrentUser is null)
         {
             SetState(CoordinatorRealtimeState.NotConfigured);
@@ -46,7 +42,6 @@ public sealed class CoordinatorRealtimeClient(
             _connectionLoop = ConnectUntilConnectedAsync(_connectionLoopCancellation.Token);
         }
         return Task.CompletedTask;
-#endif
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
@@ -179,6 +174,7 @@ public sealed class CoordinatorRealtimeClient(
                 options.Headers.Add("Authorization", $"Bearer {link.DeviceToken}");
                 options.Headers.Add("X-Device-Id", link.DeviceId.ToString("D"));
                 options.Headers.Add("X-User-Session", session.SessionToken);
+                options.Headers.Add("X-Device-Name", OperatingSystem.IsAndroid() ? "Android" : Environment.MachineName);
                 options.HttpMessageHandlerFactory = _ => CoordinatorPairingClient.CreatePinnedHandler(fingerprint);
             })
             .WithAutomaticReconnect(new ExponentialReconnectPolicy())

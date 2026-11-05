@@ -59,6 +59,19 @@
                         <Button x:Name="ReviewShortagesButton" Text="Revisar faltantes" Clicked="OnReviewShortagesClicked" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
+                <Border x:Name="DevicesCard" IsVisible="False" Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="Dispositivos vinculados" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />
+                                <Label Text="Consulta quién está conectado y si ya recibió los cambios confirmados." FontSize="13" TextColor="#61738A" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Actualizar" Clicked="OnRefreshClicked" Style="{StaticResource SecondaryButton}" Padding="12,8" />
+                        </Grid>
+                        <Label x:Name="DeviceListStatusLabel" FontSize="13" TextColor="#61738A" />
+                        <VerticalStackLayout x:Name="DeviceRows" Spacing="8" />
+                    </VerticalStackLayout>
+                </Border>
                 <Border Padding="20" BackgroundColor="White" Stroke="#E3EAF2" StrokeThickness="1" StrokeShape="RoundRectangle 16">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Acciones" FontSize="19" FontAttributes="Bold" TextColor="#111D31" />

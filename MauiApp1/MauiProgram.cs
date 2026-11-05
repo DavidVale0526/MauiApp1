@@ -75,6 +75,9 @@ namespace MauiApp1
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorAddressResolver>();
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorUserSessionStorage, MauiApp1.Services.SecureCoordinatorUserSessionStorage>();
             builder.Services.AddSingleton<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>();
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDeviceClient>(services =>
+                services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
+            builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorDeviceDirectory, MauiApp1.Services.CoordinatorDeviceDirectory>();
             builder.Services.AddSingleton<MauiApp1.Application.Lan.ICoordinatorPairingClient>(services =>
                 services.GetRequiredService<MauiApp1.Infrastructure.Lan.CoordinatorPairingClient>());
             builder.Services.AddSingleton<MauiApp1.Application.Authentication.ICoordinatorAuthenticationClient>(services =>

@@ -13,13 +13,17 @@ internal sealed class CoordinatorConnectionRegistry
     private readonly ConcurrentDictionary<string, CoordinatorAuthorizedConnection> _connections = new();
 
     public void Add(CoordinatorAuthorizedConnection connection) => _connections[connection.ConnectionId] = connection;
-    public void Remove(string connectionId) => _connections.TryRemove(connectionId, out _);
+    public CoordinatorAuthorizedConnection? Remove(string connectionId) =>
+        _connections.TryRemove(connectionId, out var connection) ? connection : null;
+    public bool HasDevice(Guid deviceId) => _connections.Values.Any(item => item.DeviceId == deviceId);
     public IReadOnlyList<CoordinatorAuthorizedConnection> Snapshot() => _connections.Values.ToArray();
 }
 
 internal sealed class CoordinatorChangesHub(
     CoordinatorPairingStore pairingStore,
-    CoordinatorConnectionRegistry connections) : Hub
+    CoordinatorConnectionRegistry connections,
+    MauiApp1.Infrastructure.Lan.CoordinatorDevicePresenceStore presenceStore,
+    ILogger<CoordinatorChangesHub> logger) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -51,12 +55,29 @@ internal sealed class CoordinatorChangesHub(
 
         connections.Add(new CoordinatorAuthorizedConnection(
             Context.ConnectionId, deviceId, userId.Value, deviceToken, sessionToken));
+        try
+        {
+            var deviceName = request.Headers["X-Device-Name"].FirstOrDefault();
+            await presenceStore.MarkConnectedAsync(deviceId, userId.Value, deviceName, Context.ConnectionAborted);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "No se pudo actualizar la presencia del dispositivo {DeviceId}.", deviceId);
+        }
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        connections.Remove(Context.ConnectionId);
+        var removed = connections.Remove(Context.ConnectionId);
+        if (removed is not null && !connections.HasDevice(removed.DeviceId))
+        {
+            try { await presenceStore.MarkDisconnectedAsync(removed.DeviceId, CancellationToken.None); }
+            catch (Exception storeException)
+            {
+                logger.LogWarning(storeException, "No se pudo registrar la desconexión del dispositivo {DeviceId}.", removed.DeviceId);
+            }
+        }
         await base.OnDisconnectedAsync(exception);
     }
 }

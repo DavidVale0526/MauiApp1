@@ -170,6 +170,15 @@ internal sealed class CoordinatorOperationStore(string databasePath)
         return operations;
     }
 
+    public async Task<long> GetLatestSequenceAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COALESCE(MAX(Sequence), 0) FROM CoordinatorOperations;";
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
     public async Task<IReadOnlyList<CoordinatorConflictItem>> GetConflictsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqliteConnection(_connectionString);

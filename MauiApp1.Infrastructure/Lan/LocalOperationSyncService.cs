@@ -138,7 +138,12 @@ internal sealed class LocalOperationSyncService(
             _lastDownloadError = page is null
                 ? changeClient.LastChangeError ?? "No se pudieron descargar los cambios del coordinador. Comprueba la sesión central y la conexión LAN."
                 : null;
-            if (page is null || page.Changes.Count == 0) return appliedChanges;
+            if (page is null) return appliedChanges;
+            if (page.Changes.Count == 0)
+            {
+                await changeClient.AcknowledgeChangesAsync(afterSequence, cancellationToken);
+                return appliedChanges;
+            }
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
             if (context.Entry(state).State == EntityState.Detached) context.DeviceSyncStates.Add(state);
             foreach (var change in page.Changes.OrderBy(item => item.Sequence))
@@ -176,6 +181,7 @@ internal sealed class LocalOperationSyncService(
             }
             await transaction.CommitAsync(cancellationToken);
             afterSequence = state.LastSequence;
+            await changeClient.AcknowledgeChangesAsync(afterSequence, cancellationToken);
         }
     }
 
